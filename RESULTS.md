@@ -219,3 +219,14 @@ Analysis of the saved blend run (`blend`), no refits. Box CPU, 16 threads. Findi
 | fresh-octlike-bq: champion + `blank_merchant_qr` vs champion, 9 cells | ffbdfb7 | +0.0000 in every seed on given, cleaned and gen-only; lower bound +0.0000; 0 rows changed; **FAIL** (not positive) | about 10 min |
 | fresh-octlike-bq, first two launches | ffbdfb7 | failed: missing frames in the shared cache, then cells from an older frame build (251,860 vs 252,462 September rows); scored on current-frame champion cells | <2 min |
 | fresh-blend-blankqr (`python -m ringtrace.blend recipes/blend-blankqr.json`), upload candidate | 92735ae | given 0.5130 / 0.5091 / 0.5148 (0.5123); cleaned 0.5647 / 0.5641 / 0.5714 (0.5667); gen-only 0.9022 / 0.9000 / 0.9019 (0.9013); valid; sha256 `e7c594672f0921e6def080f0c06347144cd848282b10c9fe6e384416eed043d0`; against the blend's file: 20 October rows legit -> fraud (13 qr_swap, 7 refund_abuse) | about 5 min |
+
+## Red team: how a file could reach 0.557 public
+
+Analysis of the saved run `fresh-blend-blankqr` (decoded with the fixed point and the anchored
+template rule), no refits. Box CPU, 4 threads. Finding: `docs/findings/red-team.md`.
+
+| run | commit | result | wall |
+|---|---|---|---|
+| redteam-noise (`python analysis/redteam.py noise`) | b2d0684 | September, cleaned labels, 2,000 slices of 78,175 rows. Against context-only (full gap -0.0366): sd of the slice-gap error 0.0042, P(error >= 0.0084) 2.2 %, >= 0.004 16.3 %. Against evidence-nophones / champion-without-phones (identical calls, gap -0.0269): sd 0.0034, P 0.6 % / 11.7 %. Against the champion (gap -0.0002): sd 0.0002. One file's slice sd 0.0094, correlation with ours 0.90-0.93 | about 3 min |
+| redteam-census (`... census`) | b2d0684 | fraud calls per 100k, September out of fold / October: mule 261 / 303, bot 220 / 122, layering 228 / 213, sim 130 / 142, takeover 85 / 88, phishing 186 / 191, qr 200 / 198, refund 119 / 107, cashback 80 / 79, loan 42 / 38, collusion 59 / 32; no class short of the October structured estimate | about 3 min |
+| redteam-cells (`... cells`) | b2d0684 | cells >= 90 % cleaned fraud in train with October legit calls >= 3 above the out-of-fold rate: 0 one-way, 2 two-way, 26 three-way, all variants of two cells. QR + blank check: 20 called legit vs 0.4 expected (the rule already in `blend-blankqr`). COLLECT + just-under amount: 48 vs 36 expected; only 14 of its 216 called-legit train rows are cleaned fraud, so a rule loses: rejected | about 4 min |
