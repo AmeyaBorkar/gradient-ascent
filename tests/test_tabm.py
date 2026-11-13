@@ -116,3 +116,74 @@ def test_fraud_split_keeps_types_and_takes_the_fraud_mass():
     np.testing.assert_allclose(p.sum(1), 1.0)
     np.testing.assert_allclose(p[0, :3], [0.2, 0.6, 0.2])
     np.testing.assert_allclose(p[1, 1:], 0.5 / 11)
+
+
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {"embedding": "ple", "n_bins": 32},
+        {"class_weight_power": 0.5},
+        {"recent_weight": 2.0},
+    ],
+)
+def test_tabm_variants_learn_and_are_deterministic(kw):
+    X, y = _problem(2000, 1)
+    Xh, yh = _problem(500, 2)
+    period = np.where(np.arange(len(y)) < 1000, 7, 8)
+    (p1,) = tabm.fit_predict(X, y, period, [Xh], _spec(**kw), log=lambda *_: None)
+    (p2,) = tabm.fit_predict(X, y, period, [Xh], _spec(**kw), log=lambda *_: None)
+    np.testing.assert_allclose(p1.sum(1), 1.0, atol=1e-5)
+    np.testing.assert_array_equal(p1, p2)
+    assert macro_f1(yh, p1.argmax(1)) > 0.7
+
+
+def test_ple_edges_are_strictly_increasing():
+    Z = np.repeat(np.array([[0.0, 1.0], [1.0, 1.0]], dtype=np.float32), 50, axis=0)
+    e = tabm.ple_edges(Z, 4)
+    assert e.shape == (2, 5) and np.all(np.diff(e, axis=1) > 0)
+
+
+def test_recency_weight_marks_the_latest_month():
+    w = tabm.recency_weight(np.array([7, 8, 8, 7]), 2.0)
+    assert w.tolist() == [1.0, 2.0, 2.0, 1.0]
+    assert tabm.recency_weight(np.array([7, 8]), 1.0) is None
+
+
+def test_two_stage_multiplies_fraud_and_type():
+    pytest.importorskip("xgboost")
+    X, y = _problem(2000, 1)
+    Xh, yh = _problem(500, 2)
+    period = np.where(np.arange(len(y)) < 1000, 7, 8)
+    from ringtrace import cascade
+
+    spec = _spec(two_stage=True)
+    old = cascade.BoosterSpec.device
+    cascade.BoosterSpec.device = "cpu"
+    try:
+        (p,) = tabm.fit_predict(X, y, period, [Xh], spec, log=lambda *_: None)
+    finally:
+        cascade.BoosterSpec.device = old
+    np.testing.assert_allclose(p.sum(1), 1.0, atol=1e-5)
+    assert macro_f1(yh, p.argmax(1)) > 0.6
+
+
+def test_fit_target_modes():
+    from ringtrace import run
+
+    y = np.array([0, 1, 2, 0])
+    fit = np.array([True, True, False, False])
+    assert run.fit_target({}, y, fit) is y
+    cl = np.array([1, 1, 1, 1])
+    assert run.fit_target({"train_on": "cleaned"}, y, fit, cl).tolist() == [1, 1, 2, 0]
+    with pytest.raises(ValueError):
+        run.fit_target({"train_on": "nope"}, y, fit)
+
+
+def test_sweep_configs_build_valid_recipes():
+    from ringtrace import run, tabmsweep
+
+    for name in tabmsweep.CONFIGS:
+        r = tabmsweep.recipe_for(name)
+        spec, _ = run.model(r)
+        assert r["name"] == "tabm2-sw-" + name and spec.epochs > 0
+    assert tabmsweep.recipe_for("l2")["train_on"] == "event_l2"
