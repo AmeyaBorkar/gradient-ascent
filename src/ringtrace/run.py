@@ -20,7 +20,7 @@ import numpy as np
 import polars as pl
 
 from ringtrace import paths, store
-from ringtrace.cascade import BoosterSpec, CascadeSpec, fit_predict
+from ringtrace.cascade import BoosterSpec, CascadeSpec, CatBoostSpec, fit_predict
 from ringtrace.classes import CLASSES
 from ringtrace.decode import decode_by_period
 from ringtrace.scoring import macro_f1, per_class_f1
@@ -38,6 +38,8 @@ def load_recipe(path: str | Path) -> dict:
 def cascade_spec(recipe: dict) -> CascadeSpec:
     c = dict(recipe.get("cascade", {}))
     booster = BoosterSpec(**c.pop("booster", {}))
+    if "catboost" in c:
+        c["catboost"] = CatBoostSpec(**c["catboost"])
     if "seeds" in c:
         c["seeds"] = tuple(c["seeds"])
     return CascadeSpec(booster=booster, **c)
