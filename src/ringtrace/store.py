@@ -29,6 +29,17 @@ FAMILIES = {
 }
 
 _LEDGER: pl.DataFrame | None = None
+_KEY: str | None = None
+_FIXED: dict[str, pl.DataFrame] = {}
+
+
+def use_frame(
+    led: pl.DataFrame | None, key: str | None = None, fixed: dict[str, pl.DataFrame] | None = None
+) -> None:
+    """Serve ``led`` as the ledger, cache its families under ``key`` and return the frames in
+    ``fixed`` as given (one row per ledger row); ``use_frame(None)`` restores the normal ledger."""
+    global _LEDGER, _KEY, _FIXED
+    _LEDGER, _KEY, _FIXED = led, key, dict(fixed or {})
 
 
 def ledger() -> pl.DataFrame:
@@ -47,11 +58,15 @@ def _source_hash(module) -> str:
 
 
 def _ledger_key() -> str:
+    if _KEY is not None:
+        return _KEY
     names = ("train", "test", "accounts", "merchants")
     return "-".join(tables.file_digest(paths.data_dir() / f"{n}.csv", 6) for n in names)
 
 
 def family(name: str, verbose: bool = True) -> pl.DataFrame:
+    if name in _FIXED:
+        return _FIXED[name]
     module = importlib.import_module(FAMILIES[name])
     key = f"{name}-{_ledger_key()}-{_source_hash(module)}"
     target = paths.cache_dir() / "features" / f"{key}.parquet"
