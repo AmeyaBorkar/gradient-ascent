@@ -49,6 +49,27 @@ counter-anchored template rule.
   cut-position prior and per-segment occupancy in `phones.decode_phase`, two gates) is specified
   in the finding and has not been run.
 
+## The counter's segments at October's size (14 Nov)
+- [x] Reproduced the thinned baseline: 0.897 ± 0.028 on unanchored fraud rows, 0.800 in the last
+      four segments.
+- [x] A train-taught prior in `phones.decode_phase`, off by default. It adds a normal prior on each
+      cut's place on the number line and a per-segment geometric gap emission. The `phones_prior`
+      family holds the test split decoded with it, and the `counter` rule can read it (`source`,
+      `unanchored`, `below`). Tests on synthetic data.
+- [x] First gate passes. Spread 0.01 / gap weight 1.0 was chosen on seeds 0-14 by the worse of the
+      plain and the October-shifted simulation. Agreement rises +0.036 (z 3.7) on seeds 15-29 and
+      +0.030 (z 5.1) on all 30. The last four segments gain +0.09 and the full block does not fall.
+- [x] Second gate fails. The counter rule after `anchored_templates` loses in September (-0.00003
+      to -0.00004 given) on every variant that touches train. In train, when the model's fraud type
+      and the segment disagree, the model is right on 17 of 19 rows.
+- [x] Candidates built and rejected: `counter-final*.csv`, `counter-tabmF*.csv`.
+  - October moves are 5 to 10 rows, all velocity_bot -> mule_account, a pattern the model wins 6
+    of 6 times on train.
+  - The prior moves only 4 October segments.
+- **Current best idea:** none from this lever. It is worth about 0 on October, because the model
+  already follows the segment (545 of 564 fraud-block rows) and wins where they disagree. The best
+  file stays `blend-tabmF-bq`.
+
 ## Next steps (under way)
 - [ ] The October-like gate of each member and of the equal five-way blend against the champion
       (cells s13-15 x r0-2).

@@ -675,3 +675,89 @@ phones, 30 seeds, segments refitted without labels.
 October, counted only: 564 fraud-block rows, 213 unanchored, 35 of them with segment confidence
 below 0.9. **Verdict: a measured October-only loss of about 9 rows; the experiment that could
 recover it is specified in the finding and not run.**
+
+## The counter's segments at October's size (14 Nov)
+
+Laptop CPU, 8 threads, `PYTHONPATH=src`. Finding: `docs/findings/counter.md`.
+
+**Reproduction** (`python analysis/farlook.py thin`, 11 s, commit 768dfb3 and again at 67520d9
+with the new decoder switched off): thinned agreement 0.8970 ± 0.0279 on unanchored fraud rows, last
+four segments 0.7999, full block 0.9419. Identical to the earlier run to the last digit. The
+`phones` family rebuilt at the new source hash equals all three earlier cached copies.
+
+**First gate** (`python analysis/counter.py gate`, 35 s, commit 83095c9, rerun at a488ad0 with the
+full block's own confidences in the report and identical numbers):
+
+- Setup: train's fraud phase thinned to 1/6 of its phones, seeds 0-29. The prior of each draw is
+  learned from the phones outside it. The shifted variant moves the prior's cuts by October's
+  offset to train.
+- Grid: 31 settings, spread {none, 0.005, 0.01, 0.015, 0.02, 0.03, 0.05, 0.1} x gap weight {0,
+  0.25, 0.5, 1.0}. The full grid is in the finding.
+- Choice on seeds 0-14. As specified (plain agreement): spread 0.005 / gap 0.5, which gives +0.041
+  plain but only +0.013 under the shift. Adopted (maximin of plain and shifted): **spread 0.01 /
+  gap 1.0**.
+
+| spread 0.01 / gap 1.0 | agreement change | z | last four | rows lost / won a draw |
+|---|---|---|---|---|
+| report half (seeds 15-29) | +0.0360 | 3.7 | +0.100 | |
+| all 30 seeds | +0.0300 | 5.1 | +0.093 | 2.7 / 7.9 |
+| all 30, prior shifted by October's offset | +0.0265 | | +0.080 | |
+| full block taught by itself / by October's fit | +0.0010 / +0.0048 | | | |
+
+**Verdict: passes** (rise ≥ 0.02 and above 2 se on the report half and on all seeds; the last
+four do not fall; the full block does not fall).
+
+**Calibration** (`calib --spread 0.01 --gap-weight 1.0`, 8 s, commit 6cb0aac). Unanchored fraud
+rows that go from plain confidence below 0.9 to taught confidence 0.9 or more: 10.6 a draw. The
+taught segment is right on 0.940 of them (0.930 with the shifted prior), against 0.718 for the
+plain segment.
+
+**October, counted** (`october --spread 0.01 --gap-weight 1.0`, 6 s):
+
+- Train split unchanged.
+- 4 of 564 fraud-block rows change segment, all unanchored.
+- 14 unanchored rows rise to confidence 0.9 or more, and 2 fall.
+- Unanchored rows below 0.9: 35 under the plain fit, 23 under the taught fit.
+
+**Second gate** (`python analysis/counter.py table`, commit 6cb0aac, laptop, 2,000 bootstrap
+draws, October-like n/a because the local cells are incomplete):
+
+- The rule `{"name": "counter", "trusted": 11, "min_conf": 0.9, "unanchored": true}` runs after
+  `anchored_templates`.
+- "below" adds `"below": 0.9`. "plain" reads the plain counter (`source: "ctr"`); the others read
+  the taught one (`source: "cpr"`).
+- The final recipe's `final-tabm` member is read from the local `tabm` run. The two are
+  byte-identical (oof `5bef8fbcac2c...f2ea1`, test `64b2992c8f20...59`, checked on the box).
+
+| base | challenger | given Jul / Aug / Sep [95 %] | cleaned | gen-only | rows train / Oct | wall |
+|---|---|---|---|---|---|---|
+| `final` | taught | -0.00004 / 0 / -0.00003 [-0.00007, +0.00002] | -0.00003 / 0 / -0.00003 | +0.000001 / 0 / -0.00011 | 4 / 10 | 276 s |
+| `final` | taught, below | 0 / 0 / -0.00003 [-0.00003, 0] | 0 / 0 / -0.00003 | 0 / 0 / -0.00008 | 1 / 5 | |
+| `final` | plain | -0.00004 / 0 / -0.00003 | -0.00003 / 0 / -0.00003 | +0.000001 / 0 / -0.00011 | 4 / 5 | |
+| `final-half` | taught | -0.00004 / 0 / -0.00004 [-0.00007, 0] | -0.00003 / 0 / -0.00004 | 0 / 0 / 0 | 2 / 10 | 271 s |
+| `final-half` | taught, below | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 5 | |
+| `final-half` | plain | -0.00004 / 0 / -0.00004 | -0.00003 / 0 / -0.00004 | 0 / 0 / 0 | 2 / 5 | |
+
+**Verdict: fails** (September loses for every variant that changes a train row).
+
+- Each loss is a train row the model had right: two velocity_bot rows on mule-segment phones, and
+  one legit call forced to the wrong fraud type.
+- On train, when the model's fraud type disagrees with the counter's segment (19 unanchored
+  fraud-block rows), the model is right on 17 and the segment on 1. In the mule segment with a
+  velocity_bot call, the model is right on 6 of 6.
+
+**Candidates** (`python analysis/counter.py build`, commit 6cb0aac, all valid against the sample
+submission; `final-half` rebuilds `blend-tabmF-bq.csv` with 0 rows different):
+
+| file | sha256 | vs `blend-tabmF-bq` | stop rule | verdict |
+|---|---|---|---|---|
+| `counter-final.csv` | `1d5d5daecf55cc51b5116e7bef1d30c01a56e63cec6672954ca022bafdf5e099` | 12: bot -> mule 10, phishing -> legit 2 | 5 changed rows were at 0.9 or more | stop |
+| `counter-final-below.csv` | `699272642770097483b12dac2e43fcb3427eee32a4a9118f8c48cea5b4af0f43` | 7: bot -> mule 5, phishing -> legit 2 | none | fails LOMO |
+| `counter-final-plain.csv` | `646f779c9a0f5ae41adfd9b4f21a351a24ef702640950a076f4caff09aa82a78` | 7: bot -> mule 5, phishing -> legit 2 | 5 | control |
+| `counter-tabmF.csv` | `2eaa5e7a6c562f1c2854404685ab99187fbb0b35b96206218c0c2c13fcc7d5f2` | 10: bot -> mule | 5 | stop |
+| `counter-tabmF-below.csv` | `cbd2986eed7e1ea2aab236dea704cf439c5fd721e632e98109e183bddcd9cfe6` | 5: bot -> mule | none | LOMO tie; moves of the kind the model wins on train; not recommended |
+| `counter-tabmF-plain.csv` | `533e5a25144c5247220a5bcea799d4679cfab253a04dabd9d525288610406a76` | 5: bot -> mule | 5 | control |
+
+**Verdict: no candidate.** The taught decoder is better at October's size, but October's calls
+already follow the segment, and the rows a rule would change are ones where the model is right in
+train. Lever 1 is worth about 0 on October.
