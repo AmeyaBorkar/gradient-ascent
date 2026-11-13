@@ -331,7 +331,6 @@ def _cleaned_target(frame: Frame, log) -> tuple[np.ndarray, dict]:
 
 def fit(seeds: list[int], cells: list[tuple[str, list[int]]], recipes_dir: Path, log=print) -> dict:
     from ringtrace import run as runner
-    from ringtrace.cascade import fit_predict
     from ringtrace.scoring import macro_f1
 
     t0 = time.time()
@@ -353,7 +352,7 @@ def fit(seeds: list[int], cells: list[tuple[str, list[int]]], recipes_dir: Path,
                 cleaned, stats = _cleaned_target(frame, log)
                 target[frame.fit] = cleaned[frame.fit]
                 summary[f"{recipe_name}_s{seed}_cleaning"] = stats
-            spec = runner.cascade_spec(recipe)
+            spec, fit_predict = runner.model(recipe)
             for r in sets:
                 name = f"{recipe_name}_s{seed}_r{r}"
                 path = _out_dir() / f"{name}.npz"
