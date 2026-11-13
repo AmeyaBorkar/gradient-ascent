@@ -1,0 +1,47 @@
+{
+  "name": "icl-tabpfn-v2-blend3",
+  "members": [
+    {
+      "name": "champion",
+      "recipe": "recipes/champion.json",
+      "run": "blend-champion-m1",
+      "weight": 0.13333333333333336
+    },
+    {
+      "name": "lgbm",
+      "recipe": "recipes/lgbm.json",
+      "run": "lgbm",
+      "weight": 0.13333333333333336
+    },
+    {
+      "name": "catboost",
+      "recipe": "recipes/catboost.json",
+      "run": "catboost",
+      "weight": 0.13333333333333336
+    },
+    {
+      "name": "clean-event",
+      "recipe": "recipes/clean-event.json",
+      "run": "clean-event",
+      "weight": 0.13333333333333336
+    },
+    {
+      "name": "clean-l2",
+      "recipe": "recipes/clean-l2.json",
+      "run": "clean-l2",
+      "weight": 0.13333333333333336
+    },
+    {
+      "name": "icl-tabpfn-v2",
+      "recipe": "recipes/champion.json",
+      "run": "icl-tabpfn-v2",
+      "weight": 0.3333333333333333
+    }
+  ],
+  "decoder": {
+    "fraud_scale": 0.875
+  },
+  "rules": [
+    "anchored_templates"
+  ]
+}

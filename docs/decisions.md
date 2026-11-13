@@ -104,3 +104,27 @@ Short records of design choices.
     held-out labels into training. The events are the six event-id modules in the teacher's order
     (bursts, drains, flows, requests, merchant, repeats). The `l2` minority flip uses the same
     chosen event (highest fraud share) and needs no fraud-share threshold of its own.
+16. **Pretrained in-context tabular models: licences and availability** (`ringtrace.icl`). Each
+    model is checked before use; none of them may go into a submitted file without the owner's
+    decision.
+    - **TabPFN-3**, Hugging Face `Prior-Labs/tabpfn_3`, commit `24a16a89d245`, licence
+      `tabpfn-3-license-v1.0` (testing, evaluation and internal benchmarking only; no commercial
+      or production use of the model or its outputs). Evaluation only; not for a submitted file
+      without the owner's decision. **Not run: gated.** The `tabpfn` package (10.0.0) refuses to
+      download any v3 checkpoint until a Prior Labs account token has been verified and the
+      licence accepted in a browser. We create no accounts, so the model was skipped.
+    - **LimiX-2**, Hugging Face `stable-ai/LimiX-2`, commit `de07b679e74a`, licence
+      `stableai-limix-non-commercial-license-v1.0` (non-commercial). Evaluation only; not for a
+      submitted file without the owner's decision. **Not run: no installable package.** The
+      weights download freely, but the inference code is published only as a source checkout
+      from a code host; no package index carries it. Outside code is not brought into this
+      project, so the model was skipped.
+    - **TabPFN v2 (substitute)**, Hugging Face `Prior-Labs/TabPFN-v2-clf`, commit
+      `275f19d2add9`, checkpoint `tabpfn-v2-classifier-v2_default.ckpt`, licence
+      `priorlabs-1-1` (Prior Labs License 1.1), through the `tabpfn` package 10.0.0 (PyPI) with
+      torch 2.14.1+cu130 on Python 3.13; the v2 checkpoint needs no account. It keeps the job's
+      question answerable: does an in-context model with a different inductive bias add
+      anything to the trees? Treated as evaluation only as well; not for a submitted file
+      without the owner's decision. Its pretraining limits are 10,000 context rows, 500
+      features and 10 classes, so only the binary variant is run, with
+      `ignore_pretraining_limits` for a larger context.
