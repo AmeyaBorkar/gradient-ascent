@@ -91,3 +91,13 @@ def test_pair_split_endpoints():
     assert r["best_share_a"] == 1.0 and r["best"] >= r["all_b"]
     r = pair_split_best(100, 100, 40, 40, 50, 50, pool=20, q=0.0)
     assert r["best_share_a"] == 0.0
+
+
+def test_decoder_class_mult_matches_the_analysis_decoder():
+    from ringtrace.classes import CLASSES
+
+    p = _proba(seed=4)
+    assert np.array_equal(fixed_point(p, class_mult={}), fixed_point(p))
+    m = np.ones(12)
+    m[CLASSES.index("qr_swap")] = 0.5
+    assert np.array_equal(fixed_point(p, class_mult={"qr_swap": 0.5}), fixed_point_scaled(p, m))

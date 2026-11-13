@@ -26,16 +26,27 @@ def fixed_point(
     max_iter: int = 50,
     damping: float = 0.5,
     hidden_factor: float = 1.0,
+    class_mult: dict | None = None,
 ) -> np.ndarray:
     """``hidden_factor`` multiplies each fraud class's expected true count: the model is trained
     to give the ordinary-looking fraud rows a legit score, yet they still count as fraud in the
-    labels, so the true class sizes are larger than the probabilities say (1.0 = trust them)."""
+    labels, so the true class sizes are larger than the probabilities say (1.0 = trust them).
+
+    ``class_mult`` maps a class name to a multiplier on its admission cut: a row's gain for class
+    k becomes ``(2 p_ik - m_k F_k) / (N_k + P_k)``, so ``m_k < 1`` admits more rows to class k
+    and ``m_k > 1`` fewer. Absent classes keep 1, which is the plain fixed point."""
     p = np.asarray(proba, dtype=np.float64).copy()
     p[:, 1:] /= fraud_scale
     p /= p.sum(axis=1, keepdims=True)
     k = p.shape[1]
     expected = p.sum(axis=0)
     expected[1:] *= hidden_factor
+    mult = np.ones(k)
+    if class_mult:
+        from ringtrace.classes import CLASSES
+
+        for name, v in class_mult.items():
+            mult[CLASSES.index(name)] = float(v)
     pred = p.argmax(axis=1)
     weight_prev = None
     for _ in range(max_iter):
@@ -48,7 +59,7 @@ def fixed_point(
             inv = damping * weight_prev[0] + (1 - damping) * inv
             f1 = damping * weight_prev[1] + (1 - damping) * f1
         weight_prev = (inv, f1)
-        gain = (2 * p - f1[None, :]) * inv[None, :]
+        gain = (2 * p - (mult * f1)[None, :]) * inv[None, :]
         new = gain.argmax(axis=1)
         if np.array_equal(new, pred):
             break
