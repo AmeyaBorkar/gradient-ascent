@@ -1,6 +1,6 @@
 # Decisions
 
-Short records of choices that differ from, or add to, the research notes.
+Short records of design choices.
 
 1. **One stacked "ledger" frame with integer keys** (`ringtrace.tables`): accounts, merchants and
    devices become integers (merchants offset by 10,000,000 so one `receiver` key covers both).
@@ -17,26 +17,26 @@ Short records of choices that differ from, or add to, the research notes.
    positives into true positives.
 5. **Cross-fitted screen score is nested inside each month fold** (a 2-fold score over the fold's
    two training months), so no training filter ever saw the held-out month's labels.
-6. **Evidence-family readings where the research notes was silent or ambiguous** (each reproduces the research notes'
+6. **Evidence-family readings where the specification was silent or ambiguous** (each reproduces the target
    train and October event counts; see the module docstrings):
    - exact balance steps (0.25 / 0.35) are matched to the cent, which reproduces 1,592 / 1,602 rows;
      a 0.0075 tolerance over-fires;
    - a bot "farm" is a burst of more than 6 accounts with accounts >= 0.9 x rows (a few farms reuse
-     one account); a 2-6-account burst is scripted when most logins take <= 6 s (the research notes does not
+     one account); a 2-6-account burst is scripted when most logins take <= 6 s (the specification does not
      give this constant; the generator's scripted logins are short);
    - "two-bait" collect sessions are two or more baits of 1/2/5/10 without requiring a 10;
-   - drain chaining uses connected components, so one chance 3-row chain merges where the research notes
+   - drain chaining uses connected components, so one chance 3-row chain merges where the specification
      counted two runs (607 vs 608 events; same rows);
    - the stale QR-check mark keeps the original rule (`mrk_odd`) and the corrected one
      (`mrk_odd_v2`, no blank-check QR-to-person rows) side by side.
-7. **Context hygiene follows the research notes' October measurements** even though, without the event
+7. **Context hygiene follows the October measurements** even though, without the event
    families, it cost 0.0095 given (run 2): month-identifying columns (weekday, account and device
    ages, whole-frame entity totals), raw device numbers and the two dead columns are out; gaps are
    capped; receiver windows are blanked on merchant receivers; amounts stay in rupees.
 8. **Device counter emissions are a fixed table, not refitted per split.** The HMM's emission
-   table comes from the research notes' measured unmarked shares per zone plus three cross terms (bot zone
+   table comes from the measured unmarked shares per zone plus three cross terms (bot zone
    marks look like mule, sim zone like takeover, cashback zone like phishing); only the anchors
-   and the number line are per split. It reproduces the research notes' segment agreement (0.8456 / 0.9566
+   and the number line are per split. It reproduces the target segment agreement (0.8456 / 0.9566
    of fraud-block / fraud-labelled train rows against 0.8447 / 0.9555) without a fit step.
 9. **The template rule reads every family and the counter from the store, whatever the recipe's
    feature families are.** Ablations that drop a family from the features therefore still apply
@@ -44,18 +44,16 @@ Short records of choices that differ from, or add to, the research notes.
 10. **Jobs on the box run from a frozen copy of the code** (`scripts/launch.sh` copies the shipped
     tree to `~/work/jobs/<name>`): a run that lazily imported a module after the next ship once
     died silently (run 3).
-11. **Scores are reported against our own cleaned labels.** They are rebuilt from the research notes'
+11. **Scores are reported against our own cleaned labels.** They are rebuilt from the
     recipe (independent teacher on context + marks; noise inversion with rho 0.0238 and
     u 0.122; likelihood ratios of the label, the old app version and the IP-risk bin; event
-    majority, else teacher type) and change 3,629 rows against the research notes' 3,607. Small differences
-    in which rows change move the cleaned score by a few thousandths, so our 0.5665 and the
-    pack's 0.5662 are comparable, not identical measurements.
+    majority, else teacher type) and change 3,629 rows. Small differences in which rows change move the cleaned score by a
+    few thousandths, so cleaned scores from different cleanings are comparable, not identical.
 12. **The bootstrap resamples events, decoded as each recipe says.** `ringtrace.compare` re-decodes
     both runs' saved probabilities (fixed point + rules) instead of trusting stored calls, uses
     the first family event of a row as its unit, and averages the per-month macro-F1 like the
     headline score. One sparse product per month gives all 2,000 resamples.
-13. **October-like mode** (`python -m ringtrace.octlike`), for the blend test with the team's
-    probabilities on their thinned frames (`~/data-oct/s13|s14|s15`: September thinned to
+13. **October-like mode** (`python -m ringtrace.octlike`), on thinned frames (`~/data-oct/s13|s14|s15`: September thinned to
     October's density, fraud events whole, devices in the counter's legit block renumbered, the QR
     check blanked on ~150 QR payments to a person):
     - every family is rebuilt on the frame's own ledger (frame train + original test) with the

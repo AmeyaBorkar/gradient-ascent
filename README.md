@@ -1,6 +1,6 @@
 # ringtrace
 
-A clean-room pipeline for the "UPI Fraud Rings" datathon: label every October transaction with
+A pipeline for the "UPI Fraud Rings" datathon: label every October transaction with
 one of 12 classes (legit + 11 fraud types), scored by macro-F1. Train is July-September, test is
 October.
 

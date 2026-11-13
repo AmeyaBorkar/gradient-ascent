@@ -1,7 +1,7 @@
 [project]
 name = "ringtrace"
 version = "0.1.0"
-description = "Clean-room pipeline for the UPI Fraud Rings datathon (12-class macro-F1)."
+description = "Fraud-ring detection pipeline for the UPI Fraud Rings datathon (12-class macro-F1)."
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.0",

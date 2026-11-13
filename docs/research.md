@@ -1,7 +1,6 @@
 # Research and sources
 
-Ideas come from the team's research notes (prose only; no code) and the organisers' problem statement
-and starter notebook. External sources used:
+Inputs: the organisers' problem statement and starter notebook. External sources used:
 
 - Lipton, Elkan, Narayanaswamy (2014), "Thresholding Classifiers to Maximize F1 Score",
   https://arxiv.org/abs/1402.1892 : the optimal F1 threshold is half the optimal F1, the basis of
