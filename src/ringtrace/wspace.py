@@ -372,6 +372,204 @@ def fit_context(name: str, seeds=(0, 1, 2), log=print) -> dict:
 
 
 # ---------------------------------------------------------------------------------------------
+# scoring: every arm in the fraud-only role
+
+from ringtrace import final  # noqa: E402
+
+TREES = (
+    ("champion", "blend-champion-m1", "champion"),
+    ("lgbm", "lgbm", "lgbm"),
+    ("catboost", "catboost", "catboost"),
+    ("clean-event", "clean-event", "clean-event"),
+    ("clean-l2", "clean-l2", "clean-l2"),
+)
+_FOLD_MONTHS = (7, 8, 9)
+_FRAME_SEEDS = (13, 14, 15)
+
+
+def fraud_only(p_legit) -> np.ndarray:
+    """(n, 12): column 0 is the legit probability and the other columns share the rest."""
+    p = np.asarray(p_legit, dtype=np.float64)
+    out = np.empty((len(p), N_CLASSES), dtype=np.float64)
+    out[:, 0] = p
+    out[:, 1:] = (1.0 - p)[:, None] / (N_CLASSES - 1)
+    return out
+
+
+def load_arms(ctx_dir, files=("arms.npz", "rebasin.npz", "head.npz")) -> dict:
+    """Merge the npz files that exist. Keys ending in ``__test`` are October legit probabilities.
+
+    ``rows`` must be identical in every file that carries them, and so must ``test_rows``. A later
+    file overwrites an arm of the same name."""
+    ctx_dir = Path(ctx_dir)
+    rows = None
+    test_rows = None
+    arms: dict[str, np.ndarray] = {}
+    test: dict[str, np.ndarray] = {}
+    for name in files:
+        path = ctx_dir / name
+        if not path.is_file():
+            continue
+        with np.load(path) as blob:
+            if "rows" in blob:
+                got = blob["rows"].copy()
+                if rows is not None and not np.array_equal(rows, got):
+                    raise ValueError(f"{name}: rows do not match an earlier file")
+                rows = got if rows is None else rows
+            if "test_rows" in blob:
+                got = blob["test_rows"].copy()
+                if test_rows is not None and not np.array_equal(test_rows, got):
+                    raise ValueError(f"{name}: test_rows do not match an earlier file")
+                test_rows = got if test_rows is None else test_rows
+            for key in blob.files:
+                if key in ("rows", "test_rows"):
+                    continue
+                vec = blob[key].copy()
+                if key.endswith("__test"):
+                    test[key.removesuffix("__test")] = vec
+                else:
+                    arms[key] = vec
+    return {"rows": rows, "test_rows": test_rows, "arms": arms, "test": test}
+
+
+def arm_matrix(base_full, te, folds, arm) -> np.ndarray:
+    """A copy of the stored member, with this arm written on the held-out rows it covers.
+
+    October is the mean of the three folds' test vectors when every fold has one, and stays as
+    stored otherwise. Each fold's ``test_rows`` must be ``te``."""
+    out = np.array(base_full, dtype=np.float64, copy=True)
+    for loaded in folds.values():
+        if arm in loaded["arms"]:
+            out[np.asarray(loaded["rows"])] = fraud_only(loaded["arms"][arm])
+    if all(m in folds and arm in folds[m]["test"] for m in _FOLD_MONTHS):
+        vecs = []
+        for month in _FOLD_MONTHS:
+            got = folds[month]["test_rows"]
+            if got is None or not np.array_equal(got, te):
+                raise ValueError(f"fold{month} test_rows do not match the October rows")
+            vecs.append(np.asarray(folds[month]["test"][arm], dtype=np.float64))
+        out[np.asarray(te)] = fraud_only(np.mean(vecs, axis=0))
+    return out
+
+
+class ArmBench(final.Bench):
+    """Bench that serves a weight-space arm (run ``wspace:<name>``) from ``arm_arrays``."""
+
+    def __init__(self, led, targets, groups, runs_dir, cells_dir=None, log=print):
+        super().__init__(led, targets, groups, runs_dir, cells_dir, log=log)
+        self.arm_arrays = {}
+
+    def member(self, m: dict) -> np.ndarray:
+        run = m["run"]
+        if run.startswith("wspace:"):
+            return self.arm_arrays[run.removeprefix("wspace:")]
+        return super().member(m)
+
+
+def arm_recipe(arm: str) -> dict:
+    """Final recipe: five tree members at 0.1 and this arm as the fraud-only network at 0.5."""
+    if arm == "stored":
+        run, cells = "tabm", "tabm"
+    else:
+        run, cells = f"wspace:{arm}", f"wspace-{arm}"
+    members = [
+        {"name": name, "run": tree_run, "variant": "fold", "cells": tree_cells, "role": "full"}
+        for name, tree_run, tree_cells in TREES
+    ]
+    members.append({"name": "tabm", "run": run, "variant": "fold", "cells": cells, "role": "fraud"})
+    values = {name: 0.1 for name, _, _ in TREES}
+    values["tabm"] = 0.5
+    return final.check_recipe(
+        {
+            "name": f"wspace-{arm}",
+            "members": members,
+            "weights": {"mode": "fixed", "values": values},
+            "decoder": {"fraud_scale": 0.875},
+            "rules": ["anchored_templates"],
+            "base_rate_rules": [{"name": "blank_merchant_qr", "max_october_rows": 40}],
+        }
+    )
+
+
+def write_cell(cells_dir, arm, seed, rows, p_legit) -> None:
+    """One October-like cell (set 0) of this arm's fraud-only probabilities."""
+    cells_dir = Path(cells_dir)
+    cells_dir.mkdir(parents=True, exist_ok=True)
+    np.savez(
+        cells_dir / f"wspace-{arm}_s{seed}_r0.npz",
+        rows=np.asarray(rows),
+        prob=fraud_only(p_legit).astype(np.float32),
+    )
+
+
+def _contexts(root: Path, prefix: str, keys) -> dict:
+    out = {}
+    for key in keys:
+        directory = root / f"{prefix}{key}"
+        if (directory / "arms.npz").is_file():
+            out[key] = load_arms(directory)
+    return out
+
+
+def _month_line(scores: dict) -> str:
+    parts = []
+    for name, block in scores.items():
+        months = " / ".join(f"{v:.5f}" for v in block["months"])
+        parts.append(f"{name} {months}")
+    return "  ".join(parts)
+
+
+def score(
+    base="base",
+    arms=None,
+    base_run="tabm",
+    cells_dir=None,
+    draws=2000,
+    oct_draws=1000,
+    log=print,
+) -> dict:
+    """Score every arm against ``base`` and write ``score_<base>.json``."""
+    from ringtrace import paths
+
+    root = wspace_dir()
+    folds = _contexts(root, "fold", _FOLD_MONTHS)
+    frames = _contexts(root, "s", _FRAME_SEEDS)
+    cells = root / "cells" if cells_dir is None else Path(cells_dir)
+    if arms is None:
+        found = {name for loaded in folds.values() for name in loaded["arms"]}
+        found -= {base, "stored"}
+        arms = [*sorted(found), "stored"]
+    bench = ArmBench.from_store(paths.out_dir() / "runs", cells, log=log)
+    base_full = bench.member({"run": base_run, "variant": "fold"})
+    for arm in dict.fromkeys(a for a in (base, *arms) if a != "stored"):
+        bench.arm_arrays[arm] = arm_matrix(base_full, bench.te, folds, arm)
+        for seed, loaded in frames.items():
+            if arm in loaded["arms"]:
+                write_cell(cells, arm, seed, loaded["rows"], loaded["arms"][arm])
+    base_recipe = arm_recipe(base)
+    chals = [arm_recipe(arm) for arm in arms]
+    octs = bench.octlike(base_recipe, chals, sets=(0,), draws=oct_draws)
+    report: dict = {}
+    for arm, chal, oct in zip(arms, chals, octs, strict=True):
+        lo = bench.compare(base_recipe, chal, draws)
+        verdict = final.gate_verdict(lo, oct)
+        log("[wspace] " + final.fmt_line(chal["name"], lo, oct, verdict))
+        report[arm] = {"lomo": lo, "octlike": oct, "verdict": verdict, "scores": bench.lomo(chal)}
+    base_scores = bench.lomo(base_recipe)
+    report["base"] = {
+        "arm": base,
+        "scores": base_scores,
+        "folds": sorted(folds),
+        "frames": sorted(frames),
+    }
+    log(f"[wspace] {base}: {_month_line(base_scores)}")
+    (root / f"score_{base}.json").write_text(
+        json.dumps(report, indent=1, default=final._json_default)
+    )
+    return report
+
+
+# ---------------------------------------------------------------------------------------------
 # command line
 
 
@@ -381,14 +579,33 @@ def main(argv=None):
     threads.pin()
     ap = argparse.ArgumentParser(prog="python -m ringtrace.wspace")
     sub = ap.add_subparsers(dest="cmd", required=True)
-    f = sub.add_parser("fit")
-    f.add_argument("contexts", nargs="+")
-    f.add_argument("--seeds", default="0,1,2")
+    fit = sub.add_parser("fit")
+    fit.add_argument("contexts", nargs="+")
+    fit.add_argument("--seeds", default="0,1,2")
+    sc = sub.add_parser("score")
+    sc.add_argument("--base", default="base")
+    sc.add_argument("--arms", default=None)
+    sc.add_argument("--base-run", default="tabm")
+    sc.add_argument("--cells", default=None)
+    sc.add_argument("--draws", type=int, default=2000)
+    sc.add_argument("--oct-draws", type=int, default=1000)
     args = ap.parse_args(argv)
     if args.cmd == "fit":
         seeds = tuple(int(s) for s in args.seeds.split(",") if s)
         for name in args.contexts:
             fit_context(name, seeds)
+    elif args.cmd == "score":
+        chosen = None
+        if args.arms is not None:
+            chosen = [part.strip() for part in args.arms.split(",") if part.strip()]
+        score(
+            base=args.base,
+            arms=chosen,
+            base_run=args.base_run,
+            cells_dir=args.cells,
+            draws=args.draws,
+            oct_draws=args.oct_draws,
+        )
 
 
 if __name__ == "__main__":
