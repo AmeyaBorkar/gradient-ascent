@@ -43,6 +43,15 @@ def test_add_vectors_matches_single_lerp():
     assert wspace.cosine(a, b, b) == pytest.approx(1.0)
 
 
+def test_add_vectors_scales_the_difference_of_two_ends():
+    g = {"w": torch.tensor([1.0, 0.0]), "b": torch.tensor([2.0])}
+    gf = {"w": torch.tensor([4.0, 1.0]), "b": torch.tensor([-1.0])}
+    cf = {"w": torch.tensor([0.0, 3.0]), "b": torch.tensor([1.0])}
+    got = wspace.add_vectors(g, [cf, gf], [2.0, -2.0])
+    for key in g:
+        assert torch.allclose(got[key], g[key] + 2.0 * (cf[key] - gf[key]))
+
+
 def test_barrier_is_zero_on_a_line_and_positive_on_a_bump():
     assert wspace.barrier([1.0, 1.5, 2.0, 2.5, 3.0]) == pytest.approx(0.0)
     assert wspace.barrier([1.0, 1.0, 1.4, 1.0, 1.0]) == pytest.approx(0.4)

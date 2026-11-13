@@ -2,9 +2,10 @@
 
     python -m ringtrace.wspace fit fold9 s13 ...     # train the endpoints, write every arm
     python -m ringtrace.wspace rebasin fold9 ...     # weight-matched seed average (saved weights)
+    python -m ringtrace.wspace vector fold9 ...      # fine-tuned label-regime task vector
     python -m ringtrace.wspace score                 # every arm against the base (fraud-only)
 
-Four methods, all on the network of ``ringtrace.tabm``:
+Five methods, all on the network of ``ringtrace.tabm``:
 
 * **task arithmetic for the label regime** (``ta<alpha>``): theta_g is trained on the given labels
   and theta_c on event-cleaned labels of the fit months, from the same seed (same initial weights,
@@ -14,6 +15,9 @@ Four methods, all on the network of ``ringtrace.tabm``:
 * **re-basin averaging** (``rb_*``): independently trained seeds are aligned to the first by weight
   matching over every symmetry of the network (member order, hidden units, embedding units,
   frequencies and the sign gauges of the shared weights), then averaged into one model.
+* **label-regime task vector** (``tv<alpha>``): two short fine-tunes of the same given-label
+  weights, one on the given labels and one on the cleaned labels. The arm is
+  theta_g + alpha (theta_cf - theta_gf). ``ft_g`` and ``ft_c`` are those fine-tunes.
 * **head re-optimisation** (``head_*``): the body is frozen and the legit column of the output
   layer is rescaled and shifted to maximise the decoded macro-F1 of the blend on two months.
 
@@ -21,8 +25,10 @@ A context is one fit: ``fold<m>`` (the normal ledger, month m held out, October 
 ``s<seed>`` (an October-like frame, fitted on July + August, September held out). ``fit`` writes
 ``$RINGTRACE_OUT/wspace/<context>/``: the weights of every endpoint, ``arms.npz`` (the legit
 probability of every arm on the held-out rows, mean over seeds) and ``report.json`` (loss along
-each path, barriers, distances). Only the legit probability is kept: the member is used in the
-fraud-only role, where the tree members set the split among fraud types.
+each path, barriers, distances). ``rebasin`` and ``vector`` read those weights and write
+``rebasin.npz`` / ``rebasin.json`` and ``vector.npz`` / ``vector.json``. Only the legit
+probability is kept: the member is used in the fraud-only role, where the tree members set the
+split among fraud types.
 """
 
 from __future__ import annotations
@@ -574,6 +580,154 @@ def fit_context(name: str, seeds=(0, 1, 2), log=print) -> dict:
     return report
 
 
+def rebasin_context(name: str, seeds=(0, 1, 2), log=print) -> dict:
+    """Average saved given-label seeds, plain and after weight matching to the first."""
+    if len(seeds) < 2:
+        raise ValueError("rebasin needs at least two seeds")
+    torch = tabm._torch()
+    t0 = time.time()
+    ctx = context(name)
+    spec = ctx["spec"]
+    Z = matrices(ctx)
+    y_hold = ctx["y"][ctx["hold"]]
+    out = wspace_dir() / name
+    sds = [load_state(out / f"sd_g_seed{s}.pt") for s in seeds]
+    aligned = [sds[0]]
+    histories = []
+    for other in sds[1:]:
+        matched, hist = weight_matching(sds[0], other)
+        aligned.append(matched)
+        histories.append(hist)
+    arms = {"rb_naive": mean_state(sds), "rb_wm": mean_state(aligned)}
+    hold = [proba(sd, Z["hold"], spec) for sd in sds]
+    losses: dict = {
+        "seeds": {str(s): cross_entropy(p, y_hold) for s, p in zip(seeds, hold, strict=True)},
+        "pred_mean": cross_entropy(np.mean(hold, axis=0), y_hold),
+    }
+    del hold
+    arrays: dict = {"rows": ctx["rows"]}
+    if ctx["test"] is not None:
+        arrays["test_rows"] = ctx["test"]
+    for arm, sd in arms.items():
+        p = proba(sd, Z["hold"], spec)
+        losses[arm] = cross_entropy(p, y_hold)
+        arrays[arm] = p[:, 0].astype(np.float32)
+        if "test" in Z:
+            arrays[f"{arm}__test"] = proba(sd, Z["test"], spec)[:, 0].astype(np.float32)
+    align = []
+    paired = zip(seeds[1:], sds[1:], aligned[1:], histories, strict=True)
+    for seed, raw, matched, hist in paired:
+        align.append(
+            {
+                "seed": int(seed),
+                "distance_before": distance(sds[0], raw),
+                "distance_after": distance(sds[0], matched),
+                "history": hist,
+            }
+        )
+    path: dict = {"seeds": [int(seeds[0]), int(seeds[1])]}
+    for tag, other in (("before", sds[1]), ("after", aligned[1])):
+        vals = path_losses(sds[0], other, Z["hold"], y_hold, spec)
+        path[tag] = {"losses": vals, "barrier": barrier(vals)}
+    report = {
+        "context": name,
+        "seeds": [int(s) for s in seeds],
+        "hold_rows": int(len(y_hold)),
+        "loss": losses,
+        "align": align,
+        "path": path,
+        "wall_s": time.time() - t0,
+    }
+    tmp = out / ".rebasin.tmp.npz"
+    np.savez(tmp, **arrays)
+    tmp.replace(out / "rebasin.npz")
+    (out / "rebasin.json").write_text(json.dumps(report, indent=1))
+    shown = " ".join(f"{s} {losses['seeds'][str(s)]:.5f}" for s in seeds)
+    moved = " ".join(
+        f"{row['seed']} {row['distance_before']:.2f}->{row['distance_after']:.2f}" for row in align
+    )
+    log(
+        f"[wspace] {name} rebasin: loss {shown} pred {losses['pred_mean']:.5f} "
+        f"rb_naive {losses['rb_naive']:.5f} rb_wm {losses['rb_wm']:.5f}, "
+        f"dist {moved}, barrier {path['before']['barrier']:+.5f}"
+        f"->{path['after']['barrier']:+.5f} ({report['wall_s']:.0f}s)"
+    )
+    del sds, aligned, arms
+    torch.cuda.empty_cache()
+    return report
+
+
+def vector_context(name: str, seeds=(0, 1, 2), alphas=(1.0, 2.0, 4.0, 8.0), log=print) -> dict:
+    """Fine-tune each saved seed on the given and cleaned labels, then add the task vector."""
+    torch = tabm._torch()
+    t0 = time.time()
+    ctx = context(name)
+    spec = ctx["spec"]
+    out = wspace_dir() / name
+    Z = matrices(ctx)
+    y_fit, yc_fit = ctx["y"][ctx["fit"]], ctx["y_clean"][ctx["fit"]]
+    y_hold = ctx["y"][ctx["hold"]]
+    report: dict = {
+        "context": name,
+        "fit_rows": int(len(y_fit)),
+        "hold_rows": int(len(y_hold)),
+        "relabelled": int((y_fit != yc_fit).sum()),
+        "alphas": [float(a) for a in alphas],
+        "fine_tune": {"epochs": FT_EPOCHS, "lr": FT_LR},
+        "seeds": {},
+    }
+    sums: dict = {}
+    for n_done, seed in enumerate(seeds, start=1):
+        t1 = time.time()
+        g = load_state(out / f"sd_g_seed{seed}.pt")
+        c_path = out / f"sd_c_seed{seed}.pt"  # only needed for the cosine below
+        c = load_state(c_path) if c_path.exists() else None
+        gf = fine_tune(g, Z["fit"], y_fit, spec, seed, log=log)
+        cf = fine_tune(g, Z["fit"], yc_fit, spec, seed, log=log)
+        rep = {
+            "norm_g": norm(g),
+            "dist_gf": distance(g, gf),
+            "dist_cf": distance(g, cf),
+            "dist_gf_cf": distance(gf, cf),
+            "cos": float("nan")
+            if c is None
+            else cosine(gf, cf, add_vectors(gf, [c, g], [1.0, -1.0])),
+            "loss": {},
+        }
+        arms = {"ft_g": gf, "ft_c": cf}
+        for alpha in alphas:
+            arms[f"tv{alpha:g}"] = add_vectors(g, [cf, gf], [alpha, -alpha])
+        for arm, sd in arms.items():
+            p = proba(sd, Z["hold"], spec)
+            rep["loss"][arm] = cross_entropy(p, y_hold)
+            sums[arm] = sums.get(arm, 0.0) + p[:, 0]
+            if "test" in Z:
+                key = f"{arm}__test"
+                sums[key] = sums.get(key, 0.0) + proba(sd, Z["test"], spec)[:, 0]
+        rep["wall_s"] = time.time() - t1
+        report["seeds"][str(seed)] = rep
+        log(
+            f"[wspace] {name} vector seed {seed}: |g| {rep['norm_g']:.2f}, "
+            f"|gf-g| {rep['dist_gf']:.2f}, |cf-g| {rep['dist_cf']:.2f}, "
+            f"|cf-gf| {rep['dist_gf_cf']:.2f}, cos {rep['cos']:+.3f}, held-out loss "
+            + " ".join(f"{arm} {v:.5f}" for arm, v in rep["loss"].items())
+            + f" ({rep['wall_s']:.0f}s)"
+        )
+        arrays = {k: (v / n_done).astype(np.float32) for k, v in sums.items()}
+        arrays["rows"] = ctx["rows"]
+        if ctx["test"] is not None:
+            arrays["test_rows"] = ctx["test"]
+        tmp = out / ".vector.tmp.npz"
+        np.savez(tmp, **arrays)
+        tmp.replace(out / "vector.npz")
+        report["seeds_done"] = list(seeds[:n_done])
+        report["wall_s"] = time.time() - t0
+        (out / "vector.json").write_text(json.dumps(report, indent=1))
+        del g, c, gf, cf, arms
+        torch.cuda.empty_cache()
+    return report
+
+
 # ---------------------------------------------------------------------------------------------
 # scoring: every arm in the fraud-only role
 
@@ -599,7 +753,7 @@ def fraud_only(p_legit) -> np.ndarray:
     return out
 
 
-def load_arms(ctx_dir, files=("arms.npz", "rebasin.npz", "head.npz")) -> dict:
+def load_arms(ctx_dir, files=("arms.npz", "rebasin.npz", "vector.npz", "head.npz")) -> dict:
     """Merge the npz files that exist. Keys ending in ``__test`` are October legit probabilities.
 
     ``rows`` must be identical in every file that carries them, and so must ``test_rows``. A later
@@ -785,6 +939,12 @@ def main(argv=None):
     fit = sub.add_parser("fit")
     fit.add_argument("contexts", nargs="+")
     fit.add_argument("--seeds", default="0,1,2")
+    reb = sub.add_parser("rebasin")
+    reb.add_argument("contexts", nargs="+")
+    reb.add_argument("--seeds", default="0,1,2")
+    vec = sub.add_parser("vector")
+    vec.add_argument("contexts", nargs="+")
+    vec.add_argument("--seeds", default="0,1,2")
     sc = sub.add_parser("score")
     sc.add_argument("--base", default="base")
     sc.add_argument("--arms", default=None)
@@ -793,11 +953,7 @@ def main(argv=None):
     sc.add_argument("--draws", type=int, default=2000)
     sc.add_argument("--oct-draws", type=int, default=1000)
     args = ap.parse_args(argv)
-    if args.cmd == "fit":
-        seeds = tuple(int(s) for s in args.seeds.split(",") if s)
-        for name in args.contexts:
-            fit_context(name, seeds)
-    elif args.cmd == "score":
+    if args.cmd == "score":
         chosen = None
         if args.arms is not None:
             chosen = [part.strip() for part in args.arms.split(",") if part.strip()]
@@ -809,6 +965,11 @@ def main(argv=None):
             draws=args.draws,
             oct_draws=args.oct_draws,
         )
+        return
+    seeds = tuple(int(s) for s in args.seeds.split(",") if s)
+    run = {"fit": fit_context, "rebasin": rebasin_context, "vector": vector_context}[args.cmd]
+    for name in args.contexts:
+        run(name, seeds)
 
 
 if __name__ == "__main__":
