@@ -56,6 +56,8 @@ Jul / Aug / Sep; full tables in `RESULTS.md` (final-t2 to final-t7).
 | nested greedy weights | +0.00011 / +0.00005 / -0.00009 | | | lb -0.00020 | rejected |
 | fraud_scale 0.85 / 0.90 | 0 / 0 / +0.00003; -0.00004 / 0 / -0.00004 | | | 0 | ties / rejected |
 | refit / hedge October | identical on train | | | refit test fails the bar | hedge kept as an upload variant |
+| TabPFN v2 in the fraud mass (1/6 or 1/15) | -0.00018 / -0.00014 / -0.00006; -0.00002 / -0.00001 / +0.00005 | | | no cells | rejected |
+| TabDPT in the fraud mass | -0.00005 / -0.00012 / -0.00018 | -0.00005 / -0.00011 / -0.00029 | | no cells | rejected |
 | event completion | | | | | changes no October row |
 | TabM configurations (fraud-only role) | ties within ±0.00005 | | | | nothing to add |
 

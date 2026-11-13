@@ -613,4 +613,17 @@ Upload variants against `final.json` (final-t7, 20 min):
 
 - 2026-11-14 03:00 IST: final recipe unchanged; variants `final-hedge`, `final-s345`,
   `final-half` built for the upload slots; reproducibility confirmed.
+
+### final-t8 (commit fca45b9, 13 min): in-context members in the fraud mass of the final recipe
+
+Against `final.json`; no in-context cells, so October-like is n/a and none could pass.
+
+| candidate | given | cleaned | gen-only | rows | verdict |
+|---|---|---|---|---|---|
+| TabPFN v2 sharing the fraud mass (TabM 1/6 + TabPFN 1/6) | -0.00018 / -0.00014 / -0.00006 [-0.00025, -0.00001] | -0.00016 / -0.00012 / -0.00009 [-0.00025, -0.00002] | -0.00018 / -0.00007 / -0.00005 | 19 / 2 | rejected |
+| TabPFN v2 added (TabM 1/3, TabPFN 1/15) | -0.00002 / -0.00001 / +0.00005 [-0.00004, +0.00005] | -0.00001 / -0.00001 / +0.00004 | +0.00001 / +0.00003 / +0.00008 | 6 / 1 | rejected (Jul, Aug negative) |
+| TabDPT sharing the fraud mass (1/6 + 1/6) | -0.00005 / -0.00012 / -0.00018 [-0.00027, -0.00000] | -0.00005 / -0.00011 / -0.00029 [-0.00030, -0.00003] | -0.00002 / -0.00010 / -0.00009 | 20 / 3 | rejected |
+
+Also judged from its own branch: the TabM configuration sweep (`feat/tabm2`) ties the base within
+±0.00005 in the fraud-only role, so nothing to add. TabPFN-3 and LimiX were not run on their branch.
   (cap 40 October rows). No measurable component has passed the bar yet.
