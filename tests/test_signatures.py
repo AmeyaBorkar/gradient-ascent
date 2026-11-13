@@ -71,3 +71,26 @@ def test_signature_rescue_only_flips_legit_calls():
         log=lambda m: None,
     )
     assert out.tolist() == [anchors.SIM, 0, 0, 0, 0, 3]
+
+
+def test_event_completion_fills_mostly_fraud_events():
+    # mule events (mf shape 2): event 0 has 3 of 4 rows called fraud, event 4 has 1 of 3;
+    # event 7 is split across train and October and must not join
+    led = pl.DataFrame(
+        {
+            "mf_event": [0, 0, 0, 0, 4, 4, 4, 7, 7],
+            "mf_shape": [2] * 9,
+            "is_test": [False] * 8 + [True],
+        }
+    )
+    pred = np.array([1, 1, 2, 0, 1, 0, 0, 1, 0])
+    out = rules.apply(
+        [{"name": "event_completion", "family": "mule", "q": 0.67}],
+        pred,
+        np.zeros((9, 12)),
+        led,
+        log=lambda m: None,
+    )
+    assert out.tolist() == [1, 1, 2, 1, 1, 0, 0, 1, 0]
+    hit, _ = rules.completion_targets(pred, led, "chain", 0.5)
+    assert not hit.any()

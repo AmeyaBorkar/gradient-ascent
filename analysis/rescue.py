@@ -3,6 +3,9 @@
     python analysis/rescue.py survey                 # every signature: train and October aggregates
     python analysis/rescue.py rule --sig <name>      # leave-one-month-out check of one rescue rule
     python analysis/rescue.py octlike --sig <name>   # October-like check on the champion cells
+    python analysis/rescue.py evcomp [--base-run tabm]  # event completion per family and q
+
+A ``--sig`` of the form ``evcomp:<family>:<q>`` checks ``rules.event_completion`` instead.
 
 The blend is the equal-weight mean of the five members' saved arrays, decoded with the fixed
 point and the rules of ``recipes/blend-blankqr.json``. October rows are only ever counted.
@@ -27,17 +30,20 @@ MONTHS = (7, 8, 9)
 MIN_TRAIN = 50
 MIN_RATE = 0.97
 CHUNK = 100
+QS = (0.5, 0.67, 0.8)
 
 
-def load_blend():
+def load_blend(base: str = "blend"):
+    """``blend``: the five-way blend; any other name: that single run, decoded the same way."""
     led = store.ledger()
     is_test = led["is_test"].to_numpy()
     recipe = load_recipe(RECIPE)
+    members = recipe["members"] if base == "blend" else [{"run": base, "weight": 1.0}]
     parts = [
         load_member(paths.out_dir() / "runs" / m["run"], int((~is_test).sum()), int(is_test.sum()))
-        for m in recipe["members"]
+        for m in members
     ]
-    w = [m["weight"] for m in recipe["members"]]
+    w = [m["weight"] for m in members]
     proba = np.zeros((led.height, N_CLASSES))
     proba[~is_test] = weighted_mean([p[0] for p in parts], w)
     proba[is_test] = weighted_mean([p[1] for p in parts], w)
@@ -113,6 +119,50 @@ def cmd_survey() -> list[dict]:
     return rows
 
 
+def _spec(sig: str) -> dict:
+    """``evcomp:<family>:<q>`` is an event-completion rule, anything else a signature."""
+    if sig.startswith("evcomp:"):
+        _, fam, q = sig.split(":")
+        return {"name": "event_completion", "family": fam, "q": float(q)}
+    return {"name": "signature_rescue", "signature": sig}
+
+
+def cmd_evcomp(base: str) -> list[dict]:
+    """Per event family and q: the legit-called rows of mostly-fraud-called events, their cleaned
+    fraud rate and how often their label is the event's majority fraud call."""
+    from ringtrace.rules import EVENT_FAMILIES, completion_targets
+
+    led, _, calls = load_blend(base)
+    te = led["is_test"].to_numpy()
+    y = silver.load(led, "label").astype(np.int64)
+    yg = led["y"].to_numpy().astype(np.int64)
+    rows = []
+    print(f"base {base}")
+    print(f"{'family':<9}{'q':>5}{'train':>7}{'clean_fr':>9}{'given_fr':>9}{'=major':>8}{'oct':>6}")
+    for fam in EVENT_FAMILIES:
+        for q in QS:
+            hit, target = completion_targets(calls, led, fam, q)
+            a, b = hit & ~te, hit & te
+            n = int(a.sum())
+            r = {
+                "base": base,
+                "family": fam,
+                "q": q,
+                "train": n,
+                "cleaned_fraud": float((y[a] > 0).mean()) if n else float("nan"),
+                "given_fraud": float((yg[a] > 0).mean()) if n else float("nan"),
+                "cleaned_major": float((y[a] == target[a]).mean()) if n else float("nan"),
+                "october": int(b.sum()),
+                "october_to": _mix(target[b], top=11),
+            }
+            rows.append(r)
+            print(
+                f"{fam:<9}{q:>5}{n:>7}{r['cleaned_fraud']:>9.3f}{r['given_fraud']:>9.3f}"
+                f"{r['cleaned_major']:>8.3f}{r['october']:>6}"
+            )
+    return rows
+
+
 def cmd_rule(sig: str, draws: int = 2000) -> dict:
     """The blend with and without the rescue rule for ``sig``: per-month deltas on the three
     targets, a paired event bootstrap, and the October rows changed with their class mix."""
@@ -124,9 +174,7 @@ def cmd_rule(sig: str, draws: int = 2000) -> dict:
     from ringtrace.teacher import union_events
 
     led, proba, base = load_blend()
-    chal = rulebook.apply(
-        [{"name": "signature_rescue", "signature": sig}], base, proba, led, log=print
-    )
+    chal = rulebook.apply([_spec(sig)], base, proba, led, log=print)
     te = led["is_test"].to_numpy()
     tr = np.flatnonzero(~te)
     period = led["period"].to_numpy()[tr]
@@ -178,7 +226,7 @@ def cmd_octlike(sig: str, cells: str = "champion") -> dict:
     from ringtrace import octlike
 
     rules = ["anchored_templates", "blank_merchant_qr"]
-    rec = {"name": "signature_rescue", "signature": sig}
+    rec = _spec(sig)
     out = {}
     for seed in octlike.SEEDS:
         frame = octlike.Frame(seed)
@@ -233,9 +281,19 @@ def cmd_apply(sig: str, base_csv: str, out_csv: str) -> dict:
     if calls["label"].null_count():
         raise ValueError("base file does not cover every October row")
     pred = np.array([code[c] for c in calls["label"].to_list()], dtype=np.int64)
-    hit = signatures.mask(led, sig)[is_test] & (pred == 0)
     new = pred.copy()
-    new[hit] = proba[hit, 1:].argmax(axis=1) + 1
+    if sig.startswith("evcomp:"):
+        from ringtrace.rules import completion_targets
+
+        spec = _spec(sig)
+        full = np.zeros(led.height, dtype=np.int64)  # events never cross the split
+        full[is_test] = pred
+        hit_full, target = completion_targets(full, led, spec["family"], spec["q"])
+        hit = hit_full[is_test]
+        new[hit] = target[is_test][hit]
+    else:
+        hit = signatures.mask(led, sig)[is_test] & (pred == 0)
+        new[hit] = proba[hit, 1:].argmax(axis=1) + 1
     lut = dict(zip(calls["txn_id"].to_list(), [CLASSES[k] for k in new], strict=True))
     out = base.with_columns(pl.col("id").replace_strict(lut).alias("label"))
     out.write_csv(out_csv)
@@ -264,12 +322,16 @@ def cmd_apply(sig: str, base_csv: str, out_csv: str) -> dict:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["survey", "rule", "octlike", "apply"])
+    ap.add_argument("cmd", choices=["survey", "rule", "octlike", "apply", "evcomp"])
+    ap.add_argument("--base-run", default="blend")
     ap.add_argument("--sig", default="")
     ap.add_argument("--base", default="")
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
-    if a.cmd == "apply":
+    if a.cmd == "evcomp":
+        rep = cmd_evcomp(a.base_run)
+        a.sig = a.base_run
+    elif a.cmd == "apply":
         rep = cmd_apply(a.sig, a.base, a.out)
     elif a.cmd == "survey":
         rep = cmd_survey()

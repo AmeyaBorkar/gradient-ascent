@@ -159,8 +159,67 @@ def signature_rescue(pred, proba, led, log=print, signature: str = "") -> np.nda
     return out
 
 
+# event families for ``event_completion``: family -> (prefix, shapes; empty = every shape)
+EVENT_FAMILIES = {
+    "bot": ("bot", ()),
+    "drain": ("drn", ()),
+    "mule": ("mf", (2, 3)),
+    "chain": ("mf", (1, 4)),
+    "collect": ("col", ()),
+    "ring": ("rng", ()),
+    "repeat": ("rep", ()),
+}
+
+
+def completion_targets(
+    pred: np.ndarray, led: pl.DataFrame, family: str, q: float
+) -> tuple[np.ndarray, np.ndarray]:
+    """Legit-called rows of the family's events in which a share >= ``q`` of the rows is called
+    fraud, and the event's majority fraud call (ties: the smaller class code).
+    Events never join across the train/test split."""
+    prefix, shapes = EVENT_FAMILIES[family]
+    c = anchors.family_columns(led, [f"{prefix}_event", f"{prefix}_shape"])
+    ev = c[f"{prefix}_event"].fill_null(-1).to_numpy().astype(np.int64)
+    sh = c[f"{prefix}_shape"].fill_null(0).to_numpy().astype(np.int64)
+    inside = (ev >= 0) & (np.isin(sh, shapes) if shapes else True)
+    hit = np.zeros(len(pred), dtype=bool)
+    target = np.zeros(len(pred), dtype=np.int64)
+    if not inside.any():
+        return hit, target
+    idx = np.flatnonzero(inside)
+    split = led["is_test"].to_numpy().astype(np.int64)[idx]
+    _, g = np.unique(np.stack([ev[idx], split]), axis=1, return_inverse=True)
+    g = g.ravel()
+    ng = int(g.max()) + 1
+    p = np.asarray(pred)[idx]
+    n = np.bincount(g, minlength=ng)
+    votes = np.zeros((ng, 12), dtype=np.int64)
+    np.add.at(votes, (g, p), 1)
+    n_fraud = n - votes[:, 0]
+    major = votes[:, 1:].argmax(axis=1) + 1
+    ok = (n_fraud > 0) & (n_fraud >= q * n)
+    rows = ok[g] & (p == 0)
+    hit[idx[rows]] = True
+    target[idx[rows]] = major[g[rows]]
+    return hit, target
+
+
+def event_completion(pred, proba, led, log=print, family: str = "mule", q: float = 0.67):
+    """Legit-called rows of a mostly-fraud-called event of ``family`` take the event's majority
+    fraud call (the generator labels every row of an event)."""
+    hit, target = completion_targets(pred, led, family, q)
+    out = pred.copy()
+    out[hit] = target[hit]
+    log(
+        f"  {family} q={q} legit rows in mostly-fraud events "
+        f"{_split_counts(hit, led['is_test'].to_numpy())}"
+    )
+    return out
+
+
 RULES = {
     "blank_merchant_qr": blank_merchant_qr,
+    "event_completion": event_completion,
     "signature_rescue": signature_rescue,
     "counter": counter_rule,
     "legit_block": legit_block_rule,
