@@ -627,3 +627,21 @@ Against `final.json`; no in-context cells, so October-like is n/a and none could
 Also judged from its own branch: the TabM configuration sweep (`feat/tabm2`) ties the base within
 ±0.00005 in the fraud-only role, so nothing to add. TabPFN-3 and LimiX were not run on their branch.
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+## Close look at the best file (`analysis/closelook.py`, laptop CPU, 8 threads)
+
+Base: the best public file's recipe, `recipes/final-half.json` (five-way types, TabM fraud mass
+1/2, fixed point 0.875, anchored rule, blank-QR), rebuilt from saved arrays. Changes are against
+it, Jul / Aug / Sep; A-clean = cleaned labels plus the expected 3,482 hidden ordinary fraud rows
+(`analysis/closelook_core.py`). Finding: `docs/findings/closelook.md`; ledger of every run:
+`docs/findings/ledger.md`.
+
+| run | commit | result | wall |
+|---|---|---|---|
+| closelook prep | 12f2818 | October calls equal `blend-tabmF-bq.csv` on 260,582 of 260,582 rows; given 0.51372 / 0.50935 / 0.51500, cleaned 0.56536 / 0.56439 / 0.57179, gen-only 0.90311 / 0.89998 / 0.90185, A-clean 0.54620 / 0.54509 / 0.55254; vectorised rules reproduce every call | 25 s |
+| closelook volume (11 classes x 9 admission multipliers 0.3-2.0) | 8496be5 | rigid: 0-4 rows a month for 7 classes at 0.3-1.4; loan loses at every m < 1; phishing gains July, loses August; only qr_swap 0.5 never loses (given +0.00010 / +0.00013 / +0.00010, cleaned +0.00009 / +0.00020 / +0.00013, gen-only +0.00005 / +0.00010 / +0.00010) | about 4 min |
+| closelook volume, nested per class (chosen on two months by A-clean, scored on the third) | 8496be5 | held Jul given +0.000006 / cleaned -0.000004 / gen-only **-0.000089**; Aug +0.00008 / +0.00018 / **-0.000036**; Sep +0.00010 / +0.00013 / +0.00010; October 7 rows. Fails (gen-only) | in the run above |
+| closelook pairs: top 2-20 % of each unheld look-alike pool to the partner class | 8496be5 | loses in almost every month and template (for example mf1 top 10 %: cleaned -0.0017 / -0.0021 / -0.0026); nested picks no split for mf1, mf2+mf3, col1, rng1; drain1 nested -0.00010 given / -0.000014 cleaned; within-pool AUC 0.44-0.64 (rng1 August 0.90) | 1 min |
+| closelook october + scan | this commit | October calls per class follow the label-free anchors (bot 209 -> 103, collusion 55 -> 27, mule 247 -> 282 per 100k, all called fraud); 1,318 fraud-pure predicates, 0 with an October fraud-call share 0.05 below train | 1 min |
+| closelook-t1 gate (`gate recipes/cand/closelook-qrvol*.json`) | 8496be5 | qr_swap m 0.5: given +0.00010 / +0.00013 / +0.00010 [+0.00002, +0.00021], cleaned +0.00009 / +0.00020 / +0.00013 [+0.00005, +0.00024], gen-only +0.00005 / +0.00010 / +0.00010, A-clean +0.00009 / +0.00020 / +0.00013; October-like given -0.00012 / -0.00010 / -0.00003 (pooled lb -0.00015), cleaned +0.00012 / +0.00008 / +0.00000 (lb -0.00003); rows 28 / 4: **FAIL**. m 0.4: gen-only -0.00015 / -0.00011 / +0.00009, October-like given lb -0.00023: FAIL. m 0.6: October-like given -0.00003 / -0.00003 / +0.00000: FAIL | 8.7 min (October-like 218 s) |
+| closelook build `closelook-qrvol` (near-miss, not for upload) | 8496be5 | valid; sha256 `91b918f0615a71b4435ad40aa1dd5fcd7794d8e502d35a0eab6659f943a1586e`; 4 rows vs `blend-tabmF-bq` (legit -> qr_swap 2, refund_abuse -> qr_swap 2) | 30 s |

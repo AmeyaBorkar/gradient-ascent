@@ -1,12 +1,14 @@
 # Progress
 
-## Close look at the best file (14 Nov, under way)
+## Close look at the best file (14 Nov, done)
 
 Audit of every number behind the best public file (`blend-tabmF-bq`, 0.5499354), rebuilt from
 the saved arrays (`python analysis/closelook.py prep`: 0 October rows differ from the uploaded
 file). Goal: a lever worth +0.0025 macro-F1 on October, proven offline first.
 
-- [ ] Ledger of every scored run and candidate (`docs/findings/ledger.md`).
+- [x] Ledger of every scored run and candidate (`docs/findings/ledger.md`): the cleaned LOMO
+      sign agreed with public on 6 of 7 upload steps, the A-clean proxy on 4 of 5 (it equals the
+      cleaned change within 0.00005), October-like on 2 of 4; no signal predicted the size.
 - [x] Per-class anatomy (given / cleaned / A-clean, per month). Under cleaned labels every class
       but the look-alike ones runs at precision 0.89-0.99 with recall 0.23-0.48: the calls stop
       where the generator rows stop.
@@ -17,9 +19,12 @@ file). Goal: a lever worth +0.0025 macro-F1 on October, proven offline first.
       the pair's F1 sum; within-pool AUC 0.44-0.64; nested top-score splits lose or pick nothing.
 - [x] October aggregates: volume departures (velocity_bot, merchant_collusion down, mule up) are
       event-count changes; every label-free anchor is called fraud in October at the train rate.
-- [ ] Gate the qr_swap volume lever on the full bar; write `docs/findings/closelook.md`.
+- [x] Gate the qr_swap volume lever on the full bar: LOMO positive everywhere, but October-like
+      given negative on every thinning seed (lb -0.00015). FAIL; near-miss file only.
+- [x] Finding `docs/findings/closelook.md`; runs in `RESULTS.md`.
 
-Current best idea: none above +0.0005 so far; the measured levers are ties.
+Current best idea: none passes. Keep the final selection between `blend-tabmF-bq` and
+`final.csv` (2 rows apart).
 
 ## Goal
 Rebuild the latest submission end to end in this codebase alone, from ideas only. The submission
