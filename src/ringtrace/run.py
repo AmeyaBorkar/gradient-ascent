@@ -26,6 +26,7 @@ from ringtrace.decode import decode_by_period
 from ringtrace.scoring import macro_f1, per_class_f1
 
 TRAIN_MONTHS = (7, 8, 9)
+EVENT_MODES = {"event_clean": "clean", "event_l2": "l2"}
 
 
 def load_recipe(path: str | Path) -> dict:
@@ -68,6 +69,23 @@ def cleaned_labels(led: pl.DataFrame) -> np.ndarray | None:
     from ringtrace import silver
 
     return silver.load(led, "label")
+
+
+def fit_target(recipe: dict, y: np.ndarray, fit_mask: np.ndarray, cleaned=None) -> np.ndarray:
+    """Training labels for the rows in ``fit_mask``: given, cleaned (silver) or event-cleaned
+    (only the fit rows vote, so a held-out month never shapes them)."""
+    how = recipe.get("train_on", "given")
+    if how == "given":
+        return y
+    if how == "cleaned":
+        out = y.copy()
+        out[fit_mask] = cleaned[fit_mask]
+        return out
+    if how in EVENT_MODES:
+        from ringtrace import eventclean
+
+        return eventclean.clean_labels(y, eventclean.ledger_events(), EVENT_MODES[how], fit_mask)
+    raise ValueError(f"unknown train_on {how!r}")
 
 
 def check_proba(p: np.ndarray, what: str) -> None:
@@ -130,10 +148,7 @@ def main(argv: list[str] | None = None) -> dict:
     tr_idx = np.flatnonzero(~is_test)
     te_idx = np.flatnonzero(is_test)
     spec, fit_fn = model(recipe)
-    train_target = y.copy()
-    if recipe.get("train_on") == "cleaned":
-        cl = cleaned_labels(led)
-        train_target[tr_idx] = cl[tr_idx]
+    cl = cleaned_labels(led) if recipe.get("train_on") == "cleaned" else None
 
     oof = np.zeros((len(y), len(CLASSES)), dtype=np.float64)
     test_sum = np.zeros((len(te_idx), len(CLASSES)), dtype=np.float64)
@@ -141,6 +156,10 @@ def main(argv: list[str] | None = None) -> dict:
         fit = tr_idx[period[tr_idx] != m]
         hold = tr_idx[period[tr_idx] == m]
         log(f"fold {m}: train {len(fit)} rows, hold {len(hold)}")
+        fit_mask = np.zeros(len(y), dtype=bool)
+        fit_mask[fit] = True
+        train_target = fit_target(recipe, y, fit_mask, cl)
+        log(f"  training labels: {int((train_target[fit] != y[fit]).sum())} rows changed")
         outs = [X[hold]] + ([] if args.no_test else [X[te_idx]])
         res = fit_fn(X[fit], train_target[fit], period[fit], outs, spec, log=log)
         oof[hold] = res[0]

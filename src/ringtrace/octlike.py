@@ -352,6 +352,8 @@ def fit(seeds: list[int], cells: list[tuple[str, list[int]]], recipes_dir: Path,
                 cleaned, stats = _cleaned_target(frame, log)
                 target[frame.fit] = cleaned[frame.fit]
                 summary[f"{recipe_name}_s{seed}_cleaning"] = stats
+            elif recipe.get("train_on", "given") != "given":
+                target = runner.fit_target(recipe, y, frame.fit)
             spec, fit_predict = runner.model(recipe)
             for r in sets:
                 name = f"{recipe_name}_s{seed}_r{r}"
