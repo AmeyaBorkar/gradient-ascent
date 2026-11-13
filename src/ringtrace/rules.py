@@ -10,6 +10,8 @@
   pair takes the template's class.
 * ``blank_merchant_qr``: a QR payment to a merchant with a blank QR check, called legit, takes its
   most likely fraud class.
+* ``signature_rescue``: as ``blank_merchant_qr``, for any signature of ``ringtrace.signatures``
+  (parameter ``signature``).
 * ``anchored_templates``: as ``plain_templates``, except that a template row on a fraud-block phone
   whose counter segment is one of the pair (``ctr_conf >= min_conf``) keeps its segment class and
   hands it to the rest of its family event.
@@ -144,8 +146,22 @@ def blank_merchant_qr(pred, proba, led, log=print) -> np.ndarray:
     return out
 
 
+def signature_rescue(pred, proba, led, log=print, signature: str = "") -> np.ndarray:
+    """A row carrying the named generator signature (``signatures.mask``), called legit, takes its
+    most likely fraud class. Meant for signatures that are near-pure fraud in train."""
+    from ringtrace import signatures
+
+    hit = signatures.mask(led, signature) & (pred == 0)
+    out = pred.copy()
+    if hit.any():
+        out[hit] = np.asarray(proba)[hit, 1:].argmax(axis=1) + 1
+    log(f"  {signature} called legit {_split_counts(hit, led['is_test'].to_numpy())}")
+    return out
+
+
 RULES = {
     "blank_merchant_qr": blank_merchant_qr,
+    "signature_rescue": signature_rescue,
     "counter": counter_rule,
     "legit_block": legit_block_rule,
     "plain_templates": plain_templates,
