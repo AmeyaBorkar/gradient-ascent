@@ -91,3 +91,20 @@ from July + August only, the teacher fitted on the other month), same scoring:
 Cleantrain mean over the 9 cells 0.5091 against 0.5093 for the given-label champion: a tie on the
 given labels (the cleaned target cannot be scored on September here, which has no cleaned labels
 by protocol). All 18 cells ran in 28 min (16:39-17:07 IST), three frames in parallel.
+
+## Member: refit (more data)
+
+Champion XGBoost cascade, seeds 0, 1, 2; decoded with the fixed point and the anchored template
+rule. Details and per-class tables: `docs/findings/more-data.md`.
+
+| run | commit | given Jul / Aug / Sep (mean) | cleaned Jul / Aug / Sep (mean) | gen-only Jul / Aug / Sep (mean) | wall | notes |
+|---|---|---|---|---|---|---|
+| refit-curve: one month (mean of both single-month fits), screen off | ec37c9d | 0.5130 / 0.5084 / 0.5140 (0.5118) | 0.5646 / 0.5633 / 0.5706 (0.5662) | 0.9020 / 0.8990 / 0.9007 (0.9006) | 29.5 min (whole curve job, shared GPU) | |
+| refit-curve: probability mean of the two one-month models | ec37c9d | 0.5136 / 0.5088 / 0.5143 (0.5122) | 0.5652 / 0.5639 / 0.5709 (0.5667) | 0.9029 / 0.8998 / 0.9010 (0.9012) | (same job) | fold-mean analogue |
+| refit-curve: two months, 300 rounds, screen off | ec37c9d | 0.5136 / 0.5093 / 0.5145 (0.5125) | 0.5653 / 0.5643 / 0.5712 (0.5669) | 0.9031 / 0.9002 / 0.9011 (0.9015) | (same job) | second month: +0.0007 |
+| refit-curve: two months, 450 rounds, screen off | ec37c9d | 0.5138 / 0.5089 / 0.5147 (0.5124) | 0.5654 / 0.5640 / 0.5715 (0.5669) | 0.9032 / 0.8996 / 0.9014 (0.9014) | (same job) | |
+| champion (reference, run 9) | c46528d | 0.5130 / 0.5090 / 0.5146 (0.5122) | 0.5645 / 0.5639 / 0.5712 (0.5665) | — | 12.8 min | |
+| champion-refit / champion-hedge (October only, unscored) | 031e194 | — | — | — | 5.3 min | 450 rounds on all train rows; 52 / 25 argmax rows changed vs fold mean |
+| clean-event-refit / clean-event-hedge | 031e194 | — | — | — | 5.0 min | 48 / 24 argmax rows changed |
+| clean-l2-refit / clean-l2-hedge | 031e194 | — | — | — | 7.1 min | 61 / 38 argmax rows changed |
+| refit-october, first launch | ec37c9d | — | — | — | <1 min | failed: shell quoting in the recipe loop; relaunched via `scripts/refit_october.sh` |
