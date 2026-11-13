@@ -543,12 +543,77 @@ def cmd_october() -> dict:
     return rep
 
 
+# ---------------------------------------------------------------------------------------------
+# the bar and the candidate files
+
+
+def cmd_gate(recipes: list[str], report: str = "gate") -> dict:
+    """Every recipe against the best file's recipe on the full bar (``ringtrace.final.table``:
+    per-month change on every target, event bootstrap, the nine October-like cells), plus the
+    A-clean change per month."""
+    from ringtrace.final import _json_default, table
+
+    b = bench()
+    base = best_recipe()
+    chals = [best_recipe(p) for p in recipes]
+    path = out_dir() / f"{report}.json"
+
+    def save(rep):
+        path.write_text(json.dumps(rep, indent=1, default=_json_default))
+
+    rep = table(b, base, chals, save=save)
+    d = _ctx()
+    ptr = b.period[b.tr]
+    a = b.calls(base)["pred"][b.tr]
+    for c in chals:
+        p = b.calls(c)["pred"][b.tr]
+        ch = []
+        for m in MONTHS:
+            s = ptr == m
+            ch.append(
+                macro(d["cleaned"][s], p[s], d["hid"][m])
+                - macro(d["cleaned"][s], a[s], d["hid"][m])
+            )
+        rep["challengers"][c["name"]]["aclean_change"] = ch
+        print(f"[closelook] {c['name']}: A-clean change " + " / ".join(f"{x:+.5f}" for x in ch))
+    save(rep)
+    return rep
+
+
+def cmd_build(recipes: list[str]) -> dict:
+    """October files for ``recipes`` into ``$RINGTRACE_OUT/candidates/<name>.csv``, validated
+    against the sample submission, with the rows changed against the best file."""
+    import shutil
+
+    from ringtrace.final import build
+
+    b = bench()
+    out = out_dir() / "build"
+    reps = {}
+    for p in recipes:
+        r = best_recipe(p)
+        reps[r["name"]] = rep = build(
+            b,
+            r,
+            out,
+            paths.data_dir() / "sample_submission.csv",
+            paths.out_dir() / "candidates" / BEST_FILE,
+        )
+        if not rep["problems"]:
+            shutil.copyfile(
+                out / f"{r['name']}.csv", paths.out_dir() / "candidates" / f"{r['name']}.csv"
+            )
+    return reps
+
+
 COMMANDS = {
     "prep": cmd_prep,
     "anatomy": cmd_anatomy,
     "volume": cmd_volume,
     "pairs": cmd_pairs,
     "october": cmd_october,
+    "gate": cmd_gate,
+    "build": cmd_build,
 }
 
 
@@ -558,8 +623,15 @@ def main(argv=None) -> None:
     threads.pin()
     ap = argparse.ArgumentParser(prog="python analysis/closelook.py")
     ap.add_argument("cmd", choices=sorted(COMMANDS))
+    ap.add_argument("recipes", nargs="*", help="recipes for gate / build")
+    ap.add_argument("--report", default="gate", help="report name for gate")
     a = ap.parse_args(argv)
-    COMMANDS[a.cmd]()
+    if a.cmd == "gate":
+        cmd_gate(a.recipes, a.report)
+    elif a.cmd == "build":
+        cmd_build(a.recipes)
+    else:
+        COMMANDS[a.cmd]()
 
 
 if __name__ == "__main__":
