@@ -78,8 +78,13 @@ def check_recipe(recipe: dict) -> dict:
         raise RecipeError(f"duplicate member names: {names}")
     for m in members:
         m.setdefault("variant", "fold")
+        m.setdefault("role", "full")
+        if m["role"] not in ("full", "fraud"):
+            raise RecipeError(f"{m['name']}: role must be 'full' or 'fraud'")
         if m["variant"] not in VARIANTS:
             raise RecipeError(f"{m['name']}: unknown variant {m['variant']!r}")
+    if all(m["role"] == "fraud" for m in members):
+        raise RecipeError("at least one member must have role 'full'")
     w = recipe.setdefault("weights", {"mode": "equal"})
     if w.get("mode") not in WEIGHT_MODES:
         raise RecipeError(f"unknown weight mode {w.get('mode')!r}; known {WEIGHT_MODES}")
@@ -115,11 +120,25 @@ def static_weights(recipe: dict) -> np.ndarray:
     return out / out.sum()
 
 
-def mix(arrays: list[np.ndarray], weights) -> np.ndarray:
+def mix(arrays: list[np.ndarray], weights, roles=None) -> np.ndarray:
+    """Weighted mean of probabilities. A member whose role is ``fraud`` moves only the legit /
+    fraud split: the legit probability is the weighted mean over every member, and the fraud mass
+    is shared out by the ``full`` members' mean fraud-type distribution."""
+    roles = roles or ["full"] * len(arrays)
     out = np.zeros_like(arrays[0], dtype=np.float64)
-    for a, w in zip(arrays, weights, strict=True):
-        if w:
+    for a, w, r in zip(arrays, weights, roles, strict=True):
+        if w and r == "full":
             out += float(w) * a
+    if all(r == "full" for r in roles):
+        return out
+    legit = sum(float(w) * a[:, 0] for a, w in zip(arrays, weights, strict=True) if w)
+    legit = legit / float(sum(weights))
+    types = out[:, 1:]
+    tot = types.sum(axis=1, keepdims=True)
+    share = np.where(tot > 0, types / np.where(tot > 0, tot, 1), 1.0 / types.shape[1])
+    out = np.empty_like(out)
+    out[:, 0] = legit
+    out[:, 1:] = (1.0 - legit)[:, None] * share
     return out
 
 
@@ -280,6 +299,7 @@ class Bench:
         if spec.get("combine", "prob") != "prob":
             raise RecipeError("nested selection supports combine 'prob' only")
         arrays = [self.member(m) for m in recipe["members"]]
+        roles = [m["role"] for m in recipe["members"]]
         n = len(arrays)
         y = self.targets["given"]
         ptr = self.period[self.tr]
@@ -288,7 +308,7 @@ class Bench:
         def month_score(counts: tuple, k: int) -> float:
             if (counts, k) not in cache:
                 s = np.flatnonzero(self.period == k)
-                p = mix([a[s] for a in arrays], np.array(counts) / sum(counts))
+                p = mix([a[s] for a in arrays], np.array(counts) / sum(counts), roles)
                 cache[(counts, k)] = macro_f1(y[ptr == k], self.decode_rows(s, p, recipe))
             return cache[(counts, k)]
 
@@ -312,12 +332,13 @@ class Bench:
         from ringtrace import rules as rulebook
 
         arrays = [self.member(m) for m in recipe["members"]]
+        roles = [m["role"] for m in recipe["members"]]
         w = self.weights(recipe)
         pred = np.zeros(self.led.height, dtype=np.int64)
         proba = np.zeros((self.led.height, N_CLASSES))
         for k in (*TRAIN_MONTHS, "october"):
             rows = self.te if k == "october" else self.tr[self.period[self.tr] == k]
-            proba[rows] = mix([a[rows] for a in arrays], w[k])
+            proba[rows] = mix([a[rows] for a in arrays], w[k], roles)
         # as ringtrace.blend decodes: the fixed point per month, then the rules over every row
         from ringtrace.decode import fixed_point
 
@@ -399,7 +420,7 @@ class Bench:
                         probs.append(f["prob"].astype(np.float64))
                     if not np.array_equal(rows, frame.stacked[frame.hold]):
                         raise ValueError(f"cells s{seed} r{r} do not match the current frame")
-                    p = mix(probs, wsep[recipe_key(rec)])
+                    p = mix(probs, wsep[recipe_key(rec)], [m["role"] for m in rec["members"]])
                     pred = ol.decode(frame, p, rec["decoder"], rec["rules"])
                     if rec["base_rate_rules"]:
                         full_pred = np.zeros(frame.led.height, dtype=np.int64)

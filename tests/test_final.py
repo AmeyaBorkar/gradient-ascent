@@ -138,3 +138,13 @@ def test_gate_verdict():
 def test_pair_counts():
     got = final.pair_counts(np.array([0, 1, 1]), np.array([0, 2, 2]))
     assert got == {f"{final.CLASSES[1]} -> {final.CLASSES[2]}": 2}
+
+
+def test_fraud_role_moves_only_the_legit_split():
+    a = np.array([[0.6, 0.3, 0.1] + [0.0] * (N_CLASSES - 3)])
+    b = np.array([[0.2, 0.1, 0.7] + [0.0] * (N_CLASSES - 3)])
+    out = final.mix([a, b], [0.5, 0.5], ["full", "fraud"])
+    assert out[0, 0] == pytest.approx(0.4)
+    assert out[0, 1] / out[0, 2] == pytest.approx(3.0)
+    assert out.sum() == pytest.approx(1.0)
+    assert np.allclose(final.mix([a, b], [0.5, 0.5]), 0.5 * a + 0.5 * b)

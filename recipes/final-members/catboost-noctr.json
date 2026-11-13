@@ -1,0 +1,41 @@
+{
+ "name": "final-catboost-noctr",
+ "families": [
+  "context",
+  "marks",
+  "bursts",
+  "drains",
+  "flows",
+  "requests",
+  "merchant",
+  "repeats"
+ ],
+ "drop": [],
+ "cascade": {
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "booster": {
+   "rounds": 300,
+   "eta": 0.08,
+   "depth": 8
+  },
+  "stages": "catboost",
+  "catboost": {
+   "iterations": 300,
+   "depth": 8,
+   "learning_rate": 0.08,
+   "border_count": 254,
+   "task_type": "GPU",
+   "devices": "0"
+  }
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "plain_templates"
+ ]
+}

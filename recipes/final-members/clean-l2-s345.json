@@ -1,0 +1,37 @@
+{
+ "name": "final-clean-l2-s345",
+ "families": [
+  "context",
+  "marks",
+  "bursts",
+  "drains",
+  "flows",
+  "requests",
+  "merchant",
+  "repeats",
+  "phones"
+ ],
+ "drop": [
+  "ctr_dev_rows",
+  "ctr_dev_single"
+ ],
+ "cascade": {
+  "seeds": [
+   3,
+   4,
+   5
+  ],
+  "booster": {
+   "rounds": 300,
+   "eta": 0.08,
+   "depth": 8
+  }
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ],
+ "train_on": "event_l2"
+}
