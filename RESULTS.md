@@ -204,3 +204,42 @@ rule. Details and per-class tables: `docs/findings/more-data.md`.
 | clean-event-refit / clean-event-hedge | 031e194 | — | — | — | 5.0 min | 48 / 24 argmax rows changed |
 | clean-l2-refit / clean-l2-hedge | 031e194 | — | — | — | 7.1 min | 61 / 38 argmax rows changed |
 | refit-october, first launch | ec37c9d | — | — | — | <1 min | failed: shell quoting in the recipe loop; relaunched via `scripts/refit_october.sh` |
+
+## In-context tabular member: TabPFN v2 (evaluation only)
+
+`python -m ringtrace.icl lomo --name icl-tabpfn-v2 --context 20000` (`ringtrace.icl`, licence
+record in `docs/decisions.md` item 16). The champion everywhere except its candidate rows
+(champion fraud probability >= tau, 5 % of train rows), where TabPFN v2 gives p(fraud) from a
+context of candidate rows of the other months; types split as the champion's. Top 100 features
+by |AUC - 0.5| on the context. Context limit 20,000 rows: every fraud row, legit rows sampled
+(seed 0) and the odds corrected for the sampling rate; October's 23,617 fraud rows raise its
+limit to 29,522. One RTX A6000 48 GB, shared with other jobs from the second fold on; 8 threads.
+TabPFN-3 (gated by account and licence acceptance) and LimiX-2 (no installable package) were not
+run.
+
+- tau 2.0e-5; candidates Jul 26,977 / Aug 22,901 / Sep 28,418 / Oct 15,013; they hold 41.0 % of
+  fraud-labelled train rows (41.6 / 40.2 / 41.1 % per month).
+- Determinism: two runs of fold 9 on 5,000 queries (context 20,000) gave identical probabilities
+  (max difference 0.0); 104 s and 101 s.
+
+| run | commit | given Jul / Aug / Sep (mean) | cleaned Jul / Aug / Sep (mean) | gen-only Jul / Aug / Sep (mean) | wall | notes |
+|---|---|---|---|---|---|---|
+| icl-tabpfn-v2, first try | 9f5174a | — | — | — | ~22 min | died in fold 8 without a log (GPU memory taken by a CatBoost job on the same card; the launcher logged only the last command of a chain, fixed in 440998d) |
+| icl-tabpfn-v2, second try | 440998d | — | — | — | 22 min | failed in the October fold: 23,617 fraud rows exceed the 20,000 limit; fixed in 139414a |
+| **icl-tabpfn-v2** (`~/outputs/runs/icl-tabpfn-v2`) | 139414a | 0.5019 / 0.5022 / 0.5135 (**0.5059**) | 0.5530 / 0.5556 / 0.5702 (**0.5596**) | 0.8850 / 0.8889 / 0.9008 (**0.8916**) | 77 min (folds 23 / 20 / 18 / 16 min, shared GPU) | fixed point 0.5003 / 0.5533 / 0.8830 (champion 0.5064 / 0.5601 / 0.8921); 108 October argmax calls differ from the champion |
+| champion (reference) | — | 0.5130 / 0.5090 / 0.5146 (0.5122) | 0.5645 / 0.5639 / 0.5712 (0.5665) | 0.9020 / 0.8996 / 0.9014 (0.9010) | | |
+| blend, five-way (rerun, `~/outputs/runs/blend`) | 139414a | 0.5130 / 0.5091 / 0.5147 (**0.5123**) | 0.5647 / 0.5641 / 0.5714 (**0.5667**) | 0.9022 / 0.9000 / 0.9018 (**0.9013**) | <1 min | sha256 `c3af1418...` as before |
+| **icl-tabpfn-v2-blend6**: member 1/6, others 1/6 | 139414a | 0.5131 / 0.5091 / 0.5147 (**0.5123**) | 0.5648 / 0.5642 / 0.5714 (**0.5668**) | 0.9024 / 0.9001 / 0.9017 (**0.9014**) | <1 min | gen-only September -0.0001; 4-11 October rows changed vs the trees |
+| **icl-tabpfn-v2-blend3**: member 1/3, others 2/15 | 139414a | 0.5130 / 0.5090 / 0.5147 (**0.5122**) | 0.5647 / 0.5640 / 0.5714 (**0.5667**) | 0.9023 / 0.8999 / 0.9017 (**0.9013**) | <1 min | August -0.0001 given and cleaned |
+
+Paired event bootstrap (`python -m ringtrace.compare`, 2,000 draws, 5-95 %):
+
+| challenger vs base | given | cleaned |
+|---|---|---|
+| icl-tabpfn-v2 vs champion | -0.0063 [-0.0072, -0.0053] | -0.0069 [-0.0079, -0.0059] |
+| blend6 vs blend | +0.0001 [-0.0000, +0.0001] | +0.0001 [-0.0000, +0.0001] |
+| blend3 vs blend | -0.0000 [-0.0001, +0.0001] | -0.0000 [-0.0001, +0.0001] |
+
+October-like: not run to the end. The four tree members' cells were completed (s13 fitted here,
+the rest copied from the gate run); the member's cells were stopped before the first one finished,
+because every variant already fails the leave-one-month-out part of the bar.
