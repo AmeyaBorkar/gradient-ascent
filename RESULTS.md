@@ -626,4 +626,19 @@ Against `final.json`; no in-context cells, so October-like is n/a and none could
 
 Also judged from its own branch: the TabM configuration sweep (`feat/tabm2`) ties the base within
 ±0.00005 in the fraud-only role, so nothing to add. TabPFN-3 and LimiX were not run on their branch.
+
+### final-t9 (commit b50cc5d, 13 min): SWA TabM (`feat/nntech`) in the fraud mass
+
+| candidate | given | cleaned | gen-only | rows | verdict |
+|---|---|---|---|---|---|
+| SWA TabM replacing TabM (1/3) | -0.00004 / -0.00001 / +0.00004 [-0.00004, +0.00003] | -0.00003 / -0.00001 / +0.00003 | -0.00004 / -0.00004 / -0.00004 | 3 / 0 | rejected |
+| SWA TabM sharing the fraud mass (1/6 + 1/6) | -0.00004 / 0 / 0 | -0.00003 / 0 / 0 | -0.00004 / 0 / 0 | 1 / 0 | rejected (0 October rows either way) |
+
+The other techniques on `feat/nntech` (EMA, QR augmentation, distillation, mixup, noise,
+pretraining, label smoothing, logit adjustment, focal loss, RealMLP) have single-seed screens
+only. Every one except QR augmentation loses in some cell of its fraud-only screen. QR
+augmentation never loses there, but it has no full run, so it has no arrays to gate here.
+
+- 2026-11-14 03:20 IST: every arrived component judged; `recipes/final.json` unchanged since
+  02:15 (`final.csv` sha256 `39cb4952...4db3`).
   (cap 40 October rows). No measurable component has passed the bar yet.
