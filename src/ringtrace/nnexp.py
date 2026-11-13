@@ -7,7 +7,8 @@
 Cells: ``sep`` is the normal ledger with September held out (the leave-one-month-out fold 9);
 ``s13``..``s15`` are the October-like frames (``ringtrace.octlike``). Every variant is
 ``recipes/tabm.json`` plus the spec changes in ``VARIANTS``. September's probabilities go to
-``$RINGTRACE_OUT/nntech/<variant>_<cell>.npz`` (``rows``, ``prob``).
+``$RINGTRACE_OUT/nntech/<variant>_<cell>.npz`` (``rows``, ``prob``); seeds other than 0-2 add
+``-sd<seeds>`` to the name, which ``score`` then takes as the variant name.
 
 ``teacher`` cross-fits the champion recipe between July and August (fit one, predict the
 other) on each cell's fit rows: out-of-fold soft targets that never see September.
@@ -164,8 +165,9 @@ def fit(variant: str, cells: list[str], seeds: tuple[int, ...], log=print) -> No
         spec, fit_predict = realmlp.RealMLPSpec(seeds=seeds), realmlp.fit_predict
     else:
         spec = replace(variant_spec(variant, recipe), seeds=seeds)
+    tag = variant if seeds == (0, 1, 2) else f"{variant}-sd{''.join(map(str, seeds))}"
     for c in cells:
-        path = _dir() / f"{variant}_{c}.npz"
+        path = _dir() / f"{tag}_{c}.npz"
         if path.exists():
             log(f"[nnexp] {path.name} exists, skipped")
             continue
@@ -192,7 +194,7 @@ def fit(variant: str, cells: list[str], seeds: tuple[int, ...], log=print) -> No
             extras=ex,
         )
         np.savez(path, rows=cell.stacked[cell.hold], prob=prob.astype(np.float32))
-        log(f"[nnexp] {variant} {c} done ({time.time() - t0:.0f}s)")
+        log(f"[nnexp] {tag} {c} done ({time.time() - t0:.0f}s)")
 
 
 def tree_prob(cell_name: str, cell) -> np.ndarray:
