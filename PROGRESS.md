@@ -20,4 +20,4 @@ counter-anchored template rule.
 - [ ] Member 2: LightGBM cascade.
 - [ ] Member 3: CatBoost cascade.
 - [ ] Members 4 and 5: event-cleaned labels and their XGBoost cascades.
-- [ ] The blend, its one-command build, and the README (commands, seeds, versions, hardware).
+- [~] The blend (`ringtrace.blend`, `recipes/blend.json`), the one-command build (`scripts/build_submission.sh`) and the README drafted; member 1 rerun from this branch (`blend-champion-m1`, same sha256). Blend run waits for members 2-5.

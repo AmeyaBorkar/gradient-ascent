@@ -92,3 +92,13 @@ from July + August only, the teacher fitted on the other month), same scoring:
 Cleantrain mean over the 9 cells 0.5091 against 0.5093 for the given-label champion: a tie on the
 given labels (the cleaned target cannot be scored on September here, which has no cleaned labels
 by protocol). All 18 cells ran in 28 min (16:39-17:07 IST), three frames in parallel.
+
+## Member `blend` (the blend and the one-command build)
+
+Leave-one-month-out macro-F1 per held-out month Jul / Aug / Sep (mean), after the fixed point
+(scale 0.875) and the anchored template rule.
+
+| run (output dir) | commit | given | cleaned | gen-only | wall | notes |
+|---|---|---|---|---|---|---|
+| blend-champion (`~/outputs/runs/blend-champion-m1`), tries 1-6 | b893b74 / 50c44a6 | — | — | — | — | failed: CUDA out of memory in fold 7 (GPU shared with another member's job; the retry gate first watched the wrong device). Logs `~/logs/blend-champion-oom{1,2}.log` |
+| **blend-champion-m1**: `python -m ringtrace.run recipes/champion.json --name blend-champion-m1` | d02e04b | 0.5130 / 0.5090 / 0.5146 (**0.5122**) | 0.5645 / 0.5639 / 0.5712 (**0.5665**) | 0.9020 / 0.8996 / 0.9014 (**0.9010**) | 10.7 min (4 threads, shared GPU) | member 1 from this branch: identical to `champion` (run 9). Fixed point 0.5064 / 0.5601 / 0.8921. Submission VALID against the sample, sha256 `a36833d5fb8c497ff3b6e7ea116226796ec8892ad661c17afa87bf92fb8e380e` (same as run 9) |
