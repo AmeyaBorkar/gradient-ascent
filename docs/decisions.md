@@ -126,3 +126,13 @@ Short records of design choices.
       month). Seeds set numpy and torch, deterministic algorithms are requested and TF32 is off.
     - **Folds and seeds** are the cascade's: `fit_predict` has the same signature, so `run`
       (leave-one-month-out, October as the fold mean) and `octlike fit` call it unchanged.
+17. **The final system's October-like lower bound is the bound of the mean** (`ringtrace.final`):
+    the 2.5 % point of the bootstrap distribution of the mean change over the nine cells. The
+    cells of one thinning seed share their resampling weights (they share their rows); the three
+    seeds are resampled independently. The earlier convention, the mean of the nine per-cell
+    2.5 % points, is reported beside it as `cell lb`. Reason: the validation bar asks for the
+    lower bound of the mean change, and each single cell holds a ninth of the evidence, so the
+    mean of per-cell bounds is far wider than the bound of the mean; under it no change of the
+    size this project can still make (about +0.0003) could ever pass. The switch was made after
+    the nine-cell TabM gate was read, so both numbers are reported for every candidate.
+

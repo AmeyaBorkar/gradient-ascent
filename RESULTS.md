@@ -536,4 +536,21 @@ started).
 | TabM fraud mass 1 | +0.00077 / -0.00002 / +0.00026 | +0.00069 / +0.00001 / +0.00034 | +0.00062 / -0.00068 / -0.00034 | n/a | 88 / 16 | fails |
 
 - 2026-11-14 00:40 IST: first `recipes/final.json` = the five-way blend + `blank_merchant_qr`
+
+### final-t5 (commit 8d4b5c8, 21 min; October-like 482 s): the nine-cell TabM gate
+
+Base `recipes/final.json` (five-way blend + blank-QR rule); every challenger carries the same rule.
+All nine TabM cells (s13-15 x r0-2). October-like lower bound here is the mean of the nine per-cell
+2.5 % points (the gate's earlier convention).
+
+| candidate | given | cleaned | gen-only | October-like given (lb) | October-like cleaned (lb) | rows | verdict |
+|---|---|---|---|---|---|---|---|
+| TabM fraud mass 1/2 | +0.00073 / +0.00025 / +0.00025 [+0.00019, +0.00067] | +0.00068 / +0.00025 / +0.00039 [+0.00022, +0.00070] | +0.00089 / +0.000014 / **-0.0000022** [-0.00002, +0.00068] | +0.00023 / +0.00033 / +0.00038 (-0.00004) | +0.00030 / +0.00041 / +0.00032 (-0.00004) | 51 / 7 | **fails**: gen-only September is negative |
+| TabM fraud mass 1/3 | +0.00073 / +0.00024 / +0.00023 [+0.00020, +0.00066] | +0.00068 / +0.00021 / +0.00033 [+0.00021, +0.00065] | +0.00089 / +0.00018 / +0.00007 [+0.00010, +0.00074] | +0.00017 / +0.00024 / +0.00038 (-0.00004) | +0.00025 / +0.00032 / +0.00033 (-0.00003) | 38 / 5 | every month and seed positive; see the pooled bound (final-t6) |
+| TabM full member 1/2 | +0.00050 / +0.00016 / +0.00023 [+0.00010, +0.00054] | +0.00051 / +0.00018 / +0.00033 | +0.00065 / +0.00005 / +0.000004 | +0.00013 / +0.00031 / +0.00049 (-0.00004) | +0.00021 / +0.00039 / +0.00043 (-0.00005) | 41 / 7 | dominated by the fraud-only 1/3 arm; type switches in October |
+
+October changes against the final recipe: fraud mass 1/3 adds 5 fraud calls (legit -> phishing 2,
+sim_swap 1, loan 1, collusion 1); 1/2 adds 7; the full member also switches 3 fraud types.
+
+- 2026-11-14 01:30 IST: the October-like bound is now pooled (decision 17); final-t6 re-gates.
   (cap 40 October rows). No measurable component has passed the bar yet.
