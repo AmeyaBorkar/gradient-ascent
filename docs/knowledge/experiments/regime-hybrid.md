@@ -2,7 +2,7 @@
 
 Status convention. "Measured in this repository" means this repo's own runs (its champion scores
 0.5122 given / 0.5665 cleaned leave-one-month-out). Everything below is an "earlier measurement"
-from previous sessions, which a later session may re-derive here. The regime gate itself was not
+from previous sessions, which a later pass may re-derive here. The regime gate itself was not
 re-run in this repo.
 
 Summary. The training labels contain a large block of "ordinary" fraud rows that look exactly like

@@ -5,8 +5,8 @@ small (expected gains +0.0001 to +0.0015), and the biggest unknown is not a mode
 the test labels treat ordinary rows (about 63% of every fraud class), which swings the score by
 roughly 0.35-0.40 ([regime-hybrid.md](regime-hybrid.md), [ordinary-rows.md](ordinary-rows.md)). The
 list below is ordered by expected value per hour. Expected gains are **guesses** anchored on the
-measurements cited, labelled **[earlier]** unless re-derived here. The gate used by earlier
-sessions: a candidate must beat the champion in each leave-one-month-out month on given, cleaned and
+measurements cited, labelled **[earlier]** unless re-derived here. The gate used in earlier
+research: a candidate must beat the champion in each leave-one-month-out month on given, cleaned and
 generator-only labels, win in all nine October-like cells with the counter held at its unthinned
 values, and report the paired event bootstrap; the adoption bar on the October-like mean was +0.007.
 Back to the [index](index.md).

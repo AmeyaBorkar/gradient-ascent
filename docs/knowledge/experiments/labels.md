@@ -1,8 +1,7 @@
 # Labels: noise model, cleaning and noise-robust training
 
 Status vocabulary. **measured in this repo** means this repository's own runs show it (see
-`RESULTS.md`). **earlier measurement** means an earlier working session measured it; a later
-session may re-derive it here. **literature / belief** means published claims or reasoning, not a
+`RESULTS.md`). **earlier measurement** means an earlier research pass measured it; a later pass may re-derive it here. **literature / belief** means published claims or reasoning, not a
 run of ours.
 
 ## Summary

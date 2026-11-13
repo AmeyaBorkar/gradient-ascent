@@ -13,7 +13,7 @@ public score.
 - **[measured in this repo]**: shown by this repository's own runs. The runs are in
   [`RESULTS.md`](../../../RESULTS.md); the command to re-derive is given next to the claim.
 - **[earlier measurement]**: from research done before this repository existed (different code
-  base, same data and same task). A later session may re-derive it here; treat it as strong prior,
+  base, same data and same task). A later pass may re-derive it here; treat it as strong prior,
   not as a result of this repo.
 
 ## Headline numbers

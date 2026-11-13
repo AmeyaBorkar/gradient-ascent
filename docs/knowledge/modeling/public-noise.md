@@ -6,7 +6,7 @@ private rest. For one upload the public score has a standard deviation of about 
 rows are split at random and 0.019-0.027 if whole events are; for two near-identical uploads the
 difference has an sd of 0.002-0.008. Read a public gap under about 0.005 (row split) or 0.007-0.008
 (event split) between near-identical files as zero. All numbers here are **earlier measurement**
-(simulations on train months), which a later session can re-derive here.
+(simulations on train months), which a later pass can re-derive here.
 
 ## How the noise was measured
 Take a train month, draw an October-sized test month (260,582 rows, whole events kept), split it

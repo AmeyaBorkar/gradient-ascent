@@ -10,7 +10,7 @@ reaches (AUC 0.50 from every angle) and the choice between look-alike classes in
 chance (AUC 0.46-0.68). **Before trying anything new, find it in the table below.**
 
 Status key: **[repo]** = measured in this repository (`RESULTS.md`; command in the file);
-**[earlier]** = earlier measurement, a later session may re-derive it. Scores are macro-F1 over 12
+**[earlier]** = earlier measurement, a later pass may re-derive it. Scores are macro-F1 over 12
 classes. "LOMO" = leave-one-month-out (train two months, score the third, mean of three).
 "October-like" = September thinned to October's density, scored by a model fitted on July + August.
 "Given" labels = as shipped, "cleaned" = repaired labels ([labels.md](labels.md)),

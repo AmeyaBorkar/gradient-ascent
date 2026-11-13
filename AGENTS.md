@@ -75,7 +75,7 @@ job that is already running. Always give jobs explicit thread budgets; the box i
 | curated background from earlier research | `docs/knowledge/` (see onboarding) |
 
 Label every claim in a document: **measured in this repo** (a run or finding here shows it; give the
-command) or **earlier measurement** (carried over from earlier research; a later session may
+command) or **earlier measurement** (carried over from earlier research; a later pass may
 re-derive it). Keep the numbers; they are the value.
 
 ## The validation bar

@@ -55,7 +55,7 @@ qr 518, refund 280, cashback 207, loan 99, collusion 84 (3,945 fraud).
 | evidence (run 4) vs evidence-nophones (run 10): counter + template rule | +0.0333 [+0.0310, +0.0358] | +0.0343 [+0.0319, +0.0369] | challenger |
 | evidence-nophones (run 10) vs context-only (run 1): seven families (with hygiene) | +0.0118 [+0.0094, +0.0142] | +0.0130 [+0.0104, +0.0155] | challenger |
 
-## October-like September (member octlike, laptop: RTX 5070 Ti, 16 threads)
+## October-like September (laptop: RTX 5070 Ti, 16 threads)
 
 Native mode (`docs/decisions.md` item 13), commit 6b6b8e4:
 `python -m ringtrace.octlike build`, `fit champion:0,1,2`, `score champion champion`.
@@ -94,7 +94,7 @@ Earlier thinned-frame mode (before the native rewrite): Cleantrain mean over the
 given labels (the cleaned target cannot be scored on September here, which has no cleaned labels
 by protocol). All 18 cells ran in 28 min (16:39-17:07 IST), three frames in parallel.
 
-## Member 2: LightGBM cascade (`lgbm`)
+## Blend member 2: LightGBM cascade (`lgbm`)
 
 `python -m ringtrace.run recipes/lgbm.json` with `RINGTRACE_THREADS=10`. This is the champion recipe (families,
 drop list, XGBoost screening score and cut-offs, month folds, seeds 0/1/2, decoder, template rule)
@@ -113,7 +113,7 @@ On its own the LightGBM member ties the champion: +0.0000 given and +0.0002 clea
 +0.0009 / +0.0010 at the fixed point. CPU only, at 892 % CPU (10 threads), with a peak RSS of 8.0 GB.
 The template rule changed 742 train / 132 test rows. October calls: 3,951 fraud (champion 3,945).
 
-## Member 3: CatBoost cascade
+## Blend member 3: CatBoost cascade
 
 Champion features, screening and folds; both stages CatBoost on the GPU (decision 14), 4 CPU threads.
 Output: `~/outputs/runs/catboost/` (`oof.npy`, `test.npy`, `summary.json`, `submission.csv`).
@@ -124,7 +124,7 @@ Output: `~/outputs/runs/catboost/` (`oof.npy`, `test.npy`, `summary.json`, `subm
 | catboost (fixed point) | e8613ed | 0.5098 / 0.5048 / 0.5123 (0.5090) | 0.5611 / 0.5594 / 0.5680 (0.5628) | 0.8994 / 0.8930 / 0.8988 (0.8971) | — | champion fixed point 0.5064 / 0.5601: +0.0026 / +0.0027 |
 | catboost repro (fold Sep, seed 0, twice) | d83b3d7 | — | — | — | 2 x 1 min | max abs prob diff 0.165, mean 4.3e-6, 2 argmax changes |
 
-## Member `clean`: event-cleaned training labels (members 4 and 5)
+## Blend members 4 and 5: event-cleaned training labels (`clean`)
 
 `python -m ringtrace.run recipes/clean-<v>.json` (champion recipe plus `train_on`), seeds 0/1/2,
 leave-one-month-out, October = fold mean; 3 CPU threads each, two jobs sharing the GPU. Labels are
@@ -143,15 +143,15 @@ Both tie the champion after the rule (+0.0001 / +0.0001 and 0.0000 / +0.0001); a
 Outputs: `~/outputs/runs/clean-event/` and `~/outputs/runs/clean-l2/` (`oof.npy`, `test.npy`,
 `summary.json`, `submission.csv`).
 
-## Member `blend` (the blend and the one-command build)
+## The blend and the one-command build
 
 Leave-one-month-out macro-F1 per held-out month Jul / Aug / Sep (mean), after the fixed point
 (scale 0.875) and the anchored template rule.
 
 | run (output dir) | commit | given | cleaned | gen-only | wall | notes |
 |---|---|---|---|---|---|---|
-| blend-champion (`~/outputs/runs/blend-champion-m1`), tries 1-6 | b893b74 / 50c44a6 | — | — | — | — | failed: CUDA out of memory in fold 7 (GPU shared with another member's job; the retry gate first watched the wrong device). Logs `~/logs/blend-champion-oom{1,2}.log` |
-| **blend-champion-m1**: `python -m ringtrace.run recipes/champion.json --name blend-champion-m1` | d02e04b | 0.5130 / 0.5090 / 0.5146 (**0.5122**) | 0.5645 / 0.5639 / 0.5712 (**0.5665**) | 0.9020 / 0.8996 / 0.9014 (**0.9010**) | 10.7 min (4 threads, shared GPU) | member 1 from this branch: identical to `champion` (run 9). Fixed point 0.5064 / 0.5601 / 0.8921. Submission VALID against the sample, sha256 `a36833d5fb8c497ff3b6e7ea116226796ec8892ad661c17afa87bf92fb8e380e` (same as run 9) |
+| blend-champion (`~/outputs/runs/blend-champion-m1`), tries 1-6 | b893b74 / 50c44a6 | — | — | — | — | failed: CUDA out of memory in fold 7 (GPU shared with another job; the retry gate first watched the wrong device). Logs `~/logs/blend-champion-oom{1,2}.log` |
+| **blend-champion-m1**: `python -m ringtrace.run recipes/champion.json --name blend-champion-m1` | d02e04b | 0.5130 / 0.5090 / 0.5146 (**0.5122**) | 0.5645 / 0.5639 / 0.5712 (**0.5665**) | 0.9020 / 0.8996 / 0.9014 (**0.9010**) | 10.7 min (4 threads, shared GPU) | member 1 rerun: identical to `champion` (run 9). Fixed point 0.5064 / 0.5601 / 0.8921. Submission VALID against the sample, sha256 `a36833d5fb8c497ff3b6e7ea116226796ec8892ad661c17afa87bf92fb8e380e` (same as run 9) |
 | **blend-champion-fmt**: champion from the merged and `ruff format`-ed tree (`~/outputs/runs/blend-champion-fmt`) | dbc304e | 0.5130 / 0.5090 / 0.5146 (**0.5122**) | 0.5645 / 0.5639 / 0.5712 (**0.5665**) | 0.9020 / 0.8996 / 0.9014 (**0.9010**) | 11.8 min (incl. 38 s feature rebuild) | formatting changed the source hash of every family, so all nine were rebuilt under new cache keys (38 s in total). `oof.npy` and `test.npy` byte-identical to `blend-champion-m1`; submission sha256 `a36833d5...` unchanged: the merges and the formatting leave the champion recipe's output unchanged |
 | **blend** (`python -m ringtrace.blend recipes/blend.json`, `~/outputs/runs/blend`): members `blend-champion-m1`, `lgbm`, `catboost`, `clean-event`, `clean-l2`, weights 1/5 | 3d9edb9 | 0.5130 / 0.5091 / 0.5147 (**0.5123**) | 0.5647 / 0.5641 / 0.5714 (**0.5667**) | 0.9022 / 0.9000 / 0.9018 (**0.9013**) | 22 s (4 threads, CPU) | every member passed the alignment check. Submission VALID (260,582 rows, sample order), sha256 `c3af1418ffab08f7843b1813359ad7353ee0ac6676f4293609d3cf530a696c05`. October calls: legit 256,636; mule 789, bot 318, chain 556, sim 370, takeover 230, phishing 498, qr 517, refund 279, cashback 207, loan 99, collusion 83 (3,946 fraud). October rows changed vs each member's own decode: champion 20, lgbm 11, catboost 10, clean-event 5, clean-l2 4 (train rows: 39 / 37 / 69 / 44 / 46) |
 
@@ -169,7 +169,7 @@ Leave-one-month-out macro-F1 per held-out month Jul / Aug / Sep (mean), after th
 The blend ties its best member (+0.0001 given, +0.0000 to +0.0002 cleaned): the five members agree
 on all but a few dozen October rows.
 
-## Member: findings (analysis of the member runs, no refits)
+## Findings (analysis of the member runs, no refits)
 
 Each member is decoded as the run decodes it (fixed point 0.875 per month, then
 `anchored_templates`) by `analysis/findings.py`. The script ran on the box with 4 CPU threads in
@@ -188,7 +188,7 @@ The champion row matches run 9, which checks the decoding. The members' spread o
 (0.5662-0.5667) is below the 0.0002-0.0005 public-slice sd of a pairwise gap
 (`docs/findings/public-score-noise.md`).
 
-## Member: refit (more data)
+## Refit (more data)
 
 Champion XGBoost cascade, seeds 0, 1, 2; decoded with the fixed point and the anchored template
 rule. Details and per-class tables: `docs/findings/more-data.md`.

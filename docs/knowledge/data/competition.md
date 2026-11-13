@@ -7,7 +7,7 @@ scored on the private part. The organisers gave four hints about the data (next 
 labels, dead columns, relational signal); every one proved true. This file also lists the tables, the
 columns and the train-only columns that are dead in October.
 
-Status labels: **earlier measurement** = from the prior research pack, a later session can re-derive
+Status labels: **earlier measurement** = from the prior research pack, a later pass can re-derive
 it; **measured in this repo** = this repository's own runs (stated with the command). Back to the
 [index](index.md).
 

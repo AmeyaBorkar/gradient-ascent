@@ -113,7 +113,7 @@ suspiciously large gain is a bug until proven otherwise).
 
 ## 4. Merge policy (condensed)
 
-- Anyone, or an agent for them, may merge any non-draft change whose gate holds; oldest first,
+- A non-draft change may be merged whose gate holds; oldest first,
   rebase-merge only, no direct commits to the main line, no force-push except with lease on one's
   own branch, no skipping hooks.
 - Gate: a green CI check or, when hosted CI cannot run, a passing local CI script run on the exact

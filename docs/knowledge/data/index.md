@@ -45,7 +45,7 @@ wrote each row and is the strongest non-row signal.
 
 - **Measured in this repo**: this repository's own runs, logged in `RESULTS.md`; each such claim states
   the command (the main one is `python -m ringtrace.build recipes/champion.json`).
-- **Earlier measurement**: from the earlier research pack. A later session may re-derive it; the
+- **Earlier measurement**: from the earlier research pack. A later pass may re-derive it; the
   pack's analysis scripts are not in this repository, so re-deriving means rewriting a short query.
 - **Belief** and **guess** mark things inferred, not shown.
 

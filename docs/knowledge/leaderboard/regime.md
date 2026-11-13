@@ -3,7 +3,7 @@
 Summary: about 63% of every fraud label sits on rows that look like ordinary legitimate traffic.
 Whether the test labels count those rows ("regime A") or only generator-made rows ("regime B")
 changes the best strategy by about 0.02. The all-legit upload scored **0.0816**, which is regime A.
-All numbers here are **earlier measurements** unless stated; a later session can re-derive the
+All numbers here are **earlier measurements** unless stated; a later pass can re-derive the
 table with the formula below.
 
 ## The formula

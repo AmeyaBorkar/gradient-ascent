@@ -1,7 +1,7 @@
 # Getting more out of the data and the test month
 
 Status convention. "Measured in this repository" means this repo's own runs (see its results
-table). "Earlier measurement" means a previous working session measured it and a later session may
+table). "Earlier measurement" means a previous research pass measured it and a later pass may
 re-derive it here. Almost everything below is an earlier measurement; the repo-measured anchors are
 listed first.
 

@@ -115,7 +115,7 @@ Curated background from earlier research (each with claims labelled measured/ear
 - [Leaderboard](knowledge/leaderboard/index.md): upload history and how leaderboard scores related
   to local ones.
 
-These folders are being written by other sessions; if a link is missing, the folder is not merged yet.
+If a link is missing, that folder is not written yet.
 
 ## 5. Next steps
 

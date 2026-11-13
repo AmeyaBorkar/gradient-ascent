@@ -64,8 +64,7 @@ precision July / August / September):
   takeover phase 2.81, which is how the two are told apart; the `sim_swap` segment is 162 multi-row phones
   (96.7% of labels agree), the takeover segment 361 (99.5%).
 - **An earlier map ordered the zones differently** (it put `sim_swap` first, with the single-row classes
-  last); the later, finer map above lists the mule block first and was checked against label anchors. If a
-  new session finds a disagreement, re-derive the order from label-free markers; the block edges are
+  last); the later, finer map above lists the mule block first and was checked against label anchors. If a new run finds a disagreement, re-derive the order from label-free markers; the block edges are
   robust, the class order inside is the part to verify.
 
 ## 3. What the zones buy

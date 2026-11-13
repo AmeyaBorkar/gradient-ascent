@@ -10,7 +10,7 @@ decodes to the same score as a 900-round one), and two seeds disagree on about 0
 [the information-limit theory](#why-they-all-tie-the-information-limit).
 
 Status key: **[repo]** = measured in this repository (see `RESULTS.md`); **[earlier]** = earlier
-measurement, a later session may re-derive it here. Vocabulary: "given" labels are as shipped,
+measurement, a later pass may re-derive it here. Vocabulary: "given" labels are as shipped,
 "cleaned" labels are the repaired labels ([labels.md](labels.md)), "generator-only" scores only
 rows made by the fraud generator. "LOMO" is leave-one-month-out (train two months, score the third;
 mean of Jul/Aug/Sep). "October-like" is a September thinned to October's density ([more-data.md](more-data.md)).

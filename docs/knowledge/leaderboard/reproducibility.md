@@ -70,7 +70,7 @@ not bit-reproducible (atomics), another reason to keep such models out of the fi
   public score within 0.0013 (noise; see [cv-vs-public.md](cv-vs-public.md)). The rebuild is a check
   that the written method suffices to reproduce the result.
 
-## Open points to settle in a new session
+## Open points to settle next
 
 - Which of the tied best-public files (uploads 4 and 5 in [uploads.md](uploads.md)) will be
   re-run, and whether its full recipe is in the code that will be submitted.

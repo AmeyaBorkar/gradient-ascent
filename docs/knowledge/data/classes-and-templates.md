@@ -11,7 +11,7 @@ labels keep them.
 Back to the [index](index.md). Related: [generator](generator.md), [device counter](device-counter.md),
 [label noise](label-noise.md).
 
-Status: all numbers are an **earlier measurement** (a later session can re-derive them) unless marked
+Status: all numbers are an **earlier measurement** (a later pass can re-derive them) unless marked
 "measured in this repo".
 
 ## 1. Signatures

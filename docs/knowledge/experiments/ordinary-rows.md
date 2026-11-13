@@ -1,8 +1,7 @@
 # Ordinary rows: every attempt to separate them from legit
 
 Status vocabulary used below. **measured in this repo** means this repository's own runs show it
-(see `RESULTS.md`). **earlier measurement** means an earlier working session measured it; a later
-session may re-derive it here. **literature / belief** means reasoning or published claims, not a
+(see `RESULTS.md`). **earlier measurement** means an earlier research pass measured it; a later pass may re-derive it here. **literature / belief** means reasoning or published claims, not a
 run of ours.
 
 ## Summary
