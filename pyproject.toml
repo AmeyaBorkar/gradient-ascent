@@ -2,6 +2,7 @@
 name = "ringtrace"
 version = "0.1.0"
 description = "Fraud-ring detection pipeline for the UPI Fraud Rings datathon (12-class macro-F1)."
+authors = [{name = "Ameya Borkar"}]
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=2.0",
