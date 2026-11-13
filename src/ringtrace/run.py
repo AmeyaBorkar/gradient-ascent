@@ -78,6 +78,13 @@ def cleaned_labels(led: pl.DataFrame) -> np.ndarray | None:
     return silver.load(led, "label")
 
 
+def check_proba(p: np.ndarray, what: str) -> None:
+    """Every row must be a finite distribution before it is decoded or saved."""
+    bad = ~np.isfinite(p).all(axis=1) | (np.abs(p.sum(axis=1) - 1) > 1e-4)
+    if bad.any():
+        raise ValueError(f"{what}: {int(bad.sum())} rows are not finite or do not sum to 1")
+
+
 def score_block(
     name: str,
     pred: np.ndarray,
@@ -194,13 +201,17 @@ def main(argv: list[str] | None = None) -> dict:
     p_tr = oof[tr_idx]
     score_block("argmax", p_tr.argmax(1), targets, per_tr, report, log, folds)
     dec = recipe.get("decoder", {"fraud_scale": 0.875})
-    pred_tr = decode_by_period(p_tr, per_tr, **dec)
+    held = np.isin(per_tr, folds)
+    check_proba(p_tr[held], "held-out rows")
+    pred_tr = np.zeros(len(tr_idx), dtype=np.int64)  # months outside --folds are never scored
+    pred_tr[held] = decode_by_period(p_tr[held], per_tr[held], **dec)
     score_block("fixed_point", pred_tr, targets, per_tr, report, log, folds)
 
     rules = recipe.get("rules", [])
     pred_all = np.zeros(len(y), dtype=np.int64)
     pred_all[tr_idx] = pred_tr
     if not args.no_test:
+        check_proba(test_proba, "October rows")
         pred_all[te_idx] = decode_by_period(test_proba, period[te_idx], **dec)
     if rules:
         from ringtrace import rules as rulebook

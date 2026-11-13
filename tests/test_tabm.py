@@ -76,3 +76,43 @@ def test_run_dispatches_on_model():
     assert fn is tabm.fit_predict and spec.seeds == (3, 4) and spec.epochs == 2
     spec, fn = run.model({})
     assert fn.__module__ == "ringtrace.cascade"
+
+
+def test_check_proba_rejects_empty_or_nan_rows():
+    from ringtrace.run import check_proba
+
+    good = np.full((3, N_CLASSES), 1 / N_CLASSES)
+    check_proba(good, "ok")
+    for bad in (np.zeros((1, N_CLASSES)), np.full((1, N_CLASSES), np.nan)):
+        with pytest.raises(ValueError):
+            check_proba(np.vstack([good, bad]), "bad")
+
+
+def test_decompose_splits_changes_and_credits_them():
+    from ringtrace.decompose import categories, decompose
+
+    a = np.array([0, 0, 1, 2, 3, 0])
+    b = np.array([1, 0, 0, 3, 3, 0])
+    y = np.array([1, 0, 1, 3, 3, 0])
+    cats = categories(a, b)
+    assert cats["legit->fraud"].tolist() == [True, False, False, False, False, False]
+    assert cats["fraud->legit"].sum() == 1 and cats["type switch"].sum() == 1
+    rows = {r["category"]: r for r in decompose(a, b, {"given": y}, np.full(6, 7), months=(7,))}
+    assert rows["legit->fraud"]["prec_given"] == 1.0
+    assert rows["fraud->legit"]["prec_given"] == 0.0
+    assert rows["legit->fraud"]["d_given"][0] > 0 > rows["fraud->legit"]["d_given"][0]
+
+
+def test_fraud_split_keeps_types_and_takes_the_fraud_mass():
+    from ringtrace.blendscore import fraud_split_from
+
+    types = np.zeros((2, N_CLASSES))
+    types[0, [0, 1, 2]] = [0.6, 0.3, 0.1]
+    types[1, 0] = 1.0  # no fraud mass: types spread evenly
+    split = np.zeros((2, N_CLASSES))
+    split[:, 0] = [0.2, 0.5]
+    split[:, 3] = [0.8, 0.5]
+    p = fraud_split_from(types, split)
+    np.testing.assert_allclose(p.sum(1), 1.0)
+    np.testing.assert_allclose(p[0, :3], [0.2, 0.6, 0.2])
+    np.testing.assert_allclose(p[1, 1:], 0.5 / 11)

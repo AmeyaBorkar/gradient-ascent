@@ -249,3 +249,106 @@ Analysis of the saved blend run (`blend`), no refits. Box CPU, 16 threads. Findi
 | fresh-octlike-bq: champion + `blank_merchant_qr` vs champion, 9 cells | ffbdfb7 | +0.0000 in every seed on given, cleaned and gen-only; lower bound +0.0000; 0 rows changed; **FAIL** (not positive) | about 10 min |
 | fresh-octlike-bq, first two launches | ffbdfb7 | failed: missing frames in the shared cache, then cells from an older frame build (251,860 vs 252,462 September rows); scored on current-frame champion cells | <2 min |
 | fresh-blend-blankqr (`python -m ringtrace.blend recipes/blend-blankqr.json`), upload candidate | 92735ae | given 0.5130 / 0.5091 / 0.5148 (0.5123); cleaned 0.5647 / 0.5641 / 0.5714 (0.5667); gen-only 0.9022 / 0.9000 / 0.9019 (0.9013); valid; sha256 `e7c594672f0921e6def080f0c06347144cd848282b10c9fe6e384416eed043d0`; against the blend's file: 20 October rows legit -> fraud (13 qr_swap, 7 refund_abuse) | about 5 min |
+
+## TabM member (member tabm, laptop: RTX 5070 Ti, 16 threads)
+
+Model: `ringtrace.tabm` (`docs/decisions.md` item 14), recipe `recipes/tabm.json`: the champion's
+230 features (337 inputs with 107 gap flags), k = 16 weight-sharing members, 10 epochs, direct
+12-class softmax; decoded like the champion (fixed point 0.875 + anchored template rule).
+torch 2.14.1+cu130. Two reruns on the GPU give bit-identical probabilities (synthetic check,
+no nondeterminism warnings).
+
+Macro-F1 after the rule, per held-out month Jul / Aug / Sep (mean):
+
+| # | run | commit | given | cleaned | gen-only | wall | notes |
+|---|---|---|---|---|---|---|---|
+| T1 | champion, local rerun (`run recipes/champion.json`) | 25a768c | 0.5130 / 0.5090 / 0.5146 (0.5122) | 0.5645 / 0.5639 / 0.5712 (0.5665) | 0.9020 / 0.8996 / 0.9014 (0.9010) | 6.5 min | matches run 9 exactly; the base for everything below |
+| T2 | go/no-go trial: tabm, fold 9 only (fit Jul + Aug), seed 0 (`run recipes/tabm-trial.json --folds 9 --no-test`) | 56fc386 | - / - / 0.5150 | - / - / 0.5717 | - / - / 0.9014 | 5.5 min | champion Sep 0.5146 / 0.5712 / 0.9014: +0.0004 / +0.0005 / 0.0000. **Pass** |
+| T3 | trial blend champion + tabm 1:1, Sep (`blend champion+tabm-trial-fold-9 --months 9`) | 56fc386 | - / - / 0.5152 | - / - / 0.5719 | - / - / 0.9018 | <1 min | +0.0006 / +0.0007 / +0.0004 over the champion. **Pass**; 325 Sep argmax calls differ |
+| T4 | **tabm**, seeds 0-2, leave-one-month-out + October (`run recipes/tabm.json`) | 56fc386 | 0.5134 / 0.5084 / 0.5151 (**0.5123**) | 0.5649 / 0.5635 / 0.5718 (**0.5667**) | 0.9023 / 0.8984 / 0.9019 (0.9008) | 51.5 min | fixed point alone 0.5070 / 0.5609 (champion 0.5064 / 0.5601); 786 argmax calls differ from the champion over 1.56 M train rows |
+| T5 | **champion + tabm** 1:1 (`blend champion+tabm`) | 967c773 | 0.5134 / 0.5092 / 0.5149 (**0.5125**) | 0.5652 / 0.5643 / 0.5716 (**0.5670**) | 0.9031 / 0.9000 / 0.9017 (0.9016) | <1 min | +0.0003 / +0.0005 / +0.0006 over the champion; Aug and Sep given within ±0.0004 |
+
+Probability check: the trial's decoder warning (`invalid value in divide`) came from the
+1,053,917 July + August rows of the one-fold run (never predicted, all-zero, unscored), not from
+TabM: September had 0 zero-sum and 0 non-finite rows, max |row sum - 1| = 1.5e-7. Fixed in
+`run.py` (967c773): only held-out months are decoded, and every held-out and October row must be
+finite and sum to 1 before decoding (`check_proba`). Re-decoding the trial gives the same
+0.5150 / 0.5717 / 0.9014; the full run's `oof.npy` (1,564,060 rows) and `test.npy` (260,582)
+pass the check.
+
+### TabM in the five-way blend (leave-one-month-out, after the template rule)
+
+Members' month-fold arrays copied read-only from the box runs `blend-champion-m1`, `lgbm`,
+`catboost`, `clean-event`, `clean-l2`; scored with `python -m ringtrace.blend` (fixed point 0.875
+per month, then the rules). The equal five-way blend re-decoded here reproduces the reference
+October file exactly (0 differing rows). Change against the five-way blend, Jul / Aug / Sep:
+
+| arm | weights | given | cleaned | gen-only | never loses |
+|---|---|---|---|---|---|
+| a | tabm 1/6, each member 1/6 | +0.00058 / +0.00009 / +0.00024 | +0.00054 / +0.00008 / +0.00022 | +0.00078 / +0.00008 / -0.00014 | no |
+| b | tabm 1/3, each member 2/15 | +0.00055 / +0.00015 / +0.00021 | +0.00067 / +0.00014 / +0.00027 | +0.00092 / +0.00013 / -0.00010 | no |
+| **c** | tabm 1/2, each member 1/10 | +0.00050 / +0.00016 / +0.00027 | +0.00051 / +0.00018 / +0.00036 | +0.00065 / +0.00005 / +0.00005 | **yes** |
+| c + blank merchant QR rule (commit 80ccae8) | as c, rules `anchored_templates, blank_merchant_qr`, against the five-way blend with the same rules | +0.00050 / +0.00016 / +0.00023 | +0.00051 / +0.00018 / +0.00033 | +0.00065 / +0.00005 / +0.00000 | yes |
+
+Arm c, absolute: given 0.5135 / 0.5093 / 0.5150 (0.5126), cleaned 0.5652 / 0.5643 / 0.5717
+(0.5671), gen-only 0.9029 / 0.9000 / 0.9019 (0.9016). With the QR rule the five-way base is
+given 0.5123, cleaned 0.5667 (mean) and arm c given 0.5126, cleaned 0.5671. October: arm c moves
+5 calls against the five-way blend; with the QR rule, 7 calls against the five-way blend with
+that rule. Wall time under 1 min per arm.
+
+### Where arm c's changes come from, and a fraud-only variant (commit after 80ccae8)
+
+Public feedback on the October file of arm c with the QR rule: 0.5483 against 0.5486 for the
+five-way blend with the QR rule. Its 7 October changes were 4 legit->fraud adds and 3 fraud type
+switches. Hypothesis: TabM's type calls are worse than the trees'. Tested on the train months
+(`python -m ringtrace.decompose <five-way> <arm c>`). Calls after the template rule; the QR rule
+changes one add in train and nothing else. Precision = share of changed rows where the new call
+equals the label; contribution = macro-F1 change with only that category applied, Jul / Aug / Sep.
+
+| category | n | precision given / cleaned | given contribution | cleaned contribution | gen-only contribution |
+|---|---|---|---|---|---|
+| legit -> fraud | 37 | 0.59 / 0.70 | +0.00035 / +0.00029 / +0.00027 | +0.00032 / +0.00031 / +0.00036 | +0.00036 / +0.00027 / +0.00005 |
+| fraud -> legit | 0 | - | 0 | 0 | 0 |
+| type switch | 5 | 0.40 / 0.60 | +0.00015 / -0.00013 / 0 | +0.00019 / -0.00013 / 0 | +0.00028 / -0.00022 / 0 |
+| of which qr_swap -> refund_abuse | 3 | 0.67 / 1.00 | +0.00013 / 0 / 0 | +0.00028 / 0 / 0 | +0.00043 / 0 / 0 |
+| of which refund_abuse -> qr_swap | 1 | 0.00 / 0.00 | +0.00002 / 0 / 0 | -0.00009 / 0 / 0 | -0.00014 / 0 / 0 |
+| of which merchant_collusion -> refund_abuse | 1 | 0.00 / 0.00 | 0 / -0.00013 / 0 | 0 / -0.00013 / 0 | 0 / -0.00022 / 0 |
+
+Finding: TabM's gain is in the fraud mass (adds that are right 59 % of the time on given labels,
+70 % on cleaned, every month positive). Its type switches are a coin flip: 2 of 5 wrong on
+cleaned labels, and the wrong ones cost as much as a right add gains. This agrees with the public
+result.
+
+**tabm-fraud-only** (`blend.save_fraud_split`): legit column from arm c; the 11 fraud types are
+the five-way blend's distribution rescaled to arm c's fraud mass. Leave-one-month-out after the
+template rule: given 0.5137 / 0.5093 / 0.5150 (0.5127), cleaned 0.5654 / 0.5644 / 0.5718
+(0.5672), gen-only 0.9031 / 0.9000 / 0.9019 (0.9016). Change:
+
+| comparison | given | cleaned | gen-only | never loses |
+|---|---|---|---|---|
+| vs five-way blend | +0.00073 / +0.00025 / +0.00029 | +0.00068 / +0.00025 / +0.00043 | +0.00089 / +0.00001 / +0.00004 | yes |
+| vs five-way, both with the QR rule | +0.00073 / +0.00025 / +0.00025 | +0.00068 / +0.00025 / +0.00039 | +0.00089 / +0.00001 / -0.000002 | gen-only Sep -2.3e-6 (one row) |
+| vs arm c | +0.00023 / +0.00009 / +0.00002 | +0.00017 / +0.00007 / +0.00006 | +0.00024 / -0.00004 / -0.00001 | no (gen-only only) |
+
+Its changes against the five-way blend: 49 adds (precision 0.55 given / 0.65 cleaned) and 3 type
+switches, all qr_swap -> refund_abuse and all right. October file with the QR rule last:
+`candidates/blend-tabmF-bq.csv`, VALID, sha256 `8a46142660cde2af1576736289f822c1b5c6226204445bce88d4dc311fb926eb`;
+7 changes against the five-way blend with the QR rule, all legit -> fraud (phishing_collect 4,
+loan_app_extortion 1, merchant_collusion 1, sim_swap 1), no type switches.
+
+### October-like gate (seed set 0 only: 3 cells, cascade seeds 0-2 / TabM seeds 0-2)
+
+`octlike fit tabm:0` (about 15 min per cell on the laptop GPU), then
+`octlike score champion <challenger> --sets 0`. TabM per cell, given / cleaned / gen-only:
+s13 0.5242 / 0.5828 / 0.9057, s14 0.5096 / 0.5674 / 0.8902, s15 0.5140 / 0.5712 / 0.8986
+(champion r0: 0.5240 / 0.5822 / 0.9054, 0.5092 / 0.5663 / 0.8897, 0.5134 / 0.5707 / 0.8986).
+
+| challenger vs champion | given per seed s13 / s14 / s15 (lower bound) | cleaned (lower bound) | gen-only (lower bound) | verdict |
+|---|---|---|---|---|
+| tabm | +0.0002 / +0.0004 / +0.0006 (-0.0002) | +0.0006 / +0.0010 / +0.0005 (-0.0000) | +0.0002 / +0.0005 / +0.0000 (-0.0009) | FAIL (bounds) |
+| champion+tabm | +0.0004 / +0.0005 / +0.0002 (-0.0001) | +0.0007 / +0.0008 / +0.0001 (-0.0000) | +0.0010 / +0.0005 / -0.0002 (-0.0003) | FAIL (bounds) |
+
+Positive on every thinning seed for given and cleaned, but the bootstrap lower bounds do not
+clear 0, so the gate fails. Only 3 of the 9 cells were fitted (time box); s13 r1-r2 are being
+fitted now. The five-way + tabm October-like gate is not run: the other members' cells do not
+exist locally.
