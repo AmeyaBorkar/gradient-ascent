@@ -48,8 +48,9 @@ def test_subsample_context_keeps_fraud_and_reports_rate():
     assert np.array_equal(idx, idx2)
     all_idx, q1 = icl.subsample_context(y, 20_000, seed=3)
     assert len(all_idx) == len(y) and q1 == 1.0
-    with pytest.raises(ValueError):
-        icl.subsample_context(y, 50, seed=3)
+    # fraud rows alone over the limit: all kept, the limit grows to leave legit 20 % of the room
+    idx3, q3 = icl.subsample_context(y, 50, seed=3)
+    assert y[idx3].sum() == 100 and len(idx3) == 125 and q3 == pytest.approx(25 / 9900)
 
 
 def test_prior_correct_undoes_legit_subsampling():

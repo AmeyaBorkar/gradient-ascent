@@ -33,6 +33,7 @@ import argparse
 import json
 import time
 from collections.abc import Callable
+from pathlib import Path
 
 import numpy as np
 from scipy.stats import rankdata
@@ -43,6 +44,7 @@ TRAIN_MONTHS = (7, 8, 9)
 SHARE = 0.05
 TOP_K = 100
 MAX_CONTEXT = 50_000
+MAX_FRAUD_SHARE = 0.8
 QUERY_BATCH = 4096
 SEED = 0
 CHAMPION_RECIPE = "recipes/champion.json"
@@ -96,9 +98,12 @@ def subsample_context(y: np.ndarray, max_rows: int, seed: int) -> tuple[np.ndarr
     if len(y) <= max_rows:
         return np.arange(len(y)), 1.0
     fraud, legit = np.flatnonzero(y), np.flatnonzero(~y)
+    # every fraud row stays; when they would fill more than MAX_FRAUD_SHARE of the context, the
+    # limit grows so that legit rows keep that much room
+    max_rows = max(max_rows, int(np.ceil(len(fraud) / MAX_FRAUD_SHARE)))
+    if len(y) <= max_rows:
+        return np.arange(len(y)), 1.0
     room = max_rows - len(fraud)
-    if room <= 0:
-        raise ValueError(f"{len(fraud)} fraud rows alone exceed the context limit {max_rows}")
     rng = np.random.default_rng(seed)
     keep = rng.choice(legit, size=room, replace=False)
     return np.sort(np.r_[fraud, keep]), room / len(legit)
@@ -182,6 +187,7 @@ def lomo_member(
     max_context: int = MAX_CONTEXT,
     seed: int = SEED,
     log=print,
+    fold_cache: str | Path | None = None,
 ) -> tuple[np.ndarray, dict]:
     """The member's probabilities over every ledger row (``champ`` holds the champion's train
     out-of-fold and October rows in ledger order) and a report."""
@@ -207,15 +213,25 @@ def lomo_member(
     )
     out = np.asarray(champ, dtype=np.float64).copy()
     report["folds"] = {}
+    cache = Path(fold_cache) if fold_cache else None
     folds = [(str(m), train & (period != m), train & (period == m)) for m in TRAIN_MONTHS]
     folds.append(("october", train, is_test))
     for name, ctx_rows, qry_rows in folds:
         ctx = np.flatnonzero(ctx_rows & cand)
         qry = np.flatnonzero(qry_rows & cand)
         log(f"[icl] fold {name}")
-        (p,), info = score_queries(
-            X[ctx], y_fraud[ctx], [X[qry]], factory, k, max_context, seed, log=log
-        )
+        hit = cache / f"fold_{name}.npz" if cache else None
+        if hit is not None and hit.exists():
+            f = np.load(hit, allow_pickle=True)
+            p, info = f["p"], json.loads(str(f["info"]))
+            log(f"  fold {name} read from {hit}")
+        else:
+            (p,), info = score_queries(
+                X[ctx], y_fraud[ctx], [X[qry]], factory, k, max_context, seed, log=log
+            )
+            if hit is not None:
+                hit.parent.mkdir(parents=True, exist_ok=True)
+                np.savez(hit, p=p, info=json.dumps(info))
         out[qry] = compose(p, champ[qry])
         report["folds"][name] = info
     return out, report
@@ -305,7 +321,17 @@ def cmd_lomo(args) -> dict:
     champ = _champion_full(led, args.champion)
     factory = MODELS[args.model]
     proba, report = lomo_member(
-        X, y_fraud, period, is_test, champ, factory, args.share, args.k, args.context, args.seed
+        X,
+        y_fraud,
+        period,
+        is_test,
+        champ,
+        factory,
+        args.share,
+        args.k,
+        args.context,
+        args.seed,
+        fold_cache=paths.out_dir() / "runs" / args.name / "folds",
     )
     report["features"] = [cols[i] for i in report["folds"]["october"]["features"]]
     out = paths.out_dir() / "runs" / args.name
