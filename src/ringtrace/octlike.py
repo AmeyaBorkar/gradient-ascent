@@ -457,11 +457,18 @@ def score(
     recipes_dir: Path,
     draws: int = DRAWS,
     log=print,
+    rules_a: list | None = None,
+    rules_b: list | None = None,
 ) -> dict:
+    """``rules_a`` / ``rules_b`` replace the base's / challenger's rules (default decoder)."""
     from ringtrace.scoring import macro_f1
 
     ba, ch = parse_blend(base), parse_blend(challenger)
     dec_a, dec_b = _recipe_decoding(ba, recipes_dir), _recipe_decoding(ch, recipes_dir)
+    if rules_a is not None:
+        dec_a = (dec_a[0], rules_a)
+    if rules_b is not None:
+        dec_b = (dec_b[0], rules_b)
     cells = {}
     for seed in seeds:
         frame = Frame(seed)
@@ -483,6 +490,8 @@ def score(
             cells[(seed, r)] = cell
     report = {"base": base, "challenger": challenger, "per_seed": {}, "lower_bound": {}}
     targets = list(next(iter(cells.values())))
+    if rules_b is not None:
+        report["challenger_rules"] = rules_b
     log(f"[gate] {challenger} vs {base}, {len(cells)} cells, {draws} draws, 95 %")
     for t in targets:
         per_seed = {s: float(np.mean([cells[(s, r)][t]["delta"] for r in sets])) for s in seeds}
@@ -528,6 +537,9 @@ def main(argv=None) -> dict | None:
     s.add_argument("--sets", default=",".join(map(str, SEED_SETS)))
     s.add_argument("--draws", type=int, default=DRAWS)
     s.add_argument("--recipes", default="recipes")
+    s.add_argument("--rules-a", help="comma-separated rules replacing the base's")
+    s.add_argument("--rules-b", help="comma-separated rules replacing the challenger's")
+    s.add_argument("--tag", default="", help="suffix of the report file name")
     args = ap.parse_args(argv)
     if args.cmd == "build":
         for seed in _ints(args.seeds):
@@ -546,8 +558,10 @@ def main(argv=None) -> dict | None:
         _ints(args.sets),
         Path(args.recipes),
         args.draws,
+        rules_a=args.rules_a.split(",") if args.rules_a else None,
+        rules_b=args.rules_b.split(",") if args.rules_b else None,
     )
-    name = f"gate_{args.challenger}_vs_{args.base}.json".replace("*", "x")
+    name = f"gate_{args.challenger}_vs_{args.base}{args.tag}.json".replace("*", "x")
     (_out_dir() / name).write_text(json.dumps(rep, indent=1))
     return rep
 

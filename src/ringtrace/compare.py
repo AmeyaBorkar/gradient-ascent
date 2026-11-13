@@ -59,7 +59,7 @@ def _macro(c: np.ndarray) -> np.ndarray:
     return f1.mean(axis=1)
 
 
-def bootstrap(groups, truth, period, pred_a, pred_b, draws=2000, seed=0) -> dict:
+def bootstrap(groups, truth, period, pred_a, pred_b, draws=2000, seed=0, q=(5, 95)) -> dict:
     rng = np.random.default_rng(seed)
     _, g = np.unique(groups, return_inverse=True)
     deltas = np.zeros(draws)
@@ -79,7 +79,7 @@ def bootstrap(groups, truth, period, pred_a, pred_b, draws=2000, seed=0) -> dict
         point += float((_macro(np.asarray(one @ cb)) - _macro(np.asarray(one @ ca)))[0]) / len(
             months
         )
-    lo, hi = np.percentile(deltas, [5, 95])
+    lo, hi = np.percentile(deltas, list(q))
     return {
         "delta": point,
         "p05": float(lo),
