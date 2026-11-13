@@ -1,6 +1,6 @@
 """Run one recipe end to end: features -> month folds -> cascade -> decoder -> rules -> scores.
 
-    python -m ringtrace.run recipes/<name>.json [--folds-only] [--no-test]
+    python -m ringtrace.run recipes/<name>.json [--no-test] [--name <run>]
 
 Writes under ``$RINGTRACE_OUT/runs/<name>/``: ``oof.npy`` (train-row probabilities from the
 month folds), ``test.npy`` (October probabilities, mean of the fold models), ``summary.json``
@@ -78,8 +78,11 @@ def main(argv: list[str] | None = None) -> dict:
     ap.add_argument("--without", default="",
                     help="comma list of families to leave out (ablation); renames the run")
     ap.add_argument("--rules", default=None, help="comma list replacing the recipe's rules")
+    ap.add_argument("--name", default=None, help="run name (output directory) replacing the recipe's")
     args = ap.parse_args(argv)
     recipe = load_recipe(args.recipe)
+    if args.name:
+        recipe["name"] = args.name
     if args.without:
         gone = [f for f in args.without.split(",") if f]
         recipe["families"] = [f for f in recipe["families"] if f not in gone]
