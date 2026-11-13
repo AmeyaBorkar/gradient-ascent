@@ -3,6 +3,7 @@
     python -m ringtrace.nnexp teacher [--cells sep,s13,s14,s15]
     python -m ringtrace.nnexp fit <variant> [--cells sep,s13,s14,s15] [--seeds 0,1,2]
     python -m ringtrace.nnexp score <variant> [--base base] [--cells ...]
+    python -m ringtrace.nnexp table <variant> [--base base]
 
 Cells: ``sep`` is the normal ledger with September held out (the leave-one-month-out fold 9);
 ``s13``..``s15`` are the October-like frames (``ringtrace.octlike``). Every variant is
@@ -441,12 +442,31 @@ def score(variant: str, base: str, cells: list[str], draws: int = 1000, log=prin
     return report
 
 
+def table_rows(report: dict, name: str | None = None) -> list[str]:
+    """Markdown rows of a ``score`` report: per role, each cell's change x 1e-4 on the targets
+    in order (given / cleaned / gen-only), the calls changed, and whether no target loses."""
+    name = name or report["variant"]
+    cells = list(report["cells"])
+    rows = []
+    for role in ("fraud_only", "alone"):
+        parts, worst = [], 0.0
+        for c in cells:
+            r = report["cells"][c][role]
+            ds = [r[t]["delta"] for t in ("given", "cleaned", "gen") if t in r]
+            worst = min([worst, *ds])
+            parts.append(" / ".join(f"{1e4 * d:+.1f}" for d in ds) + f" ({r['changed_calls']})")
+        label = role.replace("_", "-")
+        verdict = "yes" if worst >= 0 else "no"
+        rows.append(f"| {name} | {label} | " + " | ".join(parts) + f" | {verdict} |")
+    return rows
+
+
 def main(argv=None) -> None:
     from ringtrace import threads
 
     threads.pin()
     ap = argparse.ArgumentParser(prog="python -m ringtrace.nnexp")
-    ap.add_argument("cmd", choices=["teacher", "fit", "score"])
+    ap.add_argument("cmd", choices=["teacher", "fit", "score", "table"])
     ap.add_argument("variant", nargs="?", default="base")
     ap.add_argument("--cells", default="sep,s13,s14,s15")
     ap.add_argument("--seeds", default="0,1,2")
@@ -459,6 +479,10 @@ def main(argv=None) -> None:
     elif args.cmd == "fit":
         for v in args.variant.split(","):
             fit(v, cells, tuple(int(s) for s in args.seeds.split(",")), job=args.job)
+    elif args.cmd == "table":
+        for v in args.variant.split(","):
+            report = json.loads((_dir() / f"score_{v}_vs_{args.base}.json").read_text())
+            print("\n".join(table_rows(report)))
     else:
         for v in args.variant.split(","):
             score(v, args.base, cells)

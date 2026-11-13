@@ -111,3 +111,20 @@ def test_weighted_fit_with_unit_weights_runs_on_cpu():
     spec = tabm.TabMSpec(seeds=(0,), epochs=1, k=2, width=16, blocks=1, device="cpu")
     (p,) = nn_shift.fit_predict_weighted(X, y, np.ones(300), [X[:10]], spec, log=lambda *_: None)
     assert p.shape == (10, 12) and np.allclose(p.sum(axis=1), 1.0)
+
+
+def test_table_rows_report_each_cell_and_the_worst_target():
+    def cell(dg, dc, dn, calls):
+        r = {t: {"delta": d} for t, d in (("given", dg), ("cleaned", dc), ("gen", dn))}
+        return {**r, "changed_calls": calls}
+
+    report = {
+        "variant": "v",
+        "cells": {
+            "sep": {"fraud_only": cell(1e-4, 0.0, 2e-4, 3), "alone": cell(-1e-4, 0, 0, 9)},
+            "s13": {"fraud_only": cell(0.0, 0.0, 0.0, 0), "alone": cell(0, 0, 0, 0)},
+        },
+    }
+    fraud, alone = nnexp.table_rows(report)
+    assert fraud == "| v | fraud-only | +1.0 / +0.0 / +2.0 (3) | +0.0 / +0.0 / +0.0 (0) | yes |"
+    assert alone.endswith("| no |") and "-1.0 / +0.0 / +0.0 (9)" in alone
