@@ -204,3 +204,109 @@ rule. Details and per-class tables: `docs/findings/more-data.md`.
 | clean-event-refit / clean-event-hedge | 031e194 | — | — | — | 5.0 min | 48 / 24 argmax rows changed |
 | clean-l2-refit / clean-l2-hedge | 031e194 | — | — | — | 7.1 min | 61 / 38 argmax rows changed |
 | refit-october, first launch | ec37c9d | — | — | — | <1 min | failed: shell quoting in the recipe loop; relaunched via `scripts/refit_october.sh` |
+
+## October-like gate
+
+Box (one RTX 5060 Ti, 24 CPU threads in total), commit c58bcc7 for the fits and the scoring.
+`python -m ringtrace.octlike fit <member>` on frames s13-s15 (the same frame files as the
+champion's cells above), then `python -m ringtrace.octlike score <base> <challenger>` (1,000 draws,
+95 % event-bootstrap bounds). The champion's nine cells are the ones above, not refitted. The
+event-cleaned members clean only the July + August labels (September never votes). Before 3142b78
+the fit trained them on the given labels without warning. Blends average the members'
+probabilities per cell and decode as the champion does (fixed point 0.875, then anchored
+templates). Details: `docs/findings/october-like-gate.md`.
+
+Member cells, September macro-F1, given / cleaned / gen-only:
+
+| member | frame | r0 | r1 | r2 | wall per cell |
+|---|---|---|---|---|---|
+| lgbm | s13 | 0.5237 / 0.5823 / 0.9060 | 0.5237 / 0.5823 / 0.9060 | 0.5238 / 0.5824 / 0.9063 | 180-199 s |
+| lgbm | s14 | 0.5091 / 0.5664 / 0.8900 | 0.5089 / 0.5662 / 0.8901 | 0.5092 / 0.5666 / 0.8903 | 172-187 s |
+| lgbm | s15 | 0.5139 / 0.5712 / 0.8982 | 0.5140 / 0.5712 / 0.8982 | 0.5141 / 0.5713 / 0.8984 | 165-220 s |
+| catboost | s13 | 0.5236 / 0.5820 / 0.9053 | 0.5233 / 0.5817 / 0.9048 | 0.5239 / 0.5823 / 0.9056 | 47-55 s |
+| catboost | s14 | 0.5083 / 0.5655 / 0.8881 | 0.5086 / 0.5658 / 0.8886 | 0.5086 / 0.5657 / 0.8884 | 47-72 s |
+| catboost | s15 | 0.5132 / 0.5703 / 0.8979 | 0.5131 / 0.5702 / 0.8978 | 0.5130 / 0.5703 / 0.8980 | 47-48 s |
+| clean-event | s13 | 0.5241 / 0.5823 / 0.9058 | 0.5242 / 0.5826 / 0.9060 | 0.5241 / 0.5826 / 0.9062 | 148-155 s |
+| clean-event | s14 | 0.5092 / 0.5667 / 0.8901 | 0.5092 / 0.5664 / 0.8897 | 0.5095 / 0.5670 / 0.8902 | 95-102 s |
+| clean-event | s15 | 0.5135 / 0.5706 / 0.8985 | 0.5136 / 0.5706 / 0.8986 | 0.5135 / 0.5706 / 0.8983 | 94-104 s |
+| clean-l2 | s13 | 0.5240 / 0.5824 / 0.9059 | 0.5239 / 0.5823 / 0.9055 | 0.5239 / 0.5827 / 0.9062 | 94-98 s |
+| clean-l2 | s14 | 0.5096 / 0.5670 / 0.8901 | 0.5092 / 0.5666 / 0.8900 | 0.5095 / 0.5670 / 0.8902 | 140-151 s |
+| clean-l2 | s15 | 0.5135 / 0.5707 / 0.8986 | 0.5135 / 0.5708 / 0.8988 | 0.5136 / 0.5708 / 0.8989 | 94-97 s |
+
+Two fit jobs shared the GPU, 12 threads each: lgbm then clean-event (45 min), and catboost
+(`gpu_ram_part` 0.45) then clean-l2 (25 min). A warm-up job built the frames' feature caches first
+(about 3 min).
+
+Gate: the change against the base per thinning seed (mean of r0-r2), and the averaged 95 % lower
+bound (LB). Base mean over the 9 cells: given 0.5155, cleaned 0.5731, gen-only 0.8980.
+
+| challenger vs base | given s13 / s14 / s15, LB | cleaned s13 / s14 / s15, LB | gen-only s13 / s14 / s15, LB | verdict |
+|---|---|---|---|---|
+| lgbm vs champion | -0.0003 / -0.0000 / +0.0005, -0.0007 | -0.0001 / +0.0001 / +0.0005, -0.0006 | +0.0004 / +0.0005 / -0.0003, -0.0007 | FAIL |
+| catboost vs champion | -0.0004 / -0.0006 / -0.0004, -0.0012 | -0.0004 / -0.0006 / -0.0005, -0.0014 | -0.0005 / -0.0013 / -0.0006, -0.0019 | FAIL |
+| clean-event vs champion | +0.0001 / +0.0002 / +0.0001, -0.0002 | +0.0001 / +0.0004 / -0.0001, -0.0003 | +0.0003 / +0.0004 / -0.0000, -0.0004 | FAIL |
+| clean-l2 vs champion | -0.0001 / +0.0004 / +0.0001, -0.0003 | +0.0000 / +0.0006 / +0.0001, -0.0002 | +0.0002 / +0.0005 / +0.0002, -0.0004 | FAIL |
+| five-way blend vs champion | +0.0001 / +0.0004 / +0.0002, -0.0001 | +0.0003 / +0.0005 / +0.0002, -0.0000 | +0.0004 / +0.0003 / +0.0002, -0.0002 | FAIL (lower bound only) |
+| four-way blend (no CatBoost) vs five-way | +0.0000 / -0.0001 / -0.0001, -0.0003 | -0.0001 / -0.0003 / -0.0001, -0.0005 | -0.0001 / +0.0000 / +0.0001, -0.0003 | FAIL |
+
+Scoring took 25 min for the six comparisons at 8 threads. Gate files:
+`~/outputs/gate/octlike/gate_<challenger>_vs_<base>.json`.
+
+Four-way against five-way on leave-one-month-out (`python -m ringtrace.gate lomo`, the members'
+`oof.npy`, 1,000 draws per month, 95 % event-bootstrap bounds). Laptop, commit f3328a8, about 1 min.
+Each cell is five-way -> four-way, change [95 % bounds]:
+
+| target | Jul | Aug | Sep |
+|---|---|---|---|
+| given | 0.5130 -> 0.5131, +0.0001 [-0.0000, +0.0003] | 0.5091 -> 0.5092, +0.0001 [-0.0001, +0.0002] | 0.5147 -> 0.5146, -0.0001 [-0.0003, -0.0000] |
+| cleaned | 0.5647 -> 0.5647, +0.0000 [-0.0002, +0.0002] | 0.5641 -> 0.5642, +0.0001 [-0.0001, +0.0002] | 0.5714 -> 0.5713, -0.0001 [-0.0003, +0.0000] |
+| gen-only | 0.9022 -> 0.9023, +0.0001 [-0.0003, +0.0003] | 0.9000 -> 0.9001, +0.0001 [-0.0001, +0.0003] | 0.9018 -> 0.9017, -0.0001 [-0.0004, +0.0001] |
+
+September is negative on all three targets, so the four-way fails the leave-one-month-out bar as
+well.
+
+October files, built on the laptop from the box runs' arrays with `python -m ringtrace.blend`. Every
+file is VALID against the sample submission:
+
+| file | sha256 | October calls changed | notes |
+|---|---|---|---|
+| `runs/blend` (five-way, rebuilt as a check) | c3af1418ffab08f7843b1813359ad7353ee0ac6676f4293609d3cf530a696c05 | 0 | byte-identical to the box build |
+| `runs/blend4` (`recipes/blend4.json`) | 8df9b36aa3ad07e7fd31effe4410635e18c0c2063f5c83b85637153408220f48 | vs five-way: 3 (legit->refund_abuse 2, sim_swap->account_takeover 1) | |
+| `runs/blend4-bq` (four-way, then `blank_merchant_qr` after the template rule) | ca13597b0fde6a69a7f4321f6cf750e928e057e021f56cbfa8e039babf2e1491 | vs blend4: 18 (legit->qr_swap 12, legit->refund_abuse 5, legit->phishing_collect 1); vs the five-way with the same rule (e7c59467...): 2 (qr_swap->phishing_collect 1, sim_swap->account_takeover 1) | the rule is not in this repository's code yet: built from a temporary copy of `src`, with an uncommitted recipe. LOMO: given 0.5131 / 0.5092 / 0.5146, cleaned 0.5647 / 0.5642 / 0.5713, gen-only 0.9023 / 0.9000 / 0.9017 |
+
+October calls of `blend4`: legit 256,634, mule 789, bot 318, chain 556, sim 369, takeover 231,
+phishing 498, qr 517, refund 281, cashback 207, loan 99, collusion 83. `blend4-bq` changes these
+by: legit 256,616, phishing 499, qr 529, refund 286.
+
+LightGBM reproducibility: `lgbm_s13_r0` refitted at 12 and at 16 threads (`lgbm-rep12`,
+`lgbm-rep16`) is byte-identical to the original cell (max abs difference 0.0, 0 argmax changes).
+Each refit took about 3.5 min.
+
+## Refit test
+
+The October analogue on the October-like frames: champion recipe, commit c58bcc7. In each cell,
+the champion is fitted on July alone (`champion-m7`) and on August alone (`champion-m8`) with the
+screen off, since one month cannot cross-fit it. Their averaged probabilities (the fold mean) are
+compared with the champion's July + August cell (the refit). Control: July + August with the screen
+off (`champion-noscreen`). Details: `docs/findings/refit-test.md`.
+
+| cells | s13 r0, r1, r2 (given/cleaned/gen-only) | s14 | s15 | wall per cell |
+|---|---|---|---|---|
+| champion-m7 | 0.5234/0.5817/0.9046, 0.5231/0.5813/0.9042, 0.5238/0.5821/0.9054 | 0.5084/0.5655/0.8880, 0.5079/0.5651/0.8872, 0.5086/0.5657/0.8886 | 0.5139/0.5712/0.8983, 0.5138/0.5711/0.8983, 0.5136/0.5709/0.8977 | 96-119 s |
+| champion-m8 | 0.5230/0.5816/0.9052, 0.5222/0.5806/0.9045, 0.5231/0.5817/0.9055 | 0.5070/0.5643/0.8873, 0.5068/0.5641/0.8869, 0.5074/0.5648/0.8879 | 0.5125/0.5699/0.8975, 0.5125/0.5699/0.8982, 0.5130/0.5703/0.8981 | 102-117 s |
+| champion-noscreen | 0.5242/0.5828/0.9062, 0.5235/0.5820/0.9048, 0.5243/0.5831/0.9065 | 0.5089/0.5661/0.8889, 0.5085/0.5659/0.8887, 0.5089/0.5663/0.8889 | 0.5135/0.5709/0.8988, 0.5135/0.5710/0.8988, 0.5132/0.5706/0.8980 | 90-167 s |
+
+Two GPU fit jobs at 8 threads each took about 35 min for the 27 cells. Gate scoring took 18 min at
+8 threads. Fold-mean base: 0.5151 given, 0.5728 cleaned, 0.8972 gen-only.
+
+| challenger vs base | given s13 / s14 / s15, LB | cleaned s13 / s14 / s15, LB | gen-only s13 / s14 / s15, LB | verdict |
+|---|---|---|---|---|
+| refit (champion) vs fold mean | +0.0006 / +0.0006 / -0.0000, -0.0003 | +0.0006 / +0.0006 / -0.0000, -0.0004 | +0.0007 / +0.0012 / +0.0002, -0.0003 | FAIL |
+| July + August, screen off vs fold mean | +0.0005 / +0.0003 / -0.0001, -0.0003 | +0.0008 / +0.0004 / +0.0001, -0.0001 | +0.0009 / +0.0004 / +0.0003, -0.0002 | FAIL |
+| screen on vs screen off (July + August) | +0.0000 / +0.0003 / +0.0001, -0.0006 | -0.0002 / +0.0002 / -0.0001, -0.0008 | -0.0002 / +0.0008 / -0.0000, -0.0009 | FAIL (tie) |
+
+The refit fails, so no October refit of lgbm or catboost was run, and no refit blend was built.
+
+Failed launches (no output): the first warm-up and the first two fit jobs stopped at once on shell
+quoting. The first refit-cell fits stopped on `--tag -m7`, which argparse reads as an option; they
+were relaunched with `--tag=-m7`.
