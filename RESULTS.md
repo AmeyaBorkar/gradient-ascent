@@ -135,3 +135,60 @@ Arm c, absolute: given 0.5135 / 0.5093 / 0.5150 (0.5126), cleaned 0.5652 / 0.564
 given 0.5123, cleaned 0.5667 (mean) and arm c given 0.5126, cleaned 0.5671. October: arm c moves
 5 calls against the five-way blend; with the QR rule, 7 calls against the five-way blend with
 that rule. Wall time under 1 min per arm.
+
+### Where arm c's changes come from, and a fraud-only variant (commit after 80ccae8)
+
+Public feedback on the October file of arm c with the QR rule: 0.5483 against 0.5486 for the
+five-way blend with the QR rule. Its 7 October changes were 4 legit->fraud adds and 3 fraud type
+switches. Hypothesis: TabM's type calls are worse than the trees'. Tested on the train months
+(`python -m ringtrace.decompose <five-way> <arm c>`). Calls after the template rule; the QR rule
+changes one add in train and nothing else. Precision = share of changed rows where the new call
+equals the label; contribution = macro-F1 change with only that category applied, Jul / Aug / Sep.
+
+| category | n | precision given / cleaned | given contribution | cleaned contribution | gen-only contribution |
+|---|---|---|---|---|---|
+| legit -> fraud | 37 | 0.59 / 0.70 | +0.00035 / +0.00029 / +0.00027 | +0.00032 / +0.00031 / +0.00036 | +0.00036 / +0.00027 / +0.00005 |
+| fraud -> legit | 0 | - | 0 | 0 | 0 |
+| type switch | 5 | 0.40 / 0.60 | +0.00015 / -0.00013 / 0 | +0.00019 / -0.00013 / 0 | +0.00028 / -0.00022 / 0 |
+| of which qr_swap -> refund_abuse | 3 | 0.67 / 1.00 | +0.00013 / 0 / 0 | +0.00028 / 0 / 0 | +0.00043 / 0 / 0 |
+| of which refund_abuse -> qr_swap | 1 | 0.00 / 0.00 | +0.00002 / 0 / 0 | -0.00009 / 0 / 0 | -0.00014 / 0 / 0 |
+| of which merchant_collusion -> refund_abuse | 1 | 0.00 / 0.00 | 0 / -0.00013 / 0 | 0 / -0.00013 / 0 | 0 / -0.00022 / 0 |
+
+Finding: TabM's gain is in the fraud mass (adds that are right 59 % of the time on given labels,
+70 % on cleaned, every month positive). Its type switches are a coin flip: 2 of 5 wrong on
+cleaned labels, and the wrong ones cost as much as a right add gains. This agrees with the public
+result.
+
+**tabm-fraud-only** (`blend.save_fraud_split`): legit column from arm c; the 11 fraud types are
+the five-way blend's distribution rescaled to arm c's fraud mass. Leave-one-month-out after the
+template rule: given 0.5137 / 0.5093 / 0.5150 (0.5127), cleaned 0.5654 / 0.5644 / 0.5718
+(0.5672), gen-only 0.9031 / 0.9000 / 0.9019 (0.9016). Change:
+
+| comparison | given | cleaned | gen-only | never loses |
+|---|---|---|---|---|
+| vs five-way blend | +0.00073 / +0.00025 / +0.00029 | +0.00068 / +0.00025 / +0.00043 | +0.00089 / +0.00001 / +0.00004 | yes |
+| vs five-way, both with the QR rule | +0.00073 / +0.00025 / +0.00025 | +0.00068 / +0.00025 / +0.00039 | +0.00089 / +0.00001 / -0.000002 | gen-only Sep -2.3e-6 (one row) |
+| vs arm c | +0.00023 / +0.00009 / +0.00002 | +0.00017 / +0.00007 / +0.00006 | +0.00024 / -0.00004 / -0.00001 | no (gen-only only) |
+
+Its changes against the five-way blend: 49 adds (precision 0.55 given / 0.65 cleaned) and 3 type
+switches, all qr_swap -> refund_abuse and all right. October file with the QR rule last:
+`candidates/blend-tabmF-bq.csv`, VALID, sha256 `8a46142660cde2af1576736289f822c1b5c6226204445bce88d4dc311fb926eb`;
+7 changes against the five-way blend with the QR rule, all legit -> fraud (phishing_collect 4,
+loan_app_extortion 1, merchant_collusion 1, sim_swap 1), no type switches.
+
+### October-like gate (seed set 0 only: 3 cells, cascade seeds 0-2 / TabM seeds 0-2)
+
+`octlike fit tabm:0` (about 15 min per cell on the laptop GPU), then
+`octlike score champion <challenger> --sets 0`. TabM per cell, given / cleaned / gen-only:
+s13 0.5242 / 0.5828 / 0.9057, s14 0.5096 / 0.5674 / 0.8902, s15 0.5140 / 0.5712 / 0.8986
+(champion r0: 0.5240 / 0.5822 / 0.9054, 0.5092 / 0.5663 / 0.8897, 0.5134 / 0.5707 / 0.8986).
+
+| challenger vs champion | given per seed s13 / s14 / s15 (lower bound) | cleaned (lower bound) | gen-only (lower bound) | verdict |
+|---|---|---|---|---|
+| tabm | +0.0002 / +0.0004 / +0.0006 (-0.0002) | +0.0006 / +0.0010 / +0.0005 (-0.0000) | +0.0002 / +0.0005 / +0.0000 (-0.0009) | FAIL (bounds) |
+| champion+tabm | +0.0004 / +0.0005 / +0.0002 (-0.0001) | +0.0007 / +0.0008 / +0.0001 (-0.0000) | +0.0010 / +0.0005 / -0.0002 (-0.0003) | FAIL (bounds) |
+
+Positive on every thinning seed for given and cleaned, but the bootstrap lower bounds do not
+clear 0, so the gate fails. Only 3 of the 9 cells were fitted (time box); s13 r1-r2 are being
+fitted now. The five-way + tabm October-like gate is not run: the other members' cells do not
+exist locally.

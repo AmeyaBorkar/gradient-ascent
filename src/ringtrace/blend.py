@@ -100,3 +100,27 @@ def write_submission(led, te_idx: np.ndarray, pred: np.ndarray, path: str) -> No
 
 if __name__ == "__main__":
     main()
+
+
+def fraud_split_from(types: np.ndarray, split: np.ndarray) -> np.ndarray:
+    """``types``'s distribution over the fraud classes, rescaled to ``split``'s fraud mass
+    (the legit column comes from ``split``)."""
+    out = np.empty_like(types, dtype=np.float64)
+    out[:, 0] = split[:, 0]
+    mass = types[:, 1:].sum(axis=1, keepdims=True)
+    share = np.divide(types[:, 1:], mass, out=np.full_like(types[:, 1:], 1 / 11), where=mass > 0)
+    out[:, 1:] = share * (1 - split[:, :1])
+    return out
+
+
+def save_fraud_split(types_spec: str, split_spec: str, name: str) -> None:
+    """Write run ``name`` (oof + test) from two blends, see ``fraud_split_from``."""
+    out = paths.out_dir() / "runs" / name
+    out.mkdir(parents=True, exist_ok=True)
+    for which in ("oof", "test"):
+        p = fraud_split_from(
+            blend_arrays(parse_blend(types_spec), which),
+            blend_arrays(parse_blend(split_spec), which),
+        )
+        check_proba(p, name)
+        np.save(out / f"{which}.npy", p.astype(np.float32))
