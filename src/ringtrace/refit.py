@@ -183,6 +183,10 @@ def october(recipe: dict, log=print) -> dict:
     spec = cascade_spec(recipe)
     rounds = scaled_rounds(spec.booster.rounds, len(tr), folds)
     spec = replace(spec, booster=replace(spec.booster, rounds=rounds))
+    if spec.stages == "catboost":  # CatBoost stages count their own iterations
+        its = scaled_rounds(spec.catboost.iterations, len(tr), folds)
+        spec = replace(spec, catboost=replace(spec.catboost, iterations=its))
+        log(f"[{name}] CatBoost stages: {its} iterations")
     log(f"[{name}] refit on {len(tr)} rows, {rounds} rounds (folds {folds})")
     y = train_labels(recipe, led, ~is_test, log=log)
     refit = fit_predict(X[tr], y[tr], period[tr], [X[te]], spec, log=log)[0]
@@ -220,8 +224,13 @@ def main(argv: list[str] | None = None) -> dict:
     ap = argparse.ArgumentParser()
     ap.add_argument("mode", choices=("curve", "october"))
     ap.add_argument("recipe")
+    ap.add_argument("--gpu-ram-part", type=float, default=None, help="cap CatBoost GPU memory")
     args = ap.parse_args(argv)
     recipe = load_recipe(args.recipe)
+    if args.gpu_ram_part is not None:
+        recipe.setdefault("cascade", {}).setdefault("catboost", {})["gpu_ram_part"] = (
+            args.gpu_ram_part
+        )
     return curve(recipe) if args.mode == "curve" else october(recipe)
 
 
