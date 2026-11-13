@@ -200,6 +200,65 @@ def test_arm_bench_member_returns_the_array_it_was_given(tmp_path):
     assert bench.member({"run": "wspace:x", "variant": "fold"}) is arr
 
 
+def test_head_logits_and_rescale_match_the_legit_probability():
+    X, y = toy()
+    spec = tiny_spec()
+    Z = tabm.transform(tabm.fit_prep(X, 50), X)
+    assert len(Z) == len(y)
+    sd = wspace.state(tabm.build_model(Z.shape[1], spec))
+    base = wspace.proba(sd, Z, spec)[:, 0]
+    z0, lse = wspace.head_logits(sd, Z, spec)
+    assert z0.shape == lse.shape == (len(Z), spec.k)
+    assert z0.dtype == np.float32 and lse.dtype == np.float32
+    assert np.allclose(wspace.apply_head(z0, lse), base, atol=1e-5)
+    partial = wspace.head_logits(sd, Z, spec, batch=17)
+    assert np.allclose(wspace.apply_head(*partial), base, atol=1e-5)
+    a, c = 1.2, -0.3
+    w0, b0 = sd["head_w"].clone(), sd["head_b"].clone()
+    scaled = wspace.rescale_head(sd, a, c)
+    assert scaled["head_w"] is not sd["head_w"]
+    assert torch.equal(sd["head_w"], w0) and torch.equal(sd["head_b"], b0)
+    assert torch.allclose(scaled["head_w"][:, :, 0], w0[:, :, 0] * a)
+    assert torch.allclose(scaled["head_b"][:, 0], b0[:, 0] * a + c)
+    assert torch.equal(scaled["head_w"][:, :, 1:], w0[:, :, 1:])
+    assert torch.equal(scaled["embed.w"], sd["embed.w"])
+    got = wspace.proba(scaled, Z, spec)[:, 0]
+    assert np.allclose(wspace.apply_head(z0, lse, a, c), got, atol=1e-5)
+
+
+def test_apply_head_chunks_a_stable_sigmoid():
+    rng = np.random.default_rng(0)
+    n = wspace._HEAD_CHUNK + 17
+    z0 = rng.normal(size=(n, 3)).astype(np.float32)
+    lse = rng.normal(size=(n, 3)).astype(np.float32)
+    a, c = 1.2, -0.3
+    x = a * z0.astype(np.float64) + c - lse.astype(np.float64)
+    ref = np.empty_like(x)
+    pos = x >= 0
+    ref[pos] = 1.0 / (1.0 + np.exp(-x[pos]))
+    neg = ~pos
+    ex = np.exp(x[neg])
+    ref[neg] = ex / (1.0 + ex)
+    z0_copy, lse_copy = z0.copy(), lse.copy()
+    got = wspace.apply_head(z0, lse, a, c)
+    assert np.array_equal(z0, z0_copy) and np.array_equal(lse, lse_copy)
+    assert got.dtype == np.float64 and got.shape == (n,)
+    assert np.allclose(got, ref.mean(axis=1), rtol=0, atol=1e-12)
+    huge = np.array([[1000.0, -1000.0]], np.float32)
+    assert wspace.apply_head(huge, np.zeros_like(huge))[0] == pytest.approx(0.5)
+
+
+def test_pick_takes_the_highest_score_and_breaks_ties_toward_identity():
+    assert wspace.pick({(1.0, 0.0): 0.2, (1.25, -0.6): 0.2, (0.8, 0.4): 0.9}) == (0.8, 0.4)
+    # |a - 1| + |c|: (1, 0.3) is 0.3, (1.2, 0.2) is 0.4, (0.5, 0.5) is 1.0
+    tied = {(1.2, 0.2): 0.4, (0.5, 0.5): 0.4, (1.0, 0.3): 0.4}
+    assert wspace.pick(tied) == (1.0, 0.3)
+    assert wspace.pick({(0.9, 0.0): 1.0, (1.0, 0.0): 1.0, (1.1, 0.1): 1.0}) == (1.0, 0.0)
+    chosen = wspace.pick({(np.float64(1.25), np.float64(-0.4)): np.float64(3.0), (1.0, 0.0): 1.0})
+    assert chosen == (1.25, -0.4)
+    assert type(chosen[0]) is float and type(chosen[1]) is float
+
+
 def test_same_seed_gives_the_same_start_and_fine_tune_moves_the_weights():
     X, y = toy()
     spec = tiny_spec()

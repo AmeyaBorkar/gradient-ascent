@@ -3,6 +3,7 @@
     python -m ringtrace.wspace fit fold9 s13 ...     # train the endpoints, write every arm
     python -m ringtrace.wspace rebasin fold9 ...     # weight-matched seed average (saved weights)
     python -m ringtrace.wspace vector fold9 ...      # fine-tuned label-regime task vector
+    python -m ringtrace.wspace head                  # legit-column rescale, chosen on two months
     python -m ringtrace.wspace score                 # every arm against the base (fraud-only)
 
 Five methods, all on the network of ``ringtrace.tabm``:
@@ -927,6 +928,228 @@ def score(
 
 
 # ---------------------------------------------------------------------------------------------
+# head re-optimisation
+
+
+# One chunk of 2**16 rows by 48 members is 24 MB of float64, well under a gigabyte.
+_HEAD_CHUNK = 1 << 16
+
+
+def _sigmoid(x: np.ndarray) -> None:
+    """Stable sigmoid, written into ``x``. Each side is exponentiated only where it is safe."""
+    pos = x >= 0
+    x[pos] = 1.0 / (1.0 + np.exp(-x[pos]))
+    neg = ~pos
+    ex = np.exp(x[neg])
+    x[neg] = ex / (1.0 + ex)
+
+
+def head_logits(sd, Z, spec, batch: int = 16384):
+    """Legit logit and the fraud log-sum-exp of each member. Both float32, shape (n, k)."""
+    torch = tabm._torch()
+    model = load(sd, spec)
+    model.eval()
+    dev = next(model.parameters()).device
+    n = len(Z)
+    z0 = np.empty((n, spec.k), dtype=np.float32)
+    lse = np.empty((n, spec.k), dtype=np.float32)
+    with torch.no_grad():
+        for i in range(0, n, batch):
+            x = torch.from_numpy(Z[i : i + batch]).to(dev)
+            logits = model(x).float()
+            end = i + logits.shape[0]
+            z0[i:end] = logits[:, :, 0].cpu().numpy()
+            lse[i:end] = torch.logsumexp(logits[:, :, 1:], dim=-1).cpu().numpy()
+    del model
+    return z0, lse
+
+
+def apply_head(z0, lse, a: float = 1.0, c: float = 0.0) -> np.ndarray:
+    """Mean over columns of sigmoid(a * z0 + c - lse). Shape (n,), float64."""
+    z0 = np.asarray(z0)
+    lse = np.asarray(lse)
+    n, _k = z0.shape
+    out = np.empty(n, dtype=np.float64)
+    for start in range(0, n, _HEAD_CHUNK):
+        stop = min(start + _HEAD_CHUNK, n)
+        x = np.asarray(z0[start:stop], dtype=np.float64)
+        x *= a
+        x += c
+        x -= np.asarray(lse[start:stop], dtype=np.float64)
+        _sigmoid(x)
+        out[start:stop] = x.mean(axis=1)
+    return out
+
+
+def rescale_head(sd: dict, a: float, c: float) -> dict:
+    """A new state: ``head_w[:, :, 0]`` times ``a``, and ``head_b[:, 0]`` becomes ``a * b + c``."""
+    out = {k: v.clone() for k, v in sd.items()}
+    out["head_w"][:, :, 0] *= a
+    bias = out["head_b"]
+    bias[:, 0] = bias[:, 0] * a + c
+    return out
+
+
+def pick(scores: dict) -> tuple[float, float]:
+    """The ``(a, c)`` with the highest score. Ties go to the key nearest ``(1, 0)``."""
+    (a, c), _ = max(scores.items(), key=lambda kv: (kv[1], -(abs(kv[0][0] - 1) + abs(kv[0][1]))))
+    return float(a), float(c)
+
+
+def head_fit(
+    seeds=(0, 1, 2),
+    cells_dir=None,
+    grid_a=(0.8, 0.9, 1.0, 1.1, 1.25),
+    grid_c=(-0.6, -0.4, -0.2, 0.0, 0.2, 0.4, 0.6),
+    log=print,
+) -> dict:
+    """Choose the legit-column rescale on the other months and write it for every context.
+
+    ``head.npz`` holds ``head_base`` (a = 1, c = 0) and ``head``. A fold uses its own held-out
+    choice on the held-out rows and the October choice on the October rows; a frame uses the
+    choice made with September held out. ``head.json`` records the grids, ``phi``, the fit and
+    held-out scores at ``phi`` and at (1, 0), and the wall time.
+    """
+    from ringtrace import paths, store
+    from ringtrace.scoring import macro_f1
+
+    t0 = time.time()
+    root = wspace_dir()
+    names = [*(f"fold{m}" for m in _FOLD_MONTHS), *(f"s{s}" for s in _FRAME_SEEDS)]
+    for name in names:
+        for seed in seeds:
+            path = root / name / f"sd_g_seed{seed}.pt"
+            if not path.is_file():
+                raise FileNotFoundError(f"{name} is missing {path.name}")
+
+    packed: dict = {}
+    torch = tabm._torch()
+    try:
+        for name in names:
+            ctx = context(name)
+            Z = matrices(ctx)
+            spec = ctx["spec"]
+            z_hold, l_hold, z_test, l_test = [], [], [], []
+            for seed in seeds:
+                sd = load_state(root / name / f"sd_g_seed{seed}.pt")
+                z0, lse = head_logits(sd, Z["hold"], spec)
+                z_hold.append(z0)
+                l_hold.append(lse)
+                if ctx["test"] is not None:
+                    z0, lse = head_logits(sd, Z["test"], spec)
+                    z_test.append(z0)
+                    l_test.append(lse)
+                del sd
+            item = {
+                "rows": ctx["rows"],
+                "z0": np.concatenate(z_hold, axis=1),
+                "lse": np.concatenate(l_hold, axis=1),
+            }
+            if ctx["test"] is not None:
+                item["test_rows"] = ctx["test"]
+                item["z0_test"] = np.concatenate(z_test, axis=1)
+                item["lse_test"] = np.concatenate(l_test, axis=1)
+            packed[name] = item
+            del ctx, Z, item, z_hold, l_hold, z_test, l_test
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+    finally:
+        store.use_frame(None)
+
+    bench = ArmBench.from_store(
+        paths.out_dir() / "runs", cells_dir or wspace_dir() / "cells", log=log
+    )
+    recipe = arm_recipe("head")
+    weights = final.static_weights(recipe)
+    roles = [m["role"] for m in recipe["members"]]
+    trees = [bench.member(m) for m in recipe["members"][:5]]
+    cache: dict = {}
+
+    def month_score(a: float, c: float, m: int) -> float:
+        key = (float(a), float(c), int(m))
+        if key not in cache:
+            rows = bench.tr[bench.period[bench.tr] == m]
+            fold = packed[f"fold{m}"]
+            if not np.array_equal(rows, fold["rows"]):
+                raise ValueError(f"fold{m} rows do not match month {m} of the ledger")
+            p_legit = apply_head(fold["z0"], fold["lse"], a, c)
+            parts = [t[rows] for t in trees]
+            parts.append(fraud_only(p_legit))
+            pred = bench.decode_rows(rows, final.mix(parts, weights, roles), recipe)
+            y = bench.targets["given"][bench.period[bench.tr] == m]
+            cache[key] = macro_f1(y, pred)
+        return cache[key]
+
+    def mean_score(a: float, c: float, months) -> float:
+        return float(np.mean([month_score(a, c, m) for m in months]))
+
+    phi: dict = {}
+    for h in _FOLD_MONTHS:
+        others = [m for m in _FOLD_MONTHS if m != h]
+        phi[h] = pick({(a, c): mean_score(a, c, others) for a in grid_a for c in grid_c})
+    phi["october"] = pick({(a, c): mean_score(a, c, _FOLD_MONTHS) for a in grid_a for c in grid_c})
+
+    months: dict = {}
+    for h in _FOLD_MONTHS:
+        others = [m for m in _FOLD_MONTHS if m != h]
+        a, c = phi[h]
+        block = {
+            "fit": mean_score(a, c, others),
+            "fit_base": mean_score(1.0, 0.0, others),
+            "hold": month_score(a, c, h),
+            "hold_base": month_score(1.0, 0.0, h),
+        }
+        months[str(h)] = block
+        log(
+            f"[wspace] head held-out {h}: a {a:g} c {c:g} "
+            f"fit {block['fit']:.5f} base {block['fit_base']:.5f} "
+            f"hold {block['hold']:.5f} base {block['hold_base']:.5f}"
+        )
+
+    for name, item in packed.items():
+        z0, lse = item["z0"], item["lse"]
+        if name.startswith("fold"):
+            a, c = phi[int(name[4:])]
+            ao, co = phi["october"]
+            zt, lt = item["z0_test"], item["lse_test"]
+            arrays = {
+                "rows": item["rows"],
+                "test_rows": item["test_rows"],
+                "head_base": apply_head(z0, lse).astype(np.float32),
+                "head": apply_head(z0, lse, a, c).astype(np.float32),
+                "head_base__test": apply_head(zt, lt).astype(np.float32),
+                "head__test": apply_head(zt, lt, ao, co).astype(np.float32),
+            }
+        else:
+            a, c = phi[9]
+            arrays = {
+                "rows": item["rows"],
+                "head_base": apply_head(z0, lse).astype(np.float32),
+                "head": apply_head(z0, lse, a, c).astype(np.float32),
+            }
+        path = root / name / "head.npz"
+        tmp = path.with_name(".head.tmp.npz")
+        np.savez(tmp, **arrays)
+        tmp.replace(path)
+
+    report = {
+        "grid_a": [float(v) for v in grid_a],
+        "grid_c": [float(v) for v in grid_c],
+        "seeds": [int(s) for s in seeds],
+        "phi": {str(h): [phi[h][0], phi[h][1]] for h in (*_FOLD_MONTHS, "october")},
+        "months": months,
+        "grid": {
+            f"{a:g},{c:g}": [month_score(a, c, m) for m in _FOLD_MONTHS]
+            for a in grid_a
+            for c in grid_c
+        },
+        "wall_s": time.time() - t0,
+    }
+    (root / "head.json").write_text(json.dumps(report, indent=1))
+    return report
+
+
+# ---------------------------------------------------------------------------------------------
 # command line
 
 
@@ -952,7 +1175,11 @@ def main(argv=None):
     sc.add_argument("--cells", default=None)
     sc.add_argument("--draws", type=int, default=2000)
     sc.add_argument("--oct-draws", type=int, default=1000)
+    sub.add_parser("head")
     args = ap.parse_args(argv)
+    if args.cmd == "head":
+        head_fit()
+        return
     if args.cmd == "score":
         chosen = None
         if args.arms is not None:
