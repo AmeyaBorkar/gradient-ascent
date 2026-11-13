@@ -18,6 +18,13 @@ same to every family, so the cut between them is placed by the occupancy drop (s
 dense, takeover phones sparse) and snapped onto the longest run of unused numbers near it; a
 second pass of the HMM then respects that cut. Fitted separately on each split's fraud phase.
 
+A smaller phase can borrow what a full one teaches (off by default; ``counter(..., teach=...)``).
+The train split's own fit gives a ``Prior``: where each cut falls on the number line, as a fraction
+of the phase, and each segment's occupancy over the phase's mean. The test split is then decoded
+with two soft terms: each cut is drawn from a normal around the train fraction (a path that cuts
+between two phones takes the normal's mass between them), and the run of unused numbers before
+each phone is geometric at its segment's occupancy, rescaled to the test phase's own mean.
+
 Columns (prefix ``ctr``): block (0 none, 1 bot, 2 fraud phase, 3 legit block), pos (rank of the
 phone in its fraud phase, 0..1), seg (Viterbi segment 0..10), conf (posterior of the Viterbi
 segment), p00..p10 (segment posteriors), ato_vs_sim (1 takeover side, 0 sim side of the cut, for
@@ -31,6 +38,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import polars as pl
+from scipy.special import log_ndtr
 
 from ringtrace.evidence import anchors
 from ringtrace.tables import HOME_DEVICES
@@ -155,36 +163,52 @@ def block_codes(device: np.ndarray, split: np.ndarray, blocks: Blocks) -> np.nda
 # HMM over the phones of one fraud phase
 
 
-def forward_backward(ll: np.ndarray) -> np.ndarray:
-    """Segment posteriors under a uniform prior over monotone paths starting in segment 0."""
+def _hmm_terms(
+    ll: np.ndarray, enter: np.ndarray | None, end: np.ndarray | None
+) -> tuple[np.ndarray, np.ndarray]:
     n, k = ll.shape
+    return (np.zeros((n, k)) if enter is None else enter, np.zeros(k) if end is None else end)
+
+
+def forward_backward(
+    ll: np.ndarray, enter: np.ndarray | None = None, end: np.ndarray | None = None
+) -> np.ndarray:
+    """Segment posteriors over monotone paths starting in segment 0. ``enter[t, k]`` is the
+    log-weight of entering segment k at phone t and ``end[k]`` that of a path ending in segment k;
+    both default to 0, a uniform prior over paths."""
+    n, k = ll.shape
+    enter, end = _hmm_terms(ll, enter, end)
     neg = np.full(1, -np.inf)
     la = np.full((n, k), -np.inf)
     la[0, 0] = ll[0, 0]
     for t in range(1, n):
         prev = la[t - 1]
-        la[t] = np.logaddexp(prev, np.concatenate([neg, prev[:-1]])) + ll[t]
+        la[t] = np.logaddexp(prev, np.concatenate([neg, prev[:-1] + enter[t, 1:]])) + ll[t]
     lb = np.zeros((n, k))
+    lb[n - 1] = end
     for t in range(n - 2, -1, -1):
         nxt = lb[t + 1] + ll[t + 1]
-        lb[t] = np.logaddexp(nxt, np.concatenate([nxt[1:], neg]))
-    z = np.logaddexp.reduce(la[-1])
+        lb[t] = np.logaddexp(nxt, np.concatenate([nxt[1:] + enter[t + 1, 1:], neg]))
+    z = np.logaddexp.reduce(la[-1] + end)
     post = np.exp(la + lb - z)
     return post / post.sum(axis=1, keepdims=True)
 
 
-def viterbi(ll: np.ndarray) -> np.ndarray:
+def viterbi(
+    ll: np.ndarray, enter: np.ndarray | None = None, end: np.ndarray | None = None
+) -> np.ndarray:
     n, k = ll.shape
+    enter, end = _hmm_terms(ll, enter, end)
     neg = np.full(1, -np.inf)
     d = np.full(k, -np.inf)
     d[0] = ll[0, 0]
     move = np.zeros((n, k), dtype=bool)
     for t in range(1, n):
-        from_left = np.concatenate([neg, d[:-1]])
+        from_left = np.concatenate([neg, d[:-1] + enter[t, 1:]])
         move[t] = from_left > d
         d = np.where(move[t], from_left, d) + ll[t]
     path = np.zeros(n, dtype=np.int64)
-    path[-1] = int(np.argmax(d))
+    path[-1] = int(np.argmax(d + end))
     for t in range(n - 1, 0, -1):
         path[t - 1] = path[t] - 1 if move[t, path[t]] else path[t]
     return path
@@ -245,11 +269,99 @@ class Phase:
     cut: int | None
 
 
-def decode_phase(nums: np.ndarray, counts: np.ndarray, blocks: Blocks, lo: int, hi: int) -> Phase:
-    """Segment one fraud phase. ``counts[i, c]`` = rows of phone i with anchor c (0 = none)."""
+@dataclass(frozen=True)
+class Prior:
+    """What one fraud phase's fit teaches another. ``cuts[k - 1]`` is where segment k starts, as a
+    fraction of the teaching phase's number line (NaN if its fit never reached k); ``occupancy[k]``
+    is segment k's share of used numbers over the phase's mean share."""
+
+    cuts: np.ndarray
+    occupancy: np.ndarray
+    spread: float | None = 0.03  # sd of each cut, in fractions of the line; None drops the term
+    gap_weight: float = 1.0  # weight on the gap emission; 0 drops the term
+
+
+def learn_prior(
+    phase: Phase, lo: int, edge: int, spread: float | None = 0.03, gap_weight: float = 1.0
+) -> Prior:
+    """Cut fractions and relative occupancies of a fitted phase spanning ``lo..edge``."""
+    length = edge - lo + 1
+    nums, seg = phase.nums, phase.seg
+    cuts = np.full(K - 1, np.nan)
+    for k in range(1, K):
+        before, after = nums[seg < k], nums[seg >= k]
+        if len(before) and len(after):
+            cuts[k - 1] = ((before.max() + after.min()) / 2 - lo) / length
+    starts = np.concatenate([[0.0], cuts, [1.0]])
+    occ = np.ones(K)
+    for k in range(K):
+        if not np.isfinite(starts[k]):
+            continue
+        stop = next(v for v in starts[k + 1 :] if np.isfinite(v))
+        n_k = int((seg == k).sum())
+        if n_k and stop > starts[k]:
+            occ[k] = n_k / ((stop - starts[k]) * len(nums))
+    return Prior(cuts=cuts, occupancy=occ, spread=spread, gap_weight=gap_weight)
+
+
+def interval_logmass(a: np.ndarray, b: np.ndarray, centre: float, spread: float) -> np.ndarray:
+    """log of a normal's mass between ``a`` and ``b`` (elementwise, ``a < b``), tail-stable."""
+    za = (np.asarray(a, dtype=np.float64) - centre) / spread
+    zb = (np.asarray(b, dtype=np.float64) - centre) / spread
+    upper = za > 0  # both above the centre: take the mass from the upper tails
+    lo_z = np.where(upper, -zb, za)
+    hi_z = np.where(upper, -za, zb)
+    top = log_ndtr(hi_z)
+    return top + np.log1p(-np.exp(log_ndtr(lo_z) - top))
+
+
+def prior_terms(
+    nums: np.ndarray, lo: int, edge: int, prior: Prior
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """For the phones ``nums`` of a phase ``lo..edge``: the gap log-emission (n, K), the
+    log-weight of entering segment k at phone t (n, K) and that of a path ending in k (K,)."""
+    n = len(nums)
+    length = edge - lo + 1
+    emit, enter, end = np.zeros((n, K)), np.zeros((n, K)), np.zeros(K)
+    if n < 2:
+        return emit, enter, end
+    if prior.gap_weight > 0:
+        p = np.clip(prior.occupancy * n / length, 1e-6, 1 - 1e-6)
+        gaps = (np.diff(nums) - 1).astype(np.float64)
+        emit[1:] = prior.gap_weight * (gaps[:, None] * np.log1p(-p) + np.log(p))
+    if prior.spread is not None:
+        x = (np.asarray(nums, dtype=np.float64) - lo) / length
+        for k in range(1, K):
+            c = prior.cuts[k - 1]
+            if not np.isfinite(c):
+                continue
+            # entering k at phone t puts the cut between phones t - 1 and t
+            enter[1:, k] = interval_logmass(x[:-1], x[1:], c, prior.spread)
+            # a path that ends before k leaves the cut beyond the last phone
+            end[:k] += log_ndtr((c - x[-1]) / prior.spread)
+    return emit, enter, end
+
+
+def decode_phase(
+    nums: np.ndarray,
+    counts: np.ndarray,
+    blocks: Blocks,
+    lo: int,
+    hi: int,
+    prior: Prior | None = None,
+    edge: int | None = None,
+) -> Phase:
+    """Segment one fraud phase. ``counts[i, c]`` = rows of phone i with anchor c (0 = none).
+
+    ``prior`` (off by default) adds a teaching phase's cut positions and occupancies, read over the
+    phase ``lo..edge`` (``edge`` defaults to ``hi``)."""
     loge = emission_table()
     ll = counts @ loge.T
-    path = viterbi(ll)
+    enter = end = None
+    if prior is not None:
+        emit, enter, end = prior_terms(nums, lo, hi if edge is None else edge, prior)
+        ll = ll + emit
+    path = viterbi(ll, enter, end)
     zone = np.isin(path, (SIM, ATO))
     cut = None
     if zone.sum() >= 2 * CUT_MIN_SIDE:
@@ -261,8 +373,8 @@ def decode_phase(nums: np.ndarray, counts: np.ndarray, blocks: Blocks, lo: int, 
             ll = ll.copy()
             ll[nums < cut, ATO] -= SIDE_PENALTY
             ll[nums >= cut, SIM] -= SIDE_PENALTY
-            path = viterbi(ll)
-    post = forward_backward(ll * TEMPER)
+            path = viterbi(ll, enter, end)
+    post = forward_backward(ll * TEMPER, enter, end)
     conf = post[np.arange(len(path)), path]
     side = np.full(len(nums), np.nan)
     if cut is not None:
@@ -275,8 +387,13 @@ def decode_phase(nums: np.ndarray, counts: np.ndarray, blocks: Blocks, lo: int, 
 # assembly
 
 
-def counter(device: np.ndarray, split: np.ndarray, anchor: np.ndarray) -> dict[str, np.ndarray]:
-    """All counter columns as arrays, from device numbers, split ids (0/1) and row anchors."""
+def counter(
+    device: np.ndarray, split: np.ndarray, anchor: np.ndarray, teach: dict | None = None
+) -> dict[str, np.ndarray]:
+    """All counter columns as arrays, from device numbers, split ids (0/1) and row anchors.
+
+    ``teach = {"spread": s, "gap_weight": w}`` (off by default) decodes every split after the
+    first with the ``Prior`` learned from the first split's own fit."""
     device = np.asarray(device, dtype=np.int64)
     split = np.asarray(split, dtype=np.int64)
     anchor = np.asarray(anchor, dtype=np.int64)
@@ -297,14 +414,20 @@ def counter(device: np.ndarray, split: np.ndarray, anchor: np.ndarray) -> dict[s
         "dev_rows": dev_n[dev_inv].astype(np.int32),
         "dev_single": (ds_n[ds_inv] == 1).astype(np.int8),
     }
-    for s, (lo, _edge, hi) in sorted(blocks.ranges.items()):
+    prior = None
+    for s, (lo, edge, hi) in sorted(blocks.ranges.items()):
         rows = np.flatnonzero((block == 2) & (split == s))
         if len(rows) == 0:
             continue
         nums, pinv = np.unique(device[rows], return_inverse=True)
         counts = np.zeros((len(nums), K + 1))
         np.add.at(counts, (pinv, anchor[rows]), 1.0)
-        ph = decode_phase(nums, counts, blocks, lo, hi)
+        if prior is None:
+            ph = decode_phase(nums, counts, blocks, lo, hi)
+            if teach is not None:
+                prior = learn_prior(ph, lo, edge, **teach)
+        else:
+            ph = decode_phase(nums, counts, blocks, lo, hi, prior=prior, edge=edge)
         out["pos"][rows] = (pinv / max(len(nums) - 1, 1)).astype(np.float64)
         out["seg"][rows] = ph.seg[pinv]
         out["conf"][rows] = ph.conf[pinv]
