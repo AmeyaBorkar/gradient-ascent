@@ -20,3 +20,13 @@ Inputs: the organisers' problem statement and starter notebook. External sources
 - Hanley and MacGibbon (2006), "Creating non-parametric bootstrap samples using Poisson
   frequencies", Computer Methods and Programs in Biomedicine 83(1): Poisson(1) weights per
   resampling unit, used by `ringtrace.compare` with generator events as units.
+- Gorishniy, Kotelnikov, Babenko (2024), "TabM: Advancing Tabular Deep Learning with
+  Parameter-Efficient Ensembling", https://arxiv.org/abs/2410.24210 : an MLP whose k members
+  share weights with per-member scaling adapters, trained jointly; the basis of `ringtrace.tabm`.
+- Wen, Tran, Ba (2020), "BatchEnsemble: an Alternative Approach to Efficient Ensemble and Lifelong
+  Learning", https://arxiv.org/abs/2002.06715 : the rank-one per-member adapters (r, s).
+- Gorishniy, Rubachev, Babenko (2022), "On Embeddings for Numerical Features in Tabular Deep
+  Learning", https://arxiv.org/abs/2203.05556 : periodic (sin/cos with learned frequencies)
+  numeric embeddings followed by a linear layer and ReLU.
+- PyTorch reproducibility notes (`torch.use_deterministic_algorithms`, `CUBLAS_WORKSPACE_CONFIG`),
+  https://pytorch.org/docs/stable/notes/randomness.html
