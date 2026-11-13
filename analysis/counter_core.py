@@ -38,10 +38,11 @@ def passes(s: dict, rise: float = 0.02, z: float = 2.0) -> bool:
     return s["mean"] >= rise and s["z"] > z
 
 
-def class_moves(before: np.ndarray, after: np.ndarray) -> dict[str, int]:
-    """Counts of ``a->b`` for every row where the call changed."""
+def class_moves(before: np.ndarray, after: np.ndarray, names=None) -> dict[str, int]:
+    """Counts of ``a->b`` for every row where the call changed (``names[a]`` when given)."""
     moved = before != after
     keys, n = np.unique(
         np.stack([before[moved], after[moved]], axis=1).reshape(-1, 2), axis=0, return_counts=True
     )
-    return {f"{int(a)}->{int(b)}": int(c) for (a, b), c in zip(keys, n, strict=True)}
+    label = (lambda c: str(int(c))) if names is None else (lambda c: names[int(c)])
+    return {f"{label(a)}->{label(b)}": int(c) for (a, b), c in zip(keys, n, strict=True)}

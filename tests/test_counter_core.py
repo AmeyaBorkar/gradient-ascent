@@ -52,3 +52,11 @@ def test_class_moves():
     after = np.array([0, 2, 2, 3, 8, 8])
     assert class_moves(before, after) == {"1->2": 1, "2->3": 1, "7->8": 2}
     assert class_moves(before, before) == {}
+
+
+def test_class_moves_named():
+    names = ["legit", "mule", "bot"]
+    assert class_moves(np.array([0, 1, 1]), np.array([1, 2, 1]), names) == {
+        "legit->mule": 1,
+        "mule->bot": 1,
+    }

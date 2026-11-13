@@ -1,7 +1,10 @@
 """The counter's segments at October's size: a cut-position prior and a per-segment gap emission.
 
     python analysis/counter.py gate        # thinning simulation over the settings grid
+    python analysis/counter.py calib --spread S --gap-weight W     # the rule's rows, simulated
     python analysis/counter.py october --spread S --gap-weight W   # October, counted only
+    python analysis/counter.py table BASE.json CHALLENGER.json ... [--alias a=b]
+    python analysis/counter.py build BASE.json CHALLENGER.json ... [--alias a=b] [--against F]
 
 ``gate`` thins train's fraud phase to October's size (each phone kept with probability 1/6, seeds
 0..29), decodes the kept phones without and with the prior, and scores both against the cleaned
@@ -9,22 +12,28 @@ labels on the kept unanchored fraud rows. The prior of each draw is learned from
 it. A stress variant shifts the prior's cuts by the offset between October's own fit and train's
 (how far a train-built prior sits from October's cuts). The settings are chosen on seeds 0..14
 and reported on seeds 15..29. ``october`` decodes the real frame with the test split taught by the
-train split and counts how October's fraud-block rows move. Writes ``$RINGTRACE_OUT/counter/``.
+train split and counts how October's fraud-block rows move. ``table`` runs the final harness
+(``ringtrace.final.table``) on the recipes; ``build`` writes each challenger's October file to
+``$RINGTRACE_OUT/candidates/`` and counts the October rows that moved against the base recipe.
+``--alias a=b`` reads run ``b`` where a recipe names run ``a`` and reports ``b``'s sha256.
+Reports go to ``$RINGTRACE_OUT/counter/``.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 import time
 from pathlib import Path
 
 import numpy as np
+import polars as pl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from counter_core import choose, paired, passes  # noqa: E402
+from counter_core import choose, class_moves, paired, passes  # noqa: E402
 from farlook_core import keep_units  # noqa: E402
 
 from ringtrace import paths, silver, store  # noqa: E402
@@ -242,6 +251,58 @@ def cmd_gate(f: Frame, seeds: int = 30) -> dict:
     }
 
 
+def cmd_calib(f: Frame, spread, gap_weight: float, seeds: int = 30) -> dict:
+    """How often the taught segment is right on the rows the counter rule would set, in the
+    thinning simulation: unanchored fraud rows whose taught confidence is at least 0.9, split by
+    the plain fit's confidence (below 0.9: the ``below`` rule's rows), plain and October-shifted
+    prior."""
+    y, anchor = f.y, f.anchor
+    _, _, _, ph_full = f.decode(np.ones(len(f.nums_all), dtype=bool))
+    oct_phase, oct_lo, oct_edge = f.october_phase()
+    shift = (
+        phones.learn_prior(oct_phase, oct_lo, oct_edge).cuts
+        - phones.learn_prior(ph_full, f.lo, f.edge).cuts
+    )
+    acc: dict = {}
+    for seed in range(seeds):
+        keep = keep_units(len(f.nums_all), OCTOBER_SHARE, seed)
+        r, seg0, conf0, _ = f.decode(keep)
+        _, _, _, ph_out = f.decode(~keep)
+        taught = phones.learn_prior(ph_out, f.lo, f.edge)
+        open_rows = (anchor[r] == 0) & (y[r] > 0)
+        for variant, cuts in (("plain_prior", taught.cuts), ("shifted_prior", taught.cuts + shift)):
+            _, seg1, conf1, _ = f.decode(keep, with_cuts(taught, cuts, spread, gap_weight))
+            pops = {
+                "plain_below_taught_up": open_rows & (conf0 < 0.9) & (conf1 >= 0.9),
+                "plain_up_taught_up": open_rows & (conf0 >= 0.9) & (conf1 >= 0.9),
+                "taught_below": open_rows & (conf1 < 0.9),
+            }
+            for name, m in pops.items():
+                a = acc.setdefault(variant, {}).setdefault(
+                    name, {"rows": 0, "taught_right": 0, "plain_right": 0, "same_segment": 0}
+                )
+                a["rows"] += int(m.sum())
+                a["taught_right"] += int((m & (seg1 == y[r])).sum())
+                a["plain_right"] += int((m & (seg0 == y[r])).sum())
+                a["same_segment"] += int((m & (seg0 == seg1)).sum())
+                for c in np.unique(seg1[m]):
+                    mc = m & (seg1 == c)
+                    b = a.setdefault("by_taught_class", {}).setdefault(
+                        int(c), {"rows": 0, "right": 0}
+                    )
+                    b["rows"] += int(mc.sum())
+                    b["right"] += int((mc & (seg1 == y[r])).sum())
+    for pops in acc.values():
+        for a in pops.values():
+            n = max(a["rows"], 1)
+            a["taught_agreement"] = a["taught_right"] / n
+            a["plain_agreement"] = a["plain_right"] / n
+            a["rows_per_draw"] = a["rows"] / seeds
+            for b in a["by_taught_class"].values():
+                b["agreement"] = b["right"] / max(b["rows"], 1)
+    return {"setting": setting_name(spread, gap_weight), "seeds": seeds, **acc}
+
+
 def cmd_october(f: Frame, spread, gap_weight: float) -> dict:
     """October's fraud block decoded with and without the train-taught prior, counted only."""
     base = phones.counter(f.device, f.split, f.anchor)
@@ -280,21 +341,123 @@ def cmd_october(f: Frame, spread, gap_weight: float) -> dict:
     return out
 
 
+def _sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _bench_and_recipes(recipe_paths: list[str], alias: list[str]):
+    """The final harness's bench and recipes; ``alias`` entries ``a=b`` read run ``b`` wherever a
+    recipe names run ``a`` (for arrays copied under another name; their sha256 are reported)."""
+    from ringtrace.final import Bench, load_recipe
+
+    runs = paths.out_dir() / "runs"
+    swap = dict(a.split("=", 1) for a in alias)
+    recs = [load_recipe(p) for p in recipe_paths]
+    for r in recs:
+        for m in r["members"]:
+            m["run"] = swap.get(m["run"], m["run"])
+    shas = {
+        f"{a}={b}": {n: _sha(runs / b / n) for n in ("oof.npy", "test.npy")}
+        for a, b in swap.items()
+    }
+    return Bench.from_store(runs, paths.out_dir() / "octlike"), recs, shas
+
+
+def cmd_table(recipe_paths: list[str], alias: list[str]) -> dict:
+    from ringtrace import final
+
+    bench, recs, shas = _bench_and_recipes(recipe_paths, alias)
+    rep = final.table(bench, recs[0], recs[1:])
+    rep["alias_sha256"] = shas
+    return rep
+
+
+def cmd_build(recipe_paths: list[str], alias: list[str], against: str) -> dict:
+    """Build each challenger's October file into ``candidates/`` and count, against the first
+    recipe (its base), which October rows moved: on which phones, at what plain counter
+    confidence, and between which classes. Aggregates only."""
+    from ringtrace import final
+    from ringtrace.classes import CLASSES
+
+    bench, recs, shas = _bench_and_recipes(recipe_paths, alias)
+    out_dir = paths.out_dir() / "candidates"
+    led = bench.led
+    ctr = anchors.family_columns(led, ["ctr_block", "ctr_conf"])
+    block = ctr["ctr_block"].fill_null(0).to_numpy()
+    conf = ctr["ctr_conf"].cast(pl.Float64).fill_null(-1.0).to_numpy()
+    anchor = anchors.row_anchor(led)
+    te = bench.te
+    base = bench.calls(recs[0])["pred"][te]
+    report = {"base": recs[0]["name"], "alias_sha256": shas, "files": {}}
+    for r in recs[1:]:
+        summary = final.build(
+            bench,
+            r,
+            out_dir,
+            paths.data_dir() / "sample_submission.csv",
+            out_dir / against,
+        )
+        new = bench.calls(r)["pred"][te]
+        moved = base != new
+        report["files"][r["name"]] = {
+            "sha256": summary["sha256"],
+            "problems": summary["problems"],
+            "against": summary.get("against"),
+            "vs_base_rows": int(moved.sum()),
+            "vs_base_fraud_block": int((moved & (block[te] == 2)).sum()),
+            "vs_base_unanchored": int((moved & (anchor[te] == 0)).sum()),
+            "vs_base_plain_conf_0.9_up": int((moved & (conf[te] >= 0.9)).sum()),
+            "vs_base_moves": class_moves(base, new, CLASSES),
+            "train_rows_vs_base": int(
+                (bench.calls(recs[0])["pred"][bench.tr] != bench.calls(r)["pred"][bench.tr]).sum()
+            ),
+            "scores": summary["scores"],
+        }
+    return report
+
+
+def _json_default(o):
+    if isinstance(o, np.integer | np.floating):
+        return o.item()
+    if isinstance(o, np.ndarray):
+        return o.tolist()
+    raise TypeError(type(o))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("command", choices=["gate", "october"])
+    ap.add_argument("command", choices=["gate", "calib", "october", "table", "build"])
+    ap.add_argument("recipes", nargs="*", help="table / build: the base recipe, then challengers")
     ap.add_argument("--seeds", type=int, default=30)
     ap.add_argument("--spread", type=float, default=None)
     ap.add_argument("--gap-weight", type=float, default=0.0)
+    ap.add_argument("--alias", action="append", default=[], help="run a=b: read b for a")
+    ap.add_argument("--against", default="blend-tabmF-bq.csv", help="file in candidates/")
+    ap.add_argument("--name", default=None, help="report name (table / build)")
     args = ap.parse_args()
-    f = Frame()
     target = paths.out_dir() / "counter"
     target.mkdir(parents=True, exist_ok=True)
+    if args.command in ("table", "build"):
+        if args.command == "table":
+            report = cmd_table(args.recipes, args.alias)
+        else:
+            report = cmd_build(args.recipes, args.alias, args.against)
+        name = args.name or args.command
+        (target / f"{name}.json").write_text(json.dumps(report, indent=1, default=_json_default))
+        print(json.dumps(report.get("files", report.get("alias_sha256")), indent=1, default=str))
+        return
+    f = Frame()
     if args.command == "gate":
         report = cmd_gate(f, args.seeds)
+    elif args.command == "calib":
+        report = cmd_calib(f, args.spread, args.gap_weight, args.seeds)
     else:
         report = cmd_october(f, args.spread, args.gap_weight)
-    name = args.command if args.command == "gate" else f"october-{args.spread}-{args.gap_weight}"
+    name = (
+        args.command
+        if args.command == "gate"
+        else f"{args.command}-{args.spread}-{args.gap_weight}"
+    )
     (target / f"{name}.json").write_text(json.dumps(report, indent=1))
     print(
         json.dumps(
