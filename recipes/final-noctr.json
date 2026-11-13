@@ -1,0 +1,45 @@
+{
+ "name": "final-noctr",
+ "members": [
+  {
+   "name": "champion",
+   "run": "final-champion-noctr",
+   "variant": "fold"
+  },
+  {
+   "name": "lgbm",
+   "run": "final-lgbm-noctr",
+   "variant": "fold"
+  },
+  {
+   "name": "catboost",
+   "run": "final-catboost-noctr",
+   "variant": "fold"
+  },
+  {
+   "name": "clean-event",
+   "run": "final-clean-event-noctr",
+   "variant": "fold"
+  },
+  {
+   "name": "clean-l2",
+   "run": "final-clean-l2-noctr",
+   "variant": "fold"
+  }
+ ],
+ "weights": {
+  "mode": "equal"
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "plain_templates"
+ ],
+ "base_rate_rules": [
+  {
+   "name": "blank_merchant_qr",
+   "max_october_rows": 40
+  }
+ ]
+}

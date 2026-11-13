@@ -553,4 +553,28 @@ October changes against the final recipe: fraud mass 1/3 adds 5 fraud calls (leg
 sim_swap 1, loan 1, collusion 1); 1/2 adds 7; the full member also switches 3 fraud types.
 
 - 2026-11-14 01:30 IST: the October-like bound is now pooled (decision 17); final-t6 re-gates.
+
+### final-t6 (commit 147b5a3, 22 + 21 min): pooled bound, seed-averaged TabM, Mitra
+
+Against the blend + blank-QR recipe; October-like lb = pooled bound of the nine-cell mean
+(decision 17), cell lb = the earlier per-cell mean.
+
+| candidate | given | cleaned | gen-only | October-like given | October-like cleaned | rows | verdict |
+|---|---|---|---|---|---|---|---|
+| TabM fraud mass 1/3 | +0.00073 / +0.00024 / +0.00023 [+0.00020, +0.00066] | +0.00068 / +0.00021 / +0.00033 [+0.00021, +0.00065] | +0.00089 / +0.00018 / +0.00007 [+0.00010, +0.00074] | +0.00017 / +0.00024 / +0.00038 (lb +0.00009, cell lb -0.00004) | +0.00025 / +0.00032 / +0.00033 (lb +0.00011, cell lb -0.00003) | 38 / 5 | **PASS, adopted** |
+| TabM fraud mass 1/2 | +0.00073 / +0.00025 / +0.00025 [+0.00019, +0.00067] | +0.00068 / +0.00025 / +0.00039 [+0.00022, +0.00070] | +0.00089 / +0.00001 / -0.000002 | +0.00023 / +0.00033 / +0.00038 (lb +0.00012) | +0.00030 / +0.00041 / +0.00032 (lb +0.00012) | 51 / 7 | fails gen-only Sep by 2e-6; kept as an upload variant |
+
+Against the TabM 1/3 recipe:
+
+| candidate | change, every month and target | rows | verdict |
+|---|---|---|---|
+| 6-seed TabM fraud mass (seeds 0-2 + 6-8) | 0 | 0 / 0 | identical calls: a tie, the 3-seed mass stays (simpler) |
+| 9-seed TabM fraud mass (+ seeds 3-5) | 0 | 0 / 0 | identical calls; the mixed legit probability moves at most 0.041 (372 train rows by more than 0.01, 46 rows in the 0.3-0.6 band) |
+| Mitra in the fraud mass (TabM 1/6 + Mitra 1/6) | given -0.00009 / -0.00015 / -0.00018 [-0.00030, -0.00002]; cleaned -0.00008 / -0.00013 / -0.00029 [-0.00032, -0.00004]; gen -0.00006 / -0.00011 / -0.00009 | 21 / 3 | **rejected** (no Mitra cells either) |
+
+Other components judged from their own branches: event completion (`feat/rescue`) changes no October
+row of the TabM file, nothing to build.
+
+- 2026-11-14 02:15 IST: `recipes/final.json` = five-way blend types + TabM (3 seeds) fraud mass at
+  1/3 (each tree 2/15) + anchored rule + blank-QR rule. Passes the bar against the previous recipe.
   (cap 40 October rows). No measurable component has passed the bar yet.
