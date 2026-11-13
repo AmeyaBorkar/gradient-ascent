@@ -577,4 +577,40 @@ row of the TabM file, nothing to build.
 
 - 2026-11-14 02:15 IST: `recipes/final.json` = five-way blend types + TabM (3 seeds) fraud mass at
   1/3 (each tree 2/15) + anchored rule + blank-QR rule. Passes the bar against the previous recipe.
+
+### final-b2, final-repro, final-t7 (commit 798d511 / b24b0ea): October files, reproducibility, variants
+
+Files in `~/outputs/final/build2/` on the box, copied to the local candidates folder. All valid
+against the sample submission. Changes are against `ga-blend.csv` (the blend) and against the
+TabM upload file (`blend-tabmF-bq.csv`).
+
+| file | sha256 | blank-QR rows | vs blend | vs TabM upload file |
+|---|---|---|---|---|
+| `final.csv` | `39cb4952d979ea3f1f7e2fecec552afd8b17925b3aa9f63da06d143415144db3` | 15 | 25: legit -> qr 13, refund 7, phishing 2, loan 1, collusion 1, sim 1 | 2: phishing -> legit |
+| `final-hedge.csv` | `2f38ee4d051b7c48c684fee4ef87ab5a44b2377d52d2eda84f12638095e01f1a` | 10 | 28 | 8 |
+| `final-s345.csv` | `0a53fd14c9623eba0df43a9293766e3d827b5ca768102c25f16f33720d6abddd` | 9 | 25 | 3 |
+| `final-half.csv` | `8a46142660cde2af1576736289f822c1b5c6226204445bce88d4dc311fb926eb` | 10 | 27 | 0 (the same calls) |
+| `final-noctr.csv` (fallback) | `2dfe144b656b95e2d08d0fdf14ac19cece5c9b3c6b6eb852ca697df4fc96ea3e` | | | |
+
+Calls per class, `final.csv`: legit 256,611; mule 789; bot 318; chain 556; sim 371; takeover 230;
+phishing 500; qr 530; refund 286; cashback 207; loan 100; collusion 84.
+
+Reproducibility (final-repro): `git archive` of b24b0ea into an empty directory, every file built
+twice (`~/outputs/final/repro1`, `repro2`): all five sha256 identical to each other and to
+final-b2. The October files are byte-reproducible from the saved member arrays. The members
+themselves: the XGBoost champion is byte-reproducible from a clean checkout (run 11), and so is
+TabM (`feat/tabm`, byte-identical rerun). CatBoost on the GPU is not, so its saved arrays are the
+reference copy. The four-way blend without CatBoost is a tie in expectation but loses on every
+October-like seed on cleaned, so the five-way stays.
+
+Upload variants against `final.json` (final-t7, 20 min):
+
+| variant | given | cleaned | gen-only | October-like given / cleaned (lb) | rows | verdict |
+|---|---|---|---|---|---|---|
+| final-hedge | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 | 0 / 6 | tie |
+| final-s345 | -0.00001 / -0.00004 / +0.00003 [-0.00005, +0.00003] | +0.00003 / -0.00004 / -0.00006 [-0.00008, +0.00003] | +0.00004 / -0.00005 / -0.00020 | n/a | 6 / 1 | tie |
+| final-half | +0.00000 / +0.00001 / +0.00002 [-0.00006, +0.00008] | +0.00000 / +0.00004 / +0.00006 [-0.00004, +0.00011] | +0.00000 / -0.00017 / -0.00007 | +0.00006 / +0.00010 / +0.00000 (-0.00003); +0.00005 / +0.00009 / -0.00001 (-0.00003) | 13 / 2 | tie |
+
+- 2026-11-14 03:00 IST: final recipe unchanged; variants `final-hedge`, `final-s345`,
+  `final-half` built for the upload slots; reproducibility confirmed.
   (cap 40 October rows). No measurable component has passed the bar yet.
