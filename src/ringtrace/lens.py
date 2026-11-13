@@ -279,7 +279,9 @@ class Lab:
     # October-like ------------------------------------------------------------------------
 
     def octlike(self, makers: dict, seeds=(13, 14, 15), sets=(0, 1, 2), draws=1000) -> dict:
-        """``makers[name](tabm_cell, tree_cells) -> (mass, types)``; the base is ``prob``."""
+        """``makers[name](tabm_cell, tree_cells, tree_masses, types, tabm_avg=...) -> (mass,
+        types)``; ``tabm_avg`` is TabM's mean over every seed set of the thinning seed. The base
+        is ``prob``."""
         from ringtrace import octlike as ol
         from ringtrace import store
         from ringtrace.pairboot import PairedBoot
@@ -300,6 +302,7 @@ class Lab:
                         return f["prob"].astype(np.float64)
 
                     tc = load("tabm")
+                    tabm_avg = np.mean([load("tabm", r=q) for q in sets], axis=0)
                     trs = [load(CELLS[x]) for x in TREES]
                     tm = np.stack([fraud_mass(a) for a in trs], axis=1)
                     types = tree_types(trs)
@@ -307,7 +310,7 @@ class Lab:
                     ya = ol.decode(frame, base_p, DECODER, RULES)
                     boot = PairedBoot(units, truth, ya, draws=draws, seed=seed * 100 + r)
                     for name, mk in makers.items():
-                        mass, ty = mk(tc, trs, tm, types)
+                        mass, ty = mk(tc, trs, tm, types, tabm_avg=tabm_avg)
                         yb = ol.decode(frame, assemble(mass, ty), DECODER, RULES)
                         bs = boot.compare(yb)
                         cell = {"rows": int((ya != yb).sum())}
@@ -359,7 +362,7 @@ def fmt(name: str, cmp: dict, oct_: dict | None = None) -> str:
 
 def adds_split(lab: Lab, base: np.ndarray, pred: np.ndarray) -> dict:
     """Train rows legit in ``base`` and fraud in ``pred``: precision by called class, template,
-    evidence family; pocket b = given legit, generator fraud."""
+    evidence family; pocket b = generator rows (gen-only label fraud)."""
     from ringtrace.evidence import anchors
     from ringtrace.squeeze import RULE_COLUMNS
 
@@ -368,7 +371,8 @@ def adds_split(lab: Lab, base: np.ndarray, pred: np.ndarray) -> dict:
     y = lab.targets
     right_c = add & (y["cleaned"] > 0)
     right_type = add & (y["cleaned"] == b)
-    pocket = add & (y["given"] == 0) & (y["gen"] > 0)
+    pocket = add & (y["gen"] > 0)  # pocket b: generator rows (gen-only fraud) the base calls legit
+    hidden = add & (y["given"] == 0) & (y["cleaned"] > 0)
     tmpl = anchors.template_of(lab.led)[lab.tr]
     cols = anchors.family_columns(lab.led, RULE_COLUMNS)
     fam = np.full(len(lab.tr), "none", dtype=object)
@@ -390,6 +394,8 @@ def adds_split(lab: Lab, base: np.ndarray, pred: np.ndarray) -> dict:
         "right_given": int((add & (y["given"] > 0)).sum()),
         "right_type_cleaned": int(right_type.sum()),
         "pocket_b": int(pocket.sum()),
+        "given_legit_cleaned_fraud": int(hidden.sum()),
+        "false_alarm_cleaned": int((add & (y["cleaned"] == 0)).sum()),
         "by_called": bucket_table(np.array([CLASSES[k] for k in b[i]]), rc, p),
         "by_template": bucket_table(tmpl[i].astype(np.int64), rc, p),
         "by_family": bucket_table(fam[i].astype(str), rc, p),
@@ -444,11 +450,14 @@ def cmd_combine(args) -> dict:
     makers = {}
     for how in HOWS:
         if how != "prob":
-            makers[how] = lambda tc, trs, tm, ty, how=how: (combine(fraud_mass(tc), tm, how), ty)
+            makers[how] = lambda tc, trs, tm, ty, how=how, **_: (
+                combine(fraud_mass(tc), tm, how),
+                ty,
+            )
     for c in args.c:
         fit = lab.ptr != 9
         coef, icpt = fit_stacker(ytr_x[fit], yfit[fit], c)
-        makers[f"stack-c{c}"] = lambda tc, trs, tm, ty, coef=coef, icpt=icpt: (
+        makers[f"stack-c{c}"] = lambda tc, trs, tm, ty, coef=coef, icpt=icpt, **_: (
             stack_mass(stack_features(fraud_mass(tc), tm), coef, icpt),
             ty,
         )
@@ -522,6 +531,23 @@ def cmd_seeds(args) -> dict:
     return res
 
 
+def cmd_seedcells(args) -> dict:
+    """Q2 on October-like: TabM as the mean of the three seed-set cells (9 seeds) against the
+    base's 3-seed TabM, trees unchanged."""
+    lab = Lab()
+
+    def nine(tc, trs, tm, ty, tabm_avg, **_):
+        return combine(fraud_mass(tabm_avg), tm, "prob"), ty
+
+    oc = lab.octlike({"tabm9": nine})["tabm9"]
+    for t in ("given", "cleaned", "gen"):
+        ps = " / ".join(f"{v:+.5f}" for v in oc["per_seed"][t].values())
+        print(f"tabm9 oct {t:<8} {ps} (lb {oc['lower_bound'][t]:+.5f})")
+    print("rows changed over nine cells:", oc["rows"])
+    _jdump(oc, _out() / "seedcells.json")
+    return oc
+
+
 def _gated_mass(lab: Lab, allowed: np.ndarray) -> np.ndarray:
     """The base mass on ``allowed`` rows, the trees' mean mass elsewhere."""
     return np.where(allowed, lab.mass_of("prob"), lab.tree_mass.mean(axis=1))
@@ -576,6 +602,29 @@ def cmd_adds(args) -> dict:
     res["family_gate"] = {"chosen": chosen, "cmp": cmp}
 
     print(fmt("family-gate", cmp))
+
+    # a post-decode gate on the called class: an add (trees legit, base fraud) whose class had
+    # cleaned precision below the bar in both fit months goes back to legit
+    reverted = lab.base_pred.copy()
+    chosen_c = {}
+    for held in (*MONTHS, "october"):
+        fit = [m for m in MONTHS if m != held]
+        drop = []
+        for k in range(1, N_CLASSES):
+            prec = []
+            for m in fit:
+                s = add & (b == k) & (per == m)
+                prec.append(rightc[s].mean() if s.sum() else 1.0)
+            if max(prec) < args.min_precision:
+                drop.append(k)
+        rows = lab.bench.is_test if held == "october" else (~lab.bench.is_test & (per == held))
+        gate = rows & (a == 0) & (b > 0) & np.isin(b, drop)
+        reverted[gate] = 0
+        chosen_c[str(held)] = [CLASSES[k] for k in drop]
+    print("classes reverted per held month:", chosen_c)
+    cmp_c = lab.compare(reverted)
+    res["class_gate"] = {"dropped": chosen_c, "cmp": cmp_c}
+    print(fmt("class-gate", cmp_c))
     res["wall_s"] = time.time() - t0
     _jdump(res, _out() / "adds.json")
     return res
@@ -658,6 +707,7 @@ def main(argv=None):
     a = sub.add_parser("adds")
     a.add_argument("--min-precision", type=float, default=0.5)
     sub.add_parser("types")
+    sub.add_parser("seedcells")
     w = sub.add_parser("write")
     w.add_argument("name")
     w.add_argument("--out", required=True)
@@ -667,6 +717,7 @@ def main(argv=None):
         "seeds": cmd_seeds,
         "adds": cmd_adds,
         "types": cmd_types,
+        "seedcells": cmd_seedcells,
         "write": cmd_write,
     }[args.cmd](args)
 
