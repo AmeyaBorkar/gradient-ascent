@@ -192,3 +192,83 @@ Positive on every thinning seed for given and cleaned, but the bootstrap lower b
 clear 0, so the gate fails. Only 3 of the 9 cells were fitted (time box); s13 r1-r2 are being
 fitted now. The five-way + tabm October-like gate is not run: the other members' cells do not
 exist locally.
+
+## Neural training techniques (commits 9403a2f-43730fd)
+
+### Screen: one fit on July + August per technique, TabM seed 0, against the plain TabM, same seed
+
+`python -m ringtrace.nnexp fit --seeds 0 <variant>`, then `nnexp score <variant>-sd0 --base base-sd0`.
+Cells: `sep` (leave-one-month-out fold 9) and the October-like frames s13 / s14 / s15 (r0).
+Roles:
+- **fraud-only:** legit column from TabM at 1/2 plus the trees at 1/2; fraud types from the
+  trees. On `sep` the trees are the five-way blend's month-fold probabilities. On the October-like
+  cells only champion, lgbm, catboost and clean-event have r0 cells; clean-l2 has none.
+- **alone:** TabM decoded by itself.
+
+Calls are the fixed point, then `anchored_templates` and `blank_merchant_qr`. Each entry is the
+change in macro-F1 x 1e-4 on given / cleaned / gen-only. "Never loses" means no target in any
+cell is below 0.
+
+Wall time per cell: about 4.5 min on the 4090 for TabM techniques (13-28 min on the shared A6000
+for kd30 / kd70), under 1 min for RealMLP. Each technique's settings are in
+`nnexp.VARIANTS`.
+
+| technique | role | sep | s13 | s14 | s15 | never loses |
+|---|---|---|---|---|---|---|
+| swa | fraud-only | +0.1 / +0.1 / +0.4 | +0.3 / +0.3 / +0.8 | +0.0 / +0.0 / +0.0 | +0.0 / +0.0 / +0.0 | yes |
+| swa | alone | +1.3 / +1.3 / +0.9 | +1.6 / +0.9 / +4.8 | +4.2 / +4.1 / +4.7 | +0.5 / +0.5 / +1.5 | yes |
+| ema | fraud-only | -1.3 / -1.4 / -4.2 | +0.0 / +0.0 / -0.0 | -0.8 / +3.0 / +4.4 | +0.0 / +0.0 / +0.0 | no |
+| ema | alone | +1.7 / +1.6 / +1.0 | +1.0 / +0.1 / +1.3 | +3.9 / +3.8 / +4.0 | +3.6 / +3.3 / +0.8 | yes |
+| qraug | fraud-only | +0.3 / +0.2 / +0.1 | +0.5 / +0.6 / +1.6 | +0.6 / +4.2 / +5.6 | +0.2 / +0.3 / +0.8 | yes |
+| qraug | alone | +2.4 / +2.3 / -1.3 | +1.4 / +1.6 / +5.8 | -1.1 / +1.1 / -12.6 | +2.4 / +2.2 / +0.2 | no |
+| kd30 | fraud-only | +0.1 / +0.1 / +0.4 | +0.5 / +0.6 / +1.6 | +0.8 / +0.8 / +1.0 | -0.8 / -0.7 / -1.0 | no |
+| kd30 | alone | +1.4 / +1.4 / -2.5 | +0.5 / -0.2 / +10.3 | -3.1 / -2.9 / +0.6 | +2.5 / +2.7 / +8.5 | no |
+| kd70 | fraud-only | -0.4 / -0.4 / -0.6 | -1.2 / -1.0 / -0.4 | -0.3 / -0.3 / -0.8 | -1.5 / -1.2 / -0.2 | no |
+| kd70 | alone | -0.1 / +0.8 / -1.0 | +2.6 / -2.0 / +13.3 | -4.5 / -8.9 / -5.9 | +2.1 / +1.6 / +8.6 | no |
+| mixup | fraud-only | +0.1 / +0.1 / +0.4 | -0.3 / -0.2 / +0.6 | +0.8 / +0.8 / +1.0 | +0.2 / +0.3 / +0.8 | no |
+| mixup | alone | +2.7 / +0.8 / -3.1 | +3.6 / +2.1 / +9.5 | +2.8 / +2.6 / -1.6 | +1.8 / +1.6 / -2.0 | no |
+| noise | fraud-only | -0.6 / -0.6 / +0.2 | +0.5 / +0.6 / +1.6 | -0.8 / +3.0 / +4.4 | - | no |
+| noise | alone | +0.2 / -0.1 / -4.4 | +3.7 / +2.2 / +10.5 | +0.7 / +0.6 / -3.2 | - | no |
+| pre | fraud-only | -0.4 / -0.4 / -0.5 | -0.2 / +0.7 / +0.9 | - | - | no |
+| pre | alone | +2.4 / +2.3 / -1.2 | +6.9 / +2.0 / +12.2 | - | - | no |
+| smooth | fraud-only | -0.8 / -0.6 / -4.4 | -4.1 / +1.8 / -4.3 | -2.6 / +3.9 / -7.5 | -4.4 / -3.8 / -2.0 | no |
+| smooth | alone | +2.3 / +2.1 / -1.7 | +0.0 / -0.7 / -8.0 | -3.6 / -0.9 / -21.8 | -3.6 / -4.0 / -5.4 | no |
+| logitadj | fraud-only | -3034.9 / -3387.9 / -6204.7 | -3290.0 / -3673.6 / -6473.4 | -3189.9 / -3570.9 / -6380.2 | -3369.5 / -3751.5 / -6607.9 | no |
+| logitadj | alone | -3696.7 / -4066.2 / -6677.8 | -3900.6 / -4297.8 / -7012.2 | -3336.9 / -3663.4 / -6106.0 | -3639.1 / -4005.8 / -6703.9 | no |
+| focal | fraud-only | -562.3 / -621.3 / -1256.6 | -572.5 / -621.1 / -1230.1 | -576.2 / -628.3 / -1244.9 | -489.6 / -539.3 / -1094.8 | no |
+| focal | alone | -582.2 / -640.7 / -1482.3 | -595.9 / -650.6 / -1463.2 | -505.2 / -549.5 / -1240.9 | -429.3 / -469.9 / -1084.8 | no |
+| realmlp | fraud-only | -2.8 / -1.0 / -12.9 | -0.3 / +2.8 / -3.0 | -0.6 / +5.5 / +3.4 | -7.1 / -5.5 / -5.5 | no |
+| realmlp | alone | -6.7 / -7.4 / -20.9 | +0.0 / +0.4 / +8.9 | -5.7 / -5.4 / -15.8 | -6.8 / -8.9 / -15.8 | no |
+
+Outputs: `$RINGTRACE_OUT/nntech/<variant>-sd0_<cell>.npz` (rows and probabilities of the held-out
+September) and `score_<variant>-sd0_vs_base-sd0.json`. Noise and pretraining are partial
+(noise: sep, s13, s14; pretraining: sep, s13), because the machine running them was shut down.
+Both already lose in the fraud-only role on `sep`. Failures:
+- the first champion-cascade teacher crashed: the cascade needs two training months;
+- the 3-seed first launch was abandoned for time;
+- the A6000 was contended at 85 s per epoch.
+
+### Full member: SWA (last 3 epochs), seeds 0-2, leave-one-month-out + October
+
+`python -m ringtrace.run recipes/nntech-swa.json` (commit 43730fd), 51 min on the A6000.
+
+- **Alone, after the rule:** given 0.5134 / 0.5085 / 0.5151 (0.5124), cleaned 0.5649 / 0.5637 /
+  0.5719 (0.5668), gen-only 0.9023 / 0.8987 / 0.9017 (0.9009). Plain TabM (T4) scored 0.5123 /
+  0.5667 / 0.9008.
+- **Fraud-only** (`blend.save_fraud_split` as for `tabm-fraud-only`, run `nntech-swa-fraud-only`),
+  with rules `anchored_templates,blank_merchant_qr`, against `tabm-fraud-only`, Jul / Aug / Sep:
+
+| target | change |
+|---|---|
+| given | -0.000041 / +0.000013 / +0.000041 |
+| cleaned | -0.000044 / +0.000008 / +0.000037 |
+| gen-only | -0.000127 / -0.000025 / +0.000049 |
+
+**FAIL**: it loses July on every target. The October-like cells of the 3-seed member were not
+fitted, because no machine was left. In the screen's fraud-only role SWA moved 0-1 calls per
+October-like cell (s14 and s15 exactly 0), so it cannot be positive on every thinning seed.
+
+October file (template rule, then `blank_merchant_qr`): `candidates/nntech-swa.csv`, VALID,
+sha256 `715138bd2d1d6bc48338f34873363c310a2493556f1769ec0cc9a94d2f05fc3a`. Against
+`blend-tabmF-bq.csv` (sha256 `8a461426...fb926eb`) it changes 1 call: legit -> phishing_collect.
+Not a submission candidate.
