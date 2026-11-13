@@ -58,9 +58,6 @@ run, validated submission).
 - Wall times: member 1 about 11-13 min with the GPU shared by other jobs (`RESULTS.md`); the
   other members and the full build are recorded there as they are run.
 
-Provenance: the methods follow the team's shared research notes, and every line of code was
-written in this repository.
-
 ## Layout
 
 | module | role |
