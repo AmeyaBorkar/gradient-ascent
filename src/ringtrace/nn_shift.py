@@ -261,6 +261,34 @@ def scale_rows(
 # covariate-shift reweighting toward a target frame (features only)
 
 
+def column_auc_gap(
+    X_a: np.ndarray, X_b: np.ndarray, sample: int = 200_000, seed: int = 0
+) -> np.ndarray:
+    """``|AUC - 0.5|`` of each column alone at telling rows of ``X_b`` from rows of ``X_a``.
+
+    At most ``sample`` rows of each side, drawn by a seeded generator. NaN ranks below every
+    number, so a change in missingness counts as drift. Ties take the average rank.
+    """
+    from scipy.stats import rankdata
+
+    X_a = _matrix(X_a)
+    X_b = _matrix(X_b)
+    if X_a.shape[1] != X_b.shape[1]:
+        raise ValueError(f"column counts differ: {X_a.shape[1]} and {X_b.shape[1]}")
+    rng = np.random.default_rng(seed)
+    ia = np.sort(rng.choice(len(X_a), min(sample, len(X_a)), replace=False))
+    ib = np.sort(rng.choice(len(X_b), min(sample, len(X_b)), replace=False))
+    na, nb = ia.size, ib.size
+    gap = np.empty(X_a.shape[1], dtype=np.float64)
+    for j in range(X_a.shape[1]):
+        v = np.concatenate([X_a[ia, j], X_b[ib, j]]).astype(np.float64)
+        v[np.isnan(v)] = -np.inf
+        r = rankdata(v)
+        auc = (r[na:].sum() - nb * (nb + 1) / 2) / (na * nb)
+        gap[j] = abs(auc - 0.5)
+    return gap
+
+
 def domain_weights(
     X_src: np.ndarray,
     X_tgt: np.ndarray,

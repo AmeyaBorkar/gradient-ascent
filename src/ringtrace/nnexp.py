@@ -275,16 +275,47 @@ def _fit_tabr(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
 
 
 # Shift variant: the fit rows weighted by a domain classifier toward the scored rows' features.
-SHIFT = {"clip": (0.2, 5.0), "sample": 300_000, "rounds": 200}
+# On every feature the classifier tells September from July + August perfectly (AUC 1.0000),
+# from calendar-like columns. Columns whose own AUC between July + August and the unthinned
+# September is more than ``calendar_gap`` from 0.5 are left out of the classifier in every cell:
+# between those months nothing but the calendar moves, so what they detect is the month.
+SHIFT = {"clip": (0.2, 5.0), "sample": 300_000, "rounds": 200, "calendar_gap": 0.05}
+
+
+def _shift_columns(c: str, cell, X: np.ndarray, log) -> np.ndarray:
+    """Columns the domain classifier may read: fixed on ``sep``, then reused by every cell."""
+    from ringtrace import nn_shift
+
+    path = _dir() / "shift-columns.json"
+    if c == "sep":
+        gap = nn_shift.column_auc_gap(X[cell.fit], X[cell.hold])
+        keep = np.flatnonzero(gap <= SHIFT["calendar_gap"])
+        drop = np.flatnonzero(gap > SHIFT["calendar_gap"])
+        path.write_text(
+            json.dumps(
+                {
+                    "keep": keep.tolist(),
+                    "drop": drop.tolist(),
+                    "gap_of_dropped": [round(float(g), 4) for g in gap[drop]],
+                },
+                indent=1,
+            )
+        )
+        log(f"[nnexp] shift: {drop.size} calendar-like columns left out, {keep.size} kept")
+        return keep
+    if not path.exists():
+        raise FileNotFoundError("fit the shift variant on sep first: it fixes the columns")
+    return np.asarray(json.loads(path.read_text())["keep"], dtype=np.intp)
 
 
 def _fit_shift(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
     """TabM on the fit rows reweighted toward the scored rows (features only, never labels)."""
     from ringtrace import nn_shift, threads
 
+    cols = _shift_columns(c, cell, X, log)
     w, info = nn_shift.domain_weights(
-        X[cell.fit],
-        X[cell.hold],
+        X[cell.fit][:, cols],
+        X[cell.hold][:, cols],
         clip=SHIFT["clip"],
         sample=SHIFT["sample"],
         rounds=SHIFT["rounds"],

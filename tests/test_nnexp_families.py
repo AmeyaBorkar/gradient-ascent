@@ -173,3 +173,15 @@ def test_cleaned_target_returns_the_requested_label_set(monkeypatch):
     assert list(lab[:2]) == [0, 3] and list(gen[:2]) == [0, 0]
     assert seen["mask"] == [True, True, False, False]
     assert seen["oof"] == ((2, 1), [7, 8])
+
+
+def test_column_auc_gap_flags_only_the_drifting_column():
+    from ringtrace import nn_shift
+
+    rng = np.random.default_rng(3)
+    a = rng.normal(size=(5000, 3))
+    b = rng.normal(size=(5000, 3))
+    b[:, 1] += 2.0  # a calendar-like column
+    b[:1000, 2] = np.nan  # missingness moves too
+    gap = nn_shift.column_auc_gap(a, b, sample=5000)
+    assert gap[0] < 0.03 and gap[1] > 0.4 and gap[2] > 0.05
