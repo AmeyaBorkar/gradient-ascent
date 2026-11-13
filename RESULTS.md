@@ -514,5 +514,26 @@ Nested weights (copies of champion, lgbm, catboost, clean-event, clean-l2): held
 Aug 0,1,0,1,0; Sep 0,1,0,2,0; October 0,1,0,1,0. Anchor rescue and nested selection reproduce the
 earlier squeeze measurements to the fifth decimal.
 
+### final-t3 (commit ea8cf74, 24 min; October-like 561 s): variants, second seed, counter-free, TabM
+
+Same base and columns as above. October-like is n/a where a recipe's members lack cells (the
+second-seed and counter-free members have none; the TabM cells reached the box after the job
+started).
+
+| candidate | given | cleaned | gen-only | October-like | rows | verdict |
+|---|---|---|---|---|---|---|
+| hedge (all five members) | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 | 0 (cells are fold models) | 0 / 6 | train-identical by construction; decided by the refit test, which fails the bar |
+| refit (all five members) | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 | 0 | 0 / 11 | as hedge |
+| second seed set (seeds 3-5, all five) | +0.00016 / +0.00011 / -0.00001 [-0.00000, +0.00019] | -0.00007 / +0.00011 / -0.00001 [-0.00016, +0.00015] | -0.00003 / +0.00015 / +0.00001 | n/a | 10 / 2 | tie: seed noise is about 1e-4 per month and 2 October calls |
+| counter-free (no device-counter family, plain template rule) | -0.03013 / -0.03296 / -0.02721 [-0.03259, -0.02782] | -0.03120 / -0.03251 / -0.02761 | -0.00667 / -0.01163 / -0.00497 | n/a | 1,857 / 330 | fallback only |
+| TabM full member, 1/6 | +0.00058 / +0.00009 / +0.00024 [+0.00013, +0.00052] | +0.00054 / +0.00008 / +0.00022 | +0.00078 / +0.00008 / -0.00014 | n/a | 20 / 2 | fails gen-only Sep |
+| TabM full member, 1/3 | +0.00055 / +0.00015 / +0.00021 [+0.00013, +0.00051] | +0.00067 / +0.00014 / +0.00027 | +0.00092 / +0.00013 / -0.00010 | n/a | 30 / 5 | fails gen-only Sep |
+| TabM full member, 1/2 | +0.00050 / +0.00016 / +0.00027 [+0.00011, +0.00055] | +0.00051 / +0.00018 / +0.00036 | +0.00065 / +0.00005 / +0.00005 | n/a | 42 / 5 | LOMO non-negative; October-like pending |
+| TabM fraud mass 1/3 (types from the trees) | +0.00073 / +0.00024 / +0.00027 [+0.00021, +0.00067] | +0.00068 / +0.00021 / +0.00037 [+0.00022, +0.00066] | +0.00089 / +0.00018 / +0.00011 | n/a | 39 / 10 | LOMO passes; October-like pending |
+| TabM fraud mass 1/2 | +0.00073 / +0.00025 / +0.00029 [+0.00020, +0.00069] | +0.00068 / +0.00025 / +0.00043 [+0.00023, +0.00072] | +0.00089 / +0.00001 / +0.00004 | n/a | 52 / 17 | LOMO passes; October-like pending |
+| TabM fraud mass 2/3 | +0.00059 / +0.00020 / +0.00039 [+0.00016, +0.00066] | +0.00053 / +0.00020 / +0.00047 | +0.00042 / -0.00013 / +0.00007 | n/a | 64 / 19 | fails gen-only Aug |
+| TabM fraud mass 4/5 | +0.00066 / -0.00002 / +0.00035 | +0.00059 / -0.00003 / +0.00042 | +0.00050 / -0.00070 / -0.00011 | n/a | 78 / 17 | fails |
+| TabM fraud mass 1 | +0.00077 / -0.00002 / +0.00026 | +0.00069 / +0.00001 / +0.00034 | +0.00062 / -0.00068 / -0.00034 | n/a | 88 / 16 | fails |
+
 - 2026-11-14 00:40 IST: first `recipes/final.json` = the five-way blend + `blank_merchant_qr`
   (cap 40 October rows). No measurable component has passed the bar yet.
