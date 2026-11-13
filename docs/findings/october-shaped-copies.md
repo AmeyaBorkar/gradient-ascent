@@ -35,7 +35,8 @@ Mean absolute gap to October over the July and August copies:
 
 So the copies move the ring mix away from October: more single-row rings and fewer small ones. This
 is the same direction as the row-thinning artefact (more size-1 rings). The other families stay close
-to raw. Only the request events move towards October: 177-189 per 100k against 252-270 raw and 212
+5.5-6.4 rows per event against 7.05-7.17 raw and 7.82 in October. Only the request events move towards
+October: 177-189 per 100k against 252-270 raw and 212
 in October.
 
 The octlike judge frames, built the same way but without the amount scale, sit at size-1 9.5-10.7,
