@@ -91,3 +91,22 @@ from July + August only, the teacher fitted on the other month), same scoring:
 Cleantrain mean over the 9 cells 0.5091 against 0.5093 for the given-label champion: a tie on the
 given labels (the cleaned target cannot be scored on September here, which has no cleaned labels
 by protocol). All 18 cells ran in 28 min (16:39-17:07 IST), three frames in parallel.
+
+## Member: findings (analysis of the member runs, no refits)
+
+Each member is decoded as the run decodes it (fixed point 0.875 per month, then
+`anchored_templates`) by `analysis/findings.py`. The script ran on the box with 4 CPU threads in
+43 s and wrote `~/outputs/findings-analysis/findings.json`. The write-ups are in
+`docs/findings/`.
+
+| member run | commit | given Jul / Aug / Sep (mean) | cleaned Jul / Aug / Sep (mean) | gen-only Jul / Aug / Sep (mean) | wall |
+|---|---|---|---|---|---|
+| champion | 911b18d | 0.5130 / 0.5090 / 0.5146 (0.5122) | 0.5645 / 0.5639 / 0.5712 (0.5665) | 0.9020 / 0.8996 / 0.9014 (0.9010) | 43 s (whole script) |
+| catboost | 911b18d | 0.5129 / 0.5090 / 0.5141 (0.5120) | 0.5644 / 0.5637 / 0.5706 (0.5662) | 0.9023 / 0.8995 / 0.9008 (0.9008) | (same) |
+| clean-event | 911b18d | 0.5131 / 0.5091 / 0.5146 (0.5123) | 0.5646 / 0.5640 / 0.5713 (0.5666) | 0.9021 / 0.8997 / 0.9017 (0.9012) | (same) |
+| clean-l2 | 911b18d | 0.5131 / 0.5091 / 0.5146 (0.5122) | 0.5645 / 0.5642 / 0.5713 (0.5666) | 0.9019 / 0.8999 / 0.9016 (0.9012) | (same) |
+| lgbm | 911b18d | 0.5130 / 0.5092 / 0.5146 (0.5122) | 0.5646 / 0.5642 / 0.5712 (0.5667) | 0.9021 / 0.9000 / 0.9012 (0.9011) | (same) |
+
+The champion row matches run 9, which checks the decoding. The members' spread on cleaned labels
+(0.5662-0.5667) is below the 0.0002-0.0005 public-slice sd of a pairwise gap
+(`docs/findings/public-score-noise.md`).
