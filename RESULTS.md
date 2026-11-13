@@ -476,3 +476,43 @@ The refit fails, so no October refit of lgbm or catboost was run, and no refit b
 Failed launches (no output): the first warm-up and the first two fit jobs stopped at once on shell
 quoting. The first refit-cell fits stopped on `--tag -m7`, which argparse reads as an option; they
 were relaunched with `--tag=-m7`.
+
+## Final system
+
+`python -m ringtrace.final` (recipe format, one-command build and harness; `recipes/final.json`,
+candidates in `recipes/cand/`). The harness scores any recipe from saved `oof.npy` / `test.npy` and
+October-like cells, no refits: per-month change on given / cleaned / gen-only (Jul / Aug / Sep), the
+paired event bootstrap of the mean change (2,000 draws, 95 %, `ringtrace.pairboot`), the nine
+October-like cells (per-seed mean change, mean 95 % lower bound; 1,000 draws), and rows changed
+(train / October). Box CPU, 8 threads. Cells: `~/outputs/gate/octlike/` (current frames).
+
+### Builds
+
+| run | commit | result | wall |
+|---|---|---|---|
+| final-t1 build `recipes/cand/base.json` | 05cb804 | sha256 `c3af1418...6c05`, byte-identical to the blend's file; 0.5123 / 0.5667 / 0.9013 | 4 s from arrays |
+| final-t1 build `recipes/cand/blankqr.json` | 05cb804 | sha256 `e7c59467...43d0`, byte-identical to the blend + blank-QR file; 20 October rows changed (cap 40), 1 train row | 3 s |
+| final-t1 table | 05cb804 | stopped after 50 min in the October-like and bootstrap stage (one core); replaced by the shared-count bootstrap | 50 min |
+| final-t2 table, 17 challengers | cdd53de | October-like 663 s; base bootstrap counts about 15 min once, then 2-3 s per challenger; stopped at the hedge recipe (the champion's hedge run has no `oof.npy`, fixed with `variant_run`) | 27 min |
+
+### Components against the blend (final-t2, base = five-way blend, fold mean, anchored rule)
+
+Change per month Jul / Aug / Sep, [95 % bootstrap interval of the mean]; October-like per seed
+s13 / s14 / s15 (mean lower bound); rows train / October.
+
+| candidate | given | cleaned | gen-only | October-like given | October-like cleaned | rows | verdict |
+|---|---|---|---|---|---|---|---|
+| blank-merchant-QR rule (base-rate) | +0.00000 / +0.00000 / +0.00004 [+0.00000, +0.00004] | +0.00000 / +0.00000 / +0.00003 [+0.00000, +0.00004] | +0.00000 / +0.00000 / +0.00004 | +0.0000 x3 (lb +0.0000) | +0.0000 x3 (lb +0.0000) | 1 / 20 | not measurable offline; enters on base rate |
+| event types before the rule | +0.00033 / +0.00014 / +0.00000 [+0.00001, +0.00036] | +0.00047 / +0.00013 / +0.00000 [+0.00005, +0.00039] | +0.00071 / +0.00020 / +0.00000 | +0.0000 x3 (lb +0.0000) | +0.0000 x3 (lb +0.0000) | 7 / 0 | tie (0 October rows), rejected |
+| anchor rescue | +0.00005 / -0.00002 / +0.00009 [-0.00003, +0.00012] | +0.00004 / -0.00002 / +0.00016 | -0.00001 / -0.00005 / +0.00015 | -0.00001 / +0.00014 / -0.00004 (lb -0.00009) | +0.00008 / +0.00023 / -0.00005 (lb -0.00009) | 14 / 1 | rejected |
+| four-way (no CatBoost) | +0.00013 / +0.00008 / -0.00014 [-0.00006, +0.00011] | +0.00001 / +0.00007 / -0.00009 | +0.00005 / +0.00010 / -0.00011 | +0.00003 / -0.00010 / -0.00013 (lb -0.00029) | -0.00010 / -0.00027 / -0.00012 (lb -0.00050) | 20 / 3 | rejected; a tie with the five-way in expectation |
+| fraud_scale 0.85 | +0.00000 / +0.00000 / +0.00003 [+0.00000, +0.00003] | +0.00000 / +0.00000 / +0.00003 | +0.00000 / +0.00000 / -0.00003 | +0.00000 / +0.00003 / +0.00000 | +0.00000 / +0.00003 / +0.00000 | 1 / 0 | tie, rejected |
+| fraud_scale 0.90 | -0.00004 / +0.00000 / -0.00004 [-0.00007, +0.00000] | -0.00003 / +0.00000 / -0.00004 | -0.00004 / +0.00000 / +0.00004 | +0.00000 / +0.00001 / +0.00000 | +0.00000 / +0.00001 / +0.00000 | 2 / 1 | rejected |
+| nested greedy selection (prob) | +0.00011 / +0.00005 / -0.00009 [-0.00008, +0.00014] | +0.00011 / +0.00004 / -0.00004 | +0.00017 / +0.00003 / -0.00003 | +0.00002 / -0.00001 / -0.00011 (lb -0.00020) | -0.00005 / -0.00010 / -0.00010 (lb -0.00033) | 18 / 5 | rejected |
+
+Nested weights (copies of champion, lgbm, catboost, clean-event, clean-l2): held Jul 1,1,1,0,0;
+Aug 0,1,0,1,0; Sep 0,1,0,2,0; October 0,1,0,1,0. Anchor rescue and nested selection reproduce the
+earlier squeeze measurements to the fifth decimal.
+
+- 2026-11-14 00:40 IST: first `recipes/final.json` = the five-way blend + `blank_merchant_qr`
+  (cap 40 October rows). No measurable component has passed the bar yet.
