@@ -47,9 +47,8 @@ Short records of design choices.
 11. **Scores are reported against our own cleaned labels.** They are rebuilt from the
     recipe (independent teacher on context + marks; noise inversion with rho 0.0238 and
     u 0.122; likelihood ratios of the label, the old app version and the IP-risk bin; event
-    majority, else teacher type) and change 3,629 rows against the target's 3,607. Small differences
-    in which rows change move the cleaned score by a few thousandths, so our 0.5665 and the
-    pack's 0.5662 are comparable, not identical measurements.
+    majority, else teacher type) and change 3,629 rows. Small differences in which rows change move the cleaned score by a
+    few thousandths, so cleaned scores from different cleanings are comparable, not identical.
 12. **The bootstrap resamples events, decoded as each recipe says.** `ringtrace.compare` re-decodes
     both runs' saved probabilities (fixed point + rules) instead of trusting stored calls, uses
     the first family event of a row as its unit, and averages the per-month macro-F1 like the
