@@ -150,6 +150,13 @@ cleaned fraud, 0.02 % generator-made, 1,538,790 rows):
 
 ## 5. Lever 1: the counter's segments at October's size
 
+**Run since (`counter.md`).**
+- The first gate passes: +0.030 thinned agreement at spread 0.01 / gap weight 1.0.
+- The second gate fails.
+- October's calls already follow the segment, and the rows a rule would change are ones the model
+  gets right on train.
+- The lever is worth about 0 on October.
+
 `python analysis/farlook.py thin`. The counter fits its eleven segments on each split's fraud
 block from anchors alone. October's block has one sixth of train's phones, so its cuts rest on one
 sixth of the anchors. We thinned train's block to that size (each phone kept with probability

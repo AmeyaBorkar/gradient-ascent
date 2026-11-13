@@ -45,7 +45,14 @@ Back to the [index](index.md).
 - test-time adaptation and label-shift estimators (no shift loss is left: an oracle prior gains
   +0.00005; the October-like loss with the counter held is -0.0006);
 - new rule families on top of the saturated ones ([rules.md](rules.md)): 38 request variants, 12
-  drain variants, 11 money-flow variants and 12 merchant variants all tied.
+  drain variants, 11 money-flow variants and 12 merchant variants all tied;
+- a train-taught prior for the counter's October segments (cut positions and per-segment
+  occupancy). **Measured in this repo**
+  ([counter.md](../../findings/counter.md)):
+  - the segments improve at October's size (+0.030 agreement);
+  - the counter rule built on them loses in September;
+  - October's calls already follow the segment, and where the model and the segment disagree the
+    model is right on 17 of 19 train rows.
 
 ## What actually moves the score [earlier]
 
