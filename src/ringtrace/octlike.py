@@ -349,10 +349,23 @@ def fit(seeds: list[int], cells: list[tuple[str, list[int]]], recipes_dir: Path,
                 f"({time.time() - t0:.0f}s)"
             )
             target = y.copy()
-            if recipe.get("train_on") == "cleaned":
+            train_on = recipe.get("train_on", "given")
+            if train_on == "cleaned":
                 cleaned, stats = _cleaned_target(frame, log)
                 target[frame.fit] = cleaned[frame.fit]
                 summary[f"{recipe_name}_s{seed}_cleaning"] = stats
+            elif train_on in runner.EVENT_MODES:
+                from ringtrace import eventclean
+
+                # only July + August vote and change, from the frame's own events
+                target = eventclean.clean_labels(
+                    y, eventclean.ledger_events(), runner.EVENT_MODES[train_on], mask=frame.fit
+                )
+                summary[f"{recipe_name}_s{seed}_cleaning"] = {
+                    "changed": int((target != y)[frame.fit].sum())
+                }
+            elif train_on != "given":
+                raise ValueError(f"unknown train_on {train_on!r}")
             spec = runner.cascade_spec(recipe)
             for r in sets:
                 name = f"{recipe_name}_s{seed}_r{r}"
