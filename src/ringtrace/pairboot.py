@@ -98,7 +98,9 @@ class PairedBoot:
             point = {t: np.asarray(c.sum(axis=0)).ravel() for t, c in ca.items()}
             self.strata.append({"rows": rows, "ids": ids, "local": local, "tot": tot, "pt": point})
 
-    def compare(self, chal: np.ndarray, q=(2.5, 97.5)) -> dict:
+    def compare(self, chal: np.ndarray, q=(2.5, 97.5), keep_draws: bool = False) -> dict:
+        """Point change and interval per target; ``keep_draws`` adds the draws themselves, so
+        several comparisons resampled with the same weights can be pooled."""
         chal = np.asarray(chal)
         deltas = {t: np.zeros(self.draws) for t in self.truths}
         point = dict.fromkeys(self.truths, 0.0)
@@ -124,4 +126,6 @@ class PairedBoot:
         for t in self.truths:
             lo, hi = np.percentile(deltas[t] / k, list(q))
             out[t] = {"delta": point[t] / k, "lo": float(lo), "hi": float(hi)}
+            if keep_draws:
+                out[t]["draws"] = deltas[t] / k
         return out["_"] if self.single else out

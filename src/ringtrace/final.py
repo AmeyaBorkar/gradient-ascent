@@ -455,6 +455,7 @@ class Bench:
             return [None] * len(chals)
         wsep = {recipe_key(r): self.weights(r)[9] for r in [base, *chals]}
         cells: dict = {i: {} for i in todo}
+        pooled: dict = {}
         try:
             for seed in seeds:
                 frame = ol.Frame(seed)
@@ -491,14 +492,16 @@ class Bench:
                         continue
                     ya = calls(base, r)
                     hold_truth = {t: truth[frame.hold] for t, truth in frame.targets.items()}
-                    boot = PairedBoot(units, hold_truth, ya, draws=draws, seed=seed * 100 + r)
+                    # the cells of one frame share their units, so they share their weights
+                    boot = PairedBoot(units, hold_truth, ya, draws=draws, seed=seed * 100)
                     for i in todo:
                         if (seed, r) not in have[i]:
                             continue
                         yb = calls(chals[i], r)
                         cell = {"rows_changed": int((ya != yb).sum())}
-                        bs = boot.compare(yb)
+                        bs = boot.compare(yb, keep_draws=True)
                         for t, yt in hold_truth.items():
+                            pooled.setdefault(i, {}).setdefault(t, []).append(bs[t].pop("draws"))
                             cell[t] = {"base": macro_f1(yt, ya), "chal": macro_f1(yt, yb), **bs[t]}
                         cells[i][(seed, r)] = cell
         finally:
@@ -520,7 +523,14 @@ class Bench:
                     }
                     for t in tg
                 },
-                "lower_bound": {t: float(np.mean([v[t]["lo"] for v in c.values()])) for t in tg},
+                # 2.5 % point of the bootstrap distribution of the mean change over the cells
+                "lower_bound": {
+                    t: float(np.percentile(np.mean(pooled[i][t], axis=0), 2.5)) for t in tg
+                },
+                # the mean of the per-cell 2.5 % points (the stricter earlier convention)
+                "cell_lower_bound": {
+                    t: float(np.mean([v[t]["lo"] for v in c.values()])) for t in tg
+                },
                 "base_mean": {t: float(np.mean([v[t]["base"] for v in c.values()])) for t in tg},
                 "rows_changed": int(sum(v["rows_changed"] for v in c.values())),
                 "cells": {f"s{s}_r{r}": v for (s, r), v in c.items()},
@@ -545,7 +555,10 @@ def fmt_line(name: str, lomo: dict, octlike: dict | None, verdict: dict) -> str:
     if octlike is not None:
         for t in ("given", "cleaned"):
             ps = " / ".join(f"{v:+.5f}" for v in octlike["per_seed"][t].values())
-            parts.append(f"octlike {t} {ps} (lb {octlike['lower_bound'][t]:+.5f})")
+            parts.append(
+                f"octlike {t} {ps} (lb {octlike['lower_bound'][t]:+.5f}, "
+                f"cell lb {octlike['cell_lower_bound'][t]:+.5f})"
+            )
         parts.append(f"cells {octlike.get('n_cells', '?')}")
     else:
         parts.append("octlike n/a")

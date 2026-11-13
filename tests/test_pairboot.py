@@ -68,3 +68,13 @@ def test_dict_of_targets_matches_single_targets():
     multi = pb.PairedBoot(units, {"x": t1, "y": t2}, a, draws=100).compare(b)
     assert multi["x"] == pb.PairedBoot(units, t1, a, draws=100).compare(b)
     assert multi["y"] == pb.PairedBoot(units, t2, a, draws=100).compare(b)
+
+
+def test_keep_draws_matches_interval():
+    rng = np.random.default_rng(3)
+    n = 400
+    t = rng.integers(0, N_CLASSES, n)
+    a = rng.integers(0, N_CLASSES, n)
+    b = np.where(rng.random(n) < 0.2, t, a)
+    r = pb.PairedBoot(np.arange(n), t, a, draws=200).compare(b, keep_draws=True)
+    assert r["lo"] == pytest.approx(np.percentile(r["draws"], 2.5))
