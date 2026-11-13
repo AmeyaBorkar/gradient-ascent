@@ -1,5 +1,26 @@
 # Progress
 
+## Close look at the best file (14 Nov, under way)
+
+Audit of every number behind the best public file (`blend-tabmF-bq`, 0.5499354), rebuilt from
+the saved arrays (`python analysis/closelook.py prep`: 0 October rows differ from the uploaded
+file). Goal: a lever worth +0.0025 macro-F1 on October, proven offline first.
+
+- [ ] Ledger of every scored run and candidate (`docs/findings/ledger.md`).
+- [x] Per-class anatomy (given / cleaned / A-clean, per month). Under cleaned labels every class
+      but the look-alike ones runs at precision 0.89-0.99 with recall 0.23-0.48: the calls stop
+      where the generator rows stop.
+- [x] Per-class volume scaling (admission multiplier 0.3-2.0 per class): call volume is rigid
+      (0-20 rows per month for most settings). Only qr_swap at 0.5 never loses on LOMO
+      (+0.0001 mean, 4 October rows), far below +0.0005.
+- [x] Look-alike pairs: every template already gives its unheld pool to the class that maximises
+      the pair's F1 sum; within-pool AUC 0.44-0.64; nested top-score splits lose or pick nothing.
+- [x] October aggregates: volume departures (velocity_bot, merchant_collusion down, mule up) are
+      event-count changes; every label-free anchor is called fraud in October at the train rate.
+- [ ] Gate the qr_swap volume lever on the full bar; write `docs/findings/closelook.md`.
+
+Current best idea: none above +0.0005 so far; the measured levers are ties.
+
 ## Goal
 Rebuild the latest submission end to end in this codebase alone, from ideas only. The submission
 is an equal-weight blend of five cascade models, decoded per month:
