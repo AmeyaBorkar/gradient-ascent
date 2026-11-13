@@ -10,8 +10,8 @@ Cells: ``sep`` is the normal ledger with September held out (the leave-one-month
 ``$RINGTRACE_OUT/nntech/<variant>_<cell>.npz`` (``rows``, ``prob``); seeds other than 0-2 add
 ``-sd<seeds>`` to the name, which ``score`` then takes as the variant name.
 
-``teacher`` cross-fits the champion recipe between July and August (fit one, predict the
-other) on each cell's fit rows: out-of-fold soft targets that never see September.
+``teacher`` cross-fits a booster between July and August (fit one, predict the other) on each
+cell's fit rows: out-of-fold soft targets that never see September.
 
 ``score`` judges a variant against the base twice, with the same seeds: TabM alone, and
 fraud-only TabM in the tree blend (legit column from TabM at 1/2 plus the trees at 1/2, fraud
@@ -122,34 +122,24 @@ def blanked_matrix(recipe: dict) -> np.ndarray:
     return X
 
 
-def cross_fit_teacher(X: np.ndarray, y: np.ndarray, period: np.ndarray, recipe: dict, log):
-    """Out-of-fold probabilities between the fit months: fit on all but one, predict it."""
-    from ringtrace import run
-
-    spec, fit_predict = run.model(recipe)
-    out = np.zeros((len(y), 12), dtype=np.float64)
-    months = np.unique(period)
-    for m in months:
-        tr, ho = period != m, period == m
-        (p,) = fit_predict(X[tr], y[tr], period[tr], [X[ho]], spec, log=log)
-        out[ho] = p
-    return out
-
-
 def teacher(cells: list[str], log=print) -> None:
+    """Out-of-fold soft targets for each cell's fit rows: ``teacher.teacher_oof`` (one weighted
+    multiclass booster per month, fitted on the other fit month) on the TabM recipe's features.
+    The champion cascade cannot be used here: its screening stage is itself cross-fitted between
+    months, so it needs two training months."""
     from ringtrace import run
+    from ringtrace import teacher as tch
 
-    recipe = run.load_recipe(Path("recipes") / "champion.json")
+    recipe = run.load_recipe(Path("recipes") / "tabm.json")
     for c in cells:
         path = _dir() / f"teacher_{c}.npy"
         if path.exists():
-            log(f"[nnexp] {path.name} exists, skipped")
             continue
         t0 = time.time()
         cell = open_cell(c)
         X, _ = run.feature_matrix(recipe)
         y = cell.targets["given"]
-        p = cross_fit_teacher(X[cell.fit], y[cell.fit], cell.period[cell.fit], recipe, log)
+        p = tch.teacher_oof(X[cell.fit], y[cell.fit], cell.period[cell.fit])
         np.save(path, p.astype(np.float32))
         log(f"[nnexp] teacher {c}: {int(cell.fit.sum())} rows ({time.time() - t0:.0f}s)")
 
@@ -178,9 +168,8 @@ def fit(variant: str, cells: list[str], seeds: tuple[int, ...], log=print) -> No
         ex = tabm.Extras()
         if getattr(spec, "distill_alpha", 0) > 0:
             teacher([c], log)  # built once per cell, then read back
-            store_recipe = run.load_recipe(Path("recipes") / "tabm.json")
             cell = open_cell(c)
-            X, _ = run.feature_matrix(store_recipe)
+            X, _ = run.feature_matrix(recipe)
             ex.teacher = np.load(_dir() / f"teacher_{c}.npy")
         if getattr(spec, "qr_blank_p", 0) > 0:
             ex.X_blank = blanked_matrix(recipe)[cell.fit]
