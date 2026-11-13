@@ -219,3 +219,13 @@ Analysis of the saved blend run (`blend`), no refits. Box CPU, 16 threads. Findi
 | fresh-octlike-bq: champion + `blank_merchant_qr` vs champion, 9 cells | ffbdfb7 | +0.0000 in every seed on given, cleaned and gen-only; lower bound +0.0000; 0 rows changed; **FAIL** (not positive) | about 10 min |
 | fresh-octlike-bq, first two launches | ffbdfb7 | failed: missing frames in the shared cache, then cells from an older frame build (251,860 vs 252,462 September rows); scored on current-frame champion cells | <2 min |
 | fresh-blend-blankqr (`python -m ringtrace.blend recipes/blend-blankqr.json`), upload candidate | 92735ae | given 0.5130 / 0.5091 / 0.5148 (0.5123); cleaned 0.5647 / 0.5641 / 0.5714 (0.5667); gen-only 0.9022 / 0.9000 / 0.9019 (0.9013); valid; sha256 `e7c594672f0921e6def080f0c06347144cd848282b10c9fe6e384416eed043d0`; against the blend's file: 20 October rows legit -> fraud (13 qr_swap, 7 refund_abuse) | about 5 min |
+
+## October census
+
+Label-free census of October against the blend with the blank-check merchant QR rule (no refits,
+laptop CPU, 8 threads). Finding: `docs/findings/october-census.md`.
+
+| run | commit | result | wall |
+|---|---|---|---|
+| census-table (`python analysis/census.py table --sub blend-blankqr.csv`) | 868e9b6 | own decode matches the file on all October rows; 95 units; every template, family shape and counter zone gets its expected fraud calls (\|z\| <= 0.07); largest coarse deficits velocity_bot on PAY to merchant 278 vs 557.1 (z -11.8), merchant_collusion in ring events 71 vs 113.2 (z -4.0), chain in flows events 537 vs 637.2 (z -4.0): all October event mix (bursts 0.24x a month, collusion shape 0.33x, against 0.49x) | 21 s |
+| census-cells (`python analysis/census.py cells --sub blend-blankqr.csv`) | 868e9b6 | 236 fine cells; per class actual / expected 0.981-1.021 (legit 256,611 vs 256,610.8); no cell deficit beyond \|z\| 1.2; 288 October rows in cells with < 20 train rows, among them 136 QR-to-person blank (all qr_swap) and the 20 blank-check merchant QR rows outside any structure (0 of 678 in train); no fix meets the 97 % precision bar, no candidate file | 39 s |
