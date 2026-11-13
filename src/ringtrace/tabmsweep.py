@@ -137,6 +137,46 @@ def part_octlike(recipe: dict, thin_seed: int, seed: int, log=print) -> dict:
     return {**scores, "wall_s": time.time() - t0}
 
 
+FIVE_WAY = ("blend-champion-m1", "lgbm", "catboost", "clean-event", "clean-l2")
+
+
+def role_scores(config: str, log=print) -> dict:
+    """September of the month folds with the config in two blend roles, against the five-way
+    blend (members' fold-9 rows, all fitted on July + August like the sweep fit):
+
+    * ``mix``: the config at 1/2, each member at 1/10;
+    * ``fraud_only``: legit column from ``mix``, the 11 types from the five-way blend rescaled
+      to ``mix``'s fraud mass."""
+    from ringtrace import silver, store
+    from ringtrace.blend import fraud_split_from
+    from ringtrace.scoring import macro_f1
+
+    store.use_frame(None)
+    led = store.ledger()
+    is_test = led["is_test"].to_numpy()
+    period = led["period"].to_numpy()
+    tr = np.flatnonzero(~is_test)
+    hold = ~is_test & (period == 9)
+    sep_in_tr = period[tr] == 9
+    runs = paths.out_dir() / "runs"
+    five = sum(np.load(runs / m / "oof.npy")[sep_in_tr].astype(np.float64) for m in FIVE_WAY) / 5
+    mine = np.load(runs / (PREFIX + config) / "sep.npy").astype(np.float64)
+    mix = 0.5 * mine + 0.5 * five
+    arms = {"five": five, "mix": mix, "fraud_only": fraud_split_from(five, mix)}
+    recipe = recipe_for(config)
+    targets = {"given": led["y"].to_numpy().astype(np.int64)}
+    for tname, which in (("cleaned", "label"), ("gen", "structured")):
+        targets[tname] = silver.load(led, which)
+    out = {}
+    for arm, prob in arms.items():
+        pred = _decode_sep(led, period, hold, prob, recipe)
+        out[arm] = {t: macro_f1(v[hold], pred) for t, v in targets.items()}
+    for arm in ("mix", "fraud_only"):
+        out[arm + "_delta"] = {t: out[arm][t] - out["five"][t] for t in targets}
+    log(f"[role] {config}: " + json.dumps(out))
+    return out
+
+
 def main(argv=None) -> dict:
     from ringtrace import threads
 
@@ -145,6 +185,7 @@ def main(argv=None) -> dict:
     ap.add_argument("config", choices=sorted(CONFIGS))
     ap.add_argument("--parts", default="lomo,13,14,15")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--role", action="store_true", help="only the blend-role scores of September")
     args = ap.parse_args(argv)
     recipe = recipe_for(args.config)
     out = paths.out_dir() / "runs" / recipe["name"]
@@ -157,6 +198,10 @@ def main(argv=None) -> dict:
     def log(msg):
         print(msg, flush=True)
 
+    if args.role:
+        summary["role"] = role_scores(args.config, log)
+        summary_path.write_text(json.dumps(summary, indent=1))
+        return summary
     for part in args.parts.split(","):
         log(f"[sweep] {args.config} part {part}")
         if part == "lomo":
