@@ -163,3 +163,22 @@ def test_fraud_role_with_zero_full_weight_keeps_the_trees_types():
     out = final.mix([a, b], [0.0, 1.0], ["full", "fraud"])
     assert out[0, 0] == pytest.approx(0.2)
     assert out[0, 1] / out[0, 2] == pytest.approx(3.0)
+
+
+def test_two_fraud_members_differ_from_one(bench):
+    one = _recipe(
+        members=[
+            {"name": "good", "run": "good"},
+            {"name": "weak", "run": "weak", "role": "fraud"},
+        ],
+        weights={"mode": "fixed", "values": {"good": 0.5, "weak": 0.5}},
+    )
+    two = _recipe(
+        members=[
+            {"name": "good", "run": "good"},
+            {"name": "weak", "run": "weak", "role": "fraud"},
+            {"name": "good2", "run": "good", "role": "fraud"},
+        ],
+        weights={"mode": "fixed", "values": {"good": 0.5, "weak": 0.25, "good2": 0.25}},
+    )
+    assert not np.array_equal(bench.calls(one)["pred"], bench.calls(two)["pred"])

@@ -30,10 +30,25 @@
    "run": "clean-l2",
    "variant": "fold",
    "cells": "clean-l2"
+  },
+  {
+   "name": "tabm",
+   "run": "final-tabm",
+   "variant": "fold",
+   "cells": "tabm",
+   "role": "fraud"
   }
  ],
  "weights": {
-  "mode": "equal"
+  "mode": "fixed",
+  "values": {
+   "champion": 0.13333333333333336,
+   "lgbm": 0.13333333333333336,
+   "catboost": 0.13333333333333336,
+   "clean-event": 0.13333333333333336,
+   "clean-l2": 0.13333333333333336,
+   "tabm": 0.3333333333333333
+  }
  },
  "decoder": {
   "fraud_scale": 0.875
