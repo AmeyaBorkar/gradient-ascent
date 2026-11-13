@@ -115,3 +115,23 @@ TabM: September had 0 zero-sum and 0 non-finite rows, max |row sum - 1| = 1.5e-7
 finite and sum to 1 before decoding (`check_proba`). Re-decoding the trial gives the same
 0.5150 / 0.5717 / 0.9014; the full run's `oof.npy` (1,564,060 rows) and `test.npy` (260,582)
 pass the check.
+
+### TabM in the five-way blend (leave-one-month-out, after the template rule)
+
+Members' month-fold arrays copied read-only from the box runs `blend-champion-m1`, `lgbm`,
+`catboost`, `clean-event`, `clean-l2`; scored with `python -m ringtrace.blend` (fixed point 0.875
+per month, then the rules). The equal five-way blend re-decoded here reproduces the reference
+October file exactly (0 differing rows). Change against the five-way blend, Jul / Aug / Sep:
+
+| arm | weights | given | cleaned | gen-only | never loses |
+|---|---|---|---|---|---|
+| a | tabm 1/6, each member 1/6 | +0.00058 / +0.00009 / +0.00024 | +0.00054 / +0.00008 / +0.00022 | +0.00078 / +0.00008 / -0.00014 | no |
+| b | tabm 1/3, each member 2/15 | +0.00055 / +0.00015 / +0.00021 | +0.00067 / +0.00014 / +0.00027 | +0.00092 / +0.00013 / -0.00010 | no |
+| **c** | tabm 1/2, each member 1/10 | +0.00050 / +0.00016 / +0.00027 | +0.00051 / +0.00018 / +0.00036 | +0.00065 / +0.00005 / +0.00005 | **yes** |
+| c + blank merchant QR rule (commit 80ccae8) | as c, rules `anchored_templates, blank_merchant_qr`, against the five-way blend with the same rules | +0.00050 / +0.00016 / +0.00023 | +0.00051 / +0.00018 / +0.00033 | +0.00065 / +0.00005 / +0.00000 | yes |
+
+Arm c, absolute: given 0.5135 / 0.5093 / 0.5150 (0.5126), cleaned 0.5652 / 0.5643 / 0.5717
+(0.5671), gen-only 0.9029 / 0.9000 / 0.9019 (0.9016). With the QR rule the five-way base is
+given 0.5123, cleaned 0.5667 (mean) and arm c given 0.5126, cleaned 0.5671. October: arm c moves
+5 calls against the five-way blend; with the QR rule, 7 calls against the five-way blend with
+that rule. Wall time under 1 min per arm.
