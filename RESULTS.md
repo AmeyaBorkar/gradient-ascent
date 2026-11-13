@@ -207,11 +207,11 @@ rule. Details and per-class tables: `docs/findings/more-data.md`.
 
 ## October-like gate
 
-Box (one RTX 5060 Ti, 24 CPU threads in total), commit c58bcc7 for the fits and the scoring.
+Box (one RTX 5060 Ti, 24 CPU threads in total), commit 181574a for the fits and the scoring.
 `python -m ringtrace.octlike fit <member>` on frames s13-s15 (the same frame files as the
 champion's cells above), then `python -m ringtrace.octlike score <base> <challenger>` (1,000 draws,
 95 % event-bootstrap bounds). The champion's nine cells are the ones above, not refitted. The
-event-cleaned members clean only the July + August labels (September never votes). Before 3142b78
+event-cleaned members clean only the July + August labels (September never votes). Before 0de8df6
 the fit trained them on the given labels without warning. Blends average the members'
 probabilities per cell and decode as the champion does (fixed point 0.875, then anchored
 templates). Details: `docs/findings/october-like-gate.md`.
@@ -253,7 +253,7 @@ Scoring took 25 min for the six comparisons at 8 threads. Gate files:
 `~/outputs/gate/octlike/gate_<challenger>_vs_<base>.json`.
 
 Four-way against five-way on leave-one-month-out (`python -m ringtrace.gate lomo`, the members'
-`oof.npy`, 1,000 draws per month, 95 % event-bootstrap bounds). Laptop, commit f3328a8, about 1 min.
+`oof.npy`, 1,000 draws per month, 95 % event-bootstrap bounds). Laptop, commit 15c0fe2, about 1 min.
 Each cell is five-way -> four-way, change [95 % bounds]:
 
 | target | Jul | Aug | Sep |
@@ -284,7 +284,7 @@ Each refit took about 3.5 min.
 
 ## Refit test
 
-The October analogue on the October-like frames: champion recipe, commit c58bcc7. In each cell,
+The October analogue on the October-like frames: champion recipe, commit 181574a. In each cell,
 the champion is fitted on July alone (`champion-m7`) and on August alone (`champion-m8`) with the
 screen off, since one month cannot cross-fit it. Their averaged probabilities (the fold mean) are
 compared with the champion's July + August cell (the refit). Control: July + August with the screen
