@@ -1,0 +1,60 @@
+{
+ "name": "final-s345",
+ "members": [
+  {
+   "name": "champion",
+   "run": "champion-s345",
+   "variant": "fold"
+  },
+  {
+   "name": "lgbm",
+   "run": "final-lgbm-s345",
+   "variant": "fold"
+  },
+  {
+   "name": "catboost",
+   "run": "final-catboost-s345",
+   "variant": "fold"
+  },
+  {
+   "name": "clean-event",
+   "run": "final-clean-event-s345",
+   "variant": "fold"
+  },
+  {
+   "name": "clean-l2",
+   "run": "final-clean-l2-s345",
+   "variant": "fold"
+  },
+  {
+   "name": "tabm",
+   "run": "final-tabm",
+   "variant": "fold",
+   "cells": "tabm",
+   "role": "fraud"
+  }
+ ],
+ "weights": {
+  "mode": "fixed",
+  "values": {
+   "champion": 0.13333333333333336,
+   "lgbm": 0.13333333333333336,
+   "catboost": 0.13333333333333336,
+   "clean-event": 0.13333333333333336,
+   "clean-l2": 0.13333333333333336,
+   "tabm": 0.3333333333333333
+  }
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ],
+ "base_rate_rules": [
+  {
+   "name": "blank_merchant_qr",
+   "max_october_rows": 40
+  }
+ ]
+}
