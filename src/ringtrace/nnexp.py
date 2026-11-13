@@ -47,6 +47,11 @@ VARIANTS: dict[str, dict] = {
     "focal": {"loss": "focal", "focal_gamma": 2.0},
     "smooth": {"smooth_fraud": 0.03},
 }
+# Teacher of the self-training variant: the plain seed-0 TabM's probabilities of the scored rows
+# (fit on July + August, so it never saw their labels). Every pseudo row keeps its soft target.
+# The cap is floor(sum of the teacher's mass) for each fraud class; legit is uncapped, because a
+# legit cap drops the least confident legit-argmax rows, which hold the ambiguous fraud mass.
+SELFTRAIN = {"teacher": "base-sd0", "w_pseudo": 0.3, "min_conf": 0.0}
 TREES_SEP = ("blend-champion-m1", "lgbm", "catboost", "clean-event", "clean-l2")
 TREES_OCT = ("champion", "lgbm", "catboost", "clean-event", "clean-l2")
 RULES = ["anchored_templates", "blank_merchant_qr"]
@@ -144,7 +149,104 @@ def teacher(cells: list[str], log=print) -> None:
         log(f"[nnexp] teacher {c}: {int(cell.fit.sum())} rows ({time.time() - t0:.0f}s)")
 
 
-def fit(variant: str, cells: list[str], seeds: tuple[int, ...], log=print) -> None:
+def _fit_selftrain(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
+    """Soft self-training on the scored rows' features (never their labels)."""
+    from ringtrace import nn_selftrain
+
+    z = np.load(_dir() / f"{SELFTRAIN['teacher']}_{c}.npz")
+    if not np.array_equal(z["rows"], cell.stacked[cell.hold]):
+        raise ValueError(f"cell {c}: teacher rows differ")
+    P = z["prob"].astype(np.float64)
+    cap = np.floor(P.sum(axis=0)).astype(np.int64)
+    cap[0] = -1
+    cap_map = {i: int(v) for i, v in enumerate(cap) if v >= 0}
+    y = cell.targets["given"]
+    (prob,) = nn_selftrain.fit_predict_selftrain(
+        X[cell.fit],
+        y[cell.fit],
+        X[cell.hold],
+        P,
+        [X[cell.hold]],
+        spec,
+        w_pseudo=SELFTRAIN["w_pseudo"],
+        min_conf=SELFTRAIN["min_conf"],
+        cap=cap_map,
+        log=log,
+    )
+    return prob
+
+
+# Entity variant: hashed embeddings of these id columns, plus the strictly-past mean of up to
+# ``ENTITY_POOL_N`` earlier rows of the same sender and of the same receiver over these raw
+# columns (features only, from the cell's own ledger; a row never sees itself or a tie).
+ENTITY_IDS = ("sender", "receiver", "device")
+ENTITY_POOL_BY = ("sender", "receiver")
+ENTITY_POOL_COLS = (
+    "amount",
+    "new_payee",
+    "pin_retries",
+    "login_to_txn_sec",
+    "sim_age_hours",
+    "device_age_days",
+    "balance_before",
+    "to_person",
+)
+ENTITY_POOL_N = 8
+
+
+def entity_inputs(led: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
+    """``(ids, pooled)``: the id matrix and the past-pooled columns (one block per entity)."""
+    from ringtrace import nn_entity
+
+    ids = np.stack([led[c].to_numpy() for c in ENTITY_IDS], axis=1).astype(np.int64)
+    raw = led.select(
+        pl.col(c).cast(pl.Float64).fill_null(float("nan")) for c in ENTITY_POOL_COLS
+    ).to_numpy()
+    ts = led["ts"].to_numpy()
+    pooled = [
+        nn_entity.past_pool(raw, led[e].to_numpy(), ts, n=ENTITY_POOL_N) for e in ENTITY_POOL_BY
+    ]
+    return ids, np.hstack(pooled)
+
+
+def _fit_entity(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
+    """TabM with id embeddings (fit on the fit rows' labels only) and past-pooled history."""
+    from dataclasses import asdict
+
+    from ringtrace import nn_entity
+
+    ids, pooled = entity_inputs(cell.led)
+    Xe = np.hstack([X, pooled])
+    seen = {
+        e: float(np.isin(ids[cell.hold, j], ids[cell.fit, j]).mean())
+        for j, e in enumerate(ENTITY_IDS)
+    }
+    log(f"[nnexp] {c}: share of scored rows whose id was seen in the fit rows {seen}")
+    espec = nn_entity.EntitySpec(**asdict(spec))
+    (prob,) = nn_entity.fit_predict_entity(
+        Xe[cell.fit],
+        ids[cell.fit],
+        cell.targets["given"][cell.fit],
+        None,
+        [Xe[cell.hold]],
+        [ids[cell.hold]],
+        espec,
+        log=log,
+    )
+    return prob
+
+
+# Variants that are their own fit function, not a TabMSpec switch: name -> fit(c, cell, X, spec).
+FAMILIES = {"selftrain": _fit_selftrain, "entity": _fit_entity}
+
+
+def tag_of(variant: str, seeds: tuple[int, ...], job: str = "") -> str:
+    """Output name of a fit: ``[<job>-]<variant>[-sd<seeds>]``."""
+    tag = variant if seeds == (0, 1, 2) else f"{variant}-sd{''.join(map(str, seeds))}"
+    return f"{job}-{tag}" if job else tag
+
+
+def fit(variant: str, cells: list[str], seeds: tuple[int, ...], log=print, job: str = "") -> None:
     from ringtrace import run, tabm
 
     recipe = run.load_recipe(Path("recipes") / "tabm.json")
@@ -153,9 +255,11 @@ def fit(variant: str, cells: list[str], seeds: tuple[int, ...], log=print) -> No
         from ringtrace import realmlp
 
         spec, fit_predict = realmlp.RealMLPSpec(seeds=seeds), realmlp.fit_predict
+    elif variant in FAMILIES:
+        spec = replace(variant_spec("base", recipe), seeds=seeds)
     else:
         spec = replace(variant_spec(variant, recipe), seeds=seeds)
-    tag = variant if seeds == (0, 1, 2) else f"{variant}-sd{''.join(map(str, seeds))}"
+    tag = tag_of(variant, seeds, job)
     for c in cells:
         path = _dir() / f"{tag}_{c}.npz"
         if path.exists():
@@ -165,6 +269,11 @@ def fit(variant: str, cells: list[str], seeds: tuple[int, ...], log=print) -> No
         cell = open_cell(c)
         X, _ = run.feature_matrix(recipe)
         y = cell.targets["given"]
+        if variant in FAMILIES:
+            prob = FAMILIES[variant](c, cell, X, spec, log)
+            np.savez(path, rows=cell.stacked[cell.hold], prob=prob.astype(np.float32))
+            log(f"[nnexp] {tag} {c} done ({time.time() - t0:.0f}s)")
+            continue
         ex = tabm.Extras()
         if getattr(spec, "distill_alpha", 0) > 0:
             teacher([c], log)  # built once per cell, then read back
@@ -277,13 +386,14 @@ def main(argv=None) -> None:
     ap.add_argument("--cells", default="sep,s13,s14,s15")
     ap.add_argument("--seeds", default="0,1,2")
     ap.add_argument("--base", default="base")
+    ap.add_argument("--job", default="", help="prefix of the fit's output name")
     args = ap.parse_args(argv)
     cells = [c for c in args.cells.split(",") if c]
     if args.cmd == "teacher":
         teacher(cells)
     elif args.cmd == "fit":
         for v in args.variant.split(","):
-            fit(v, cells, tuple(int(s) for s in args.seeds.split(",")))
+            fit(v, cells, tuple(int(s) for s in args.seeds.split(",")), job=args.job)
     else:
         for v in args.variant.split(","):
             score(v, args.base, cells)

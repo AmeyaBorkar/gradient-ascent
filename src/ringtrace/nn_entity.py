@@ -116,6 +116,25 @@ def _hash_columns(ids: np.ndarray, buckets: int) -> np.ndarray:
     return (x % np.uint64(buckets)).astype(np.int64)
 
 
+def unseen_to_unknown(ids_tr: np.ndarray, ids: np.ndarray, buckets: int) -> np.ndarray:
+    """Hashes of ``ids`` with every id absent from that column of ``ids_tr`` sent to the
+    reserved unknown row ``buckets``.
+
+    An id first seen in the scored rows has no trained embedding of its own: its hash slot is
+    either untouched noise or another training id's slot (a collision). Either way it would
+    feed the model something that is not this id's history, so it gets the unknown vector the
+    model learned under ``ent_dropout``.
+    """
+    ids_tr = np.asarray(ids_tr, dtype=np.int64)
+    ids = np.asarray(ids, dtype=np.int64)
+    if ids.ndim != 2 or ids_tr.ndim != 2 or ids.shape[1] != ids_tr.shape[1]:
+        raise ValueError(f"id shapes differ: {ids_tr.shape} and {ids.shape}")
+    out = _hash_columns(ids, buckets)
+    for j in range(ids.shape[1]):
+        out[~np.isin(ids[:, j], ids_tr[:, j]), j] = buckets
+    return out
+
+
 def _entity_net(n_num: int, n_ent: int, spec: EntitySpec):
     torch = _torch()
     nn = torch.nn
@@ -230,7 +249,7 @@ def fit_predict_entity(
     Z = tabm.transform(prep, X_tr)
     Zo = [tabm.transform(prep, X) for X in X_out]
     Hi = _hash_columns(ids_tr, spec.buckets)
-    Ho = [_hash_columns(np.asarray(ids), spec.buckets) for ids in ids_out]
+    Ho = [unseen_to_unknown(ids_tr, np.asarray(ids), spec.buckets) for ids in ids_out]
     if Hi.shape[0] != len(Z):
         raise ValueError("ids_tr and X_tr must have the same number of rows")
     log(

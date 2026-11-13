@@ -1,0 +1,65 @@
+"""The screening driver's own-fit variants: names, entity inputs and the unseen-id guard."""
+
+import numpy as np
+import polars as pl
+
+from ringtrace import nn_entity, nnexp
+
+
+def test_tag_of_prefixes_the_job_and_names_single_seeds():
+    assert nnexp.tag_of("selftrain", (0,)) == "selftrain-sd0"
+    assert nnexp.tag_of("selftrain", (0,), "wildrun") == "wildrun-selftrain-sd0"
+    assert nnexp.tag_of("base", (0, 1, 2), "wildrun") == "wildrun-base"
+
+
+def test_unseen_ids_go_to_the_unknown_row():
+    ids_tr = np.array([[1, 10], [2, 10], [3, 11]], dtype=np.int64)
+    ids = np.array([[1, 12], [9, 10], [3, 11]], dtype=np.int64)
+    out = nn_entity.unseen_to_unknown(ids_tr, ids, buckets=64)
+    seen = nn_entity._hash_columns(ids, 64)
+    assert out[0, 0] == seen[0, 0] and out[0, 1] == 64
+    assert out[1, 0] == 64 and out[1, 1] == seen[1, 1]
+    assert np.array_equal(out[2], seen[2])
+
+
+def test_unseen_ids_predict_alike_given_the_same_features():
+    rng = np.random.default_rng(0)
+    n = 400
+    X = rng.normal(size=(n, 4))
+    y = (X[:, 0] > 0.5).astype(np.int64)
+    ids = rng.integers(0, 50, size=(n, 2))
+    spec = nn_entity.EntitySpec(seeds=(0,), epochs=1, k=2, width=16, blocks=1, device="cpu")
+    spec.buckets = 128
+    Xo = np.repeat(X[:1], 2, axis=0)
+    ids_o = np.array([[1000, 2000], [3000, 4000]], dtype=np.int64)
+    (p,) = nn_entity.fit_predict_entity(X, ids, y, None, [Xo], [ids_o], spec, log=lambda *_: None)
+    assert np.allclose(p[0], p[1])
+
+
+def test_entity_inputs_pool_strictly_earlier_rows_of_each_entity():
+    led = pl.DataFrame(
+        {
+            "sender": [1, 1, 1, 2],
+            "receiver": [5, 5, 6, 5],
+            "device": [7, 7, 7, 8],
+            "ts": [10, 20, 20, 30],
+            "amount": [100.0, 200.0, 300.0, 400.0],
+            "new_payee": [1, 0, 0, 1],
+            "pin_retries": [0, 0, 0, 0],
+            "login_to_txn_sec": [5, 5, 5, 5],
+            "sim_age_hours": [1.0, 1.0, 1.0, 1.0],
+            "device_age_days": [1.0, 1.0, 1.0, 1.0],
+            "balance_before": [1.0, 1.0, 1.0, 1.0],
+            "to_person": [True, True, False, True],
+        }
+    )
+    ids, pooled = nnexp.entity_inputs(led)
+    assert ids.shape == (4, 3)
+    k = len(nnexp.ENTITY_POOL_COLS) + 1
+    by_sender, by_receiver = pooled[:, :k], pooled[:, k:]
+    # sender 1: row 0 has no past; rows 1 and 2 (tied at ts 20) both see only row 0
+    assert by_sender[0, -1] == 0 and np.isnan(by_sender[0, 0])
+    assert by_sender[1, -1] == 1 and by_sender[1, 0] == 100.0
+    assert by_sender[2, -1] == 1 and by_sender[2, 0] == 100.0
+    # receiver 5: rows 0, 1, 3; row 3 sees rows 0 and 1
+    assert by_receiver[3, -1] == 2 and by_receiver[3, 0] == 150.0
