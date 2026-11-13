@@ -318,6 +318,30 @@ def _fit_metric(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
     return prob
 
 
+def _fit_gentarget(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
+    """The plain TabM trained on generator-only labels of the fit rows.
+
+    The cached silver labels cannot be used: their teacher is out of fold by month, so the July
+    and August labels come from a model that saw September. The target is rebuilt per cell from
+    a booster cross-fitted between July and August, with every estimate on the fit rows only
+    (``octlike._cleaned_target``)."""
+    from ringtrace import tabm
+    from ringtrace.octlike import _cleaned_target
+
+    target, stats = _cleaned_target(cell, log, which="structured")
+    (_dir() / f"gentarget-stats_{c}.json").write_text(json.dumps(stats, indent=1))
+    t = target[cell.fit]
+    if (t < 0).any():
+        raise ValueError(f"cell {c}: {int((t < 0).sum())} fit rows have no generator-only label")
+    y = cell.targets["given"][cell.fit]
+    log(
+        f"[nnexp] {c}: generator-only target keeps {int((t > 0).sum())} of {int((y > 0).sum())}"
+        f" fraud labels ({int(((t > 0) & (y == 0)).sum())} legit-labelled rows become fraud)"
+    )
+    (prob,) = tabm.fit_predict(X[cell.fit], t, cell.period[cell.fit], [X[cell.hold]], spec, log=log)
+    return prob
+
+
 # Variants that are their own fit function, not a TabMSpec switch: name -> fit(c, cell, X, spec).
 FAMILIES = {
     "selftrain": _fit_selftrain,
@@ -327,6 +351,7 @@ FAMILIES = {
     "tabr": _fit_tabr,
     "shift": _fit_shift,
     "metric": _fit_metric,
+    "gentarget": _fit_gentarget,
 }
 
 

@@ -74,6 +74,7 @@ def test_every_family_is_wired():
         "tabr",
         "shift",
         "metric",
+        "gentarget",
     }
 
 
@@ -136,3 +137,39 @@ def test_table_rows_report_each_cell_and_the_worst_target():
     fraud, alone = nnexp.table_rows(report)
     assert fraud == "| v | fraud-only | +1.0 / +0.0 / +2.0 (3) | +0.0 / +0.0 / +0.0 (0) | yes |"
     assert alone.endswith("| no |") and "-1.0 / +0.0 / +0.0 (9)" in alone
+
+
+def test_cleaned_target_returns_the_requested_label_set(monkeypatch):
+    from types import SimpleNamespace
+
+    from ringtrace import octlike, silver, store, teacher
+
+    led = pl.DataFrame({"y": [0, 3, 5, 0], "period": [7, 8, 9, 9]})
+    frame = SimpleNamespace(
+        led=led, fit=np.array([True, True, False, False]), period=led["period"].to_numpy()
+    )
+    feats = pl.DataFrame({"a": [0.0, 1.0, 2.0, 3.0], "b_event": [1, 1, 2, 2]})
+    seen = {}
+    monkeypatch.setattr(store, "frame", lambda fams: feats)
+
+    def fake_oof(X, y, period):
+        seen["oof"] = (X.shape, list(period))
+        return np.zeros((len(y), 12))
+
+    monkeypatch.setattr(teacher, "teacher_oof", fake_oof)
+    monkeypatch.setattr(teacher, "union_events", lambda n: np.full(n, -1))
+
+    def fake_build(led, proba, events, log=print, mask=None):
+        seen["mask"] = list(mask)
+        return {
+            "label": np.array([0, 3, -1, -1]),
+            "structured": np.array([0, 0, -1, -1]),
+            "stats": {},
+        }
+
+    monkeypatch.setattr(silver, "build", fake_build)
+    lab, _ = octlike._cleaned_target(frame, print)
+    gen, _ = octlike._cleaned_target(frame, print, which="structured")
+    assert list(lab[:2]) == [0, 3] and list(gen[:2]) == [0, 0]
+    assert seen["mask"] == [True, True, False, False]
+    assert seen["oof"] == ((2, 1), [7, 8])

@@ -315,8 +315,12 @@ def decode(
     return pred[hold]
 
 
-def _cleaned_target(frame: Frame, log) -> tuple[np.ndarray, dict]:
-    """Cleaned labels for July + August from a teacher that never sees September."""
+def _cleaned_target(frame: Frame, log, which: str = "label") -> tuple[np.ndarray, dict]:
+    """Cleaned labels for July + August from a teacher that never sees September.
+
+    ``which`` is ``"label"`` (cleaned) or ``"structured"`` (generator-only: ordinary fraud rows
+    become legit). ``frame`` needs ``led``, ``fit`` and ``period``; every estimate inside
+    ``silver.build`` uses the ``fit`` rows only."""
     from ringtrace import silver, store, teacher
 
     feats = store.frame(["context", "marks"])
@@ -326,7 +330,7 @@ def _cleaned_target(frame: Frame, log) -> tuple[np.ndarray, dict]:
     proba = teacher.teacher_oof(Xt[frame.fit], y[frame.fit], frame.period[frame.fit])
     events = teacher.union_events(frame.led.height)
     res = silver.build(frame.led, proba, events, log=log, mask=frame.fit)
-    return res["label"], res["stats"]
+    return res[which], res["stats"]
 
 
 def fit(seeds: list[int], cells: list[tuple[str, list[int]]], recipes_dir: Path, log=print) -> dict:
