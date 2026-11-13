@@ -260,3 +260,14 @@ October-like gates on the one-seed sweep cells (r0 = seed 0 only; the champion u
 | k32 vs tabm base | +0.0007 / +0.0003 / +0.0003 (-0.0000) | +0.0002 / +0.0003 / +0.0003 (-0.0003) | +0.0012 / +0.0003 / +0.0011 (-0.0001) | FAIL (bounds) |
 | k32 vs champion | +0.0003 / +0.0003 / +0.0009 (-0.0001) | +0.0006 / +0.0010 / +0.0008 (+0.0000) | +0.0006 / +0.0005 / -0.0002 (-0.0009) | FAIL (bounds) |
 | champion + k32 1:1 vs champion | +0.0004 / +0.0005 / +0.0006 (+0.000014) | +0.0007 / +0.0008 / +0.0006 (+0.000089) | +0.0010 / +0.0005 / -0.0003 (-0.0005) | PASS (gate rule: given and cleaned) |
+
+**Full runs of k32** (`recipes/tabm2-k32.json`, seeds 0-2, leave-one-month-out plus October; run
+`tabm2-k32`, commit f862ff0):
+- **Not finished.** The run reached fold 9 (folds 7 and 8 done, about 50 min) when the machine
+  was retired. No arrays were saved, because `run` writes only at the end.
+- **The remaining sweep jobs** (k64, cw-sqrt, cw-full) were stopped at the same time.
+- **Not run:** the nine October-like cells, champion + k32 on leave-one-month-out, and the
+  five-way + k32 gates at 1/6 and 1/2.
+- **Verdict for k32:** a candidate on one seed, not adopted. It is positive on every sweep part.
+  Champion + k32 at 1:1 passes the r0 October-like gate, but by bounds of +0.00001 given and
+  +0.00009 cleaned, on one TabM seed.

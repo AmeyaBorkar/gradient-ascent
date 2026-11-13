@@ -23,7 +23,7 @@ direct 12-class)?
   - Gen-only, October-like: +0.0012 / +0.0003 / +0.0011.
   - **Gate against base** (r0, one seed): positive on every seed, but the lower bounds are
     -0.0000 given and -0.0003 cleaned. **FAIL on bounds:** a consistent tie-plus.
-  - Taken to full runs (below).
+  - Taken to full runs: not finished, the machine was retired mid-run (see `RESULTS.md`).
 - **Short (6 epochs, lr 3e-3): positive everywhere, smaller on September.**
   - Given: Sep +0.0001; October-like +0.0007 / +0.0004 / +0.0002.
   - Cleaned: Sep +0.0001; October-like +0.0003 / +0.0004 / +0.0002.
