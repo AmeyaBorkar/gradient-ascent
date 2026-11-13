@@ -170,3 +170,13 @@ def test_train_target_modes_only_touch_fit_rows():
     assert np.array_equal(out[~fit_rows], y[~fit_rows])
     with pytest.raises(ValueError):
         octlike.train_target({"train_on": "nonsense"}, y, fit_rows)
+
+
+def test_catboost_gpu_ram_cap_from_environment(monkeypatch):
+    from ringtrace.cascade import CatBoostSpec
+
+    monkeypatch.delenv("RINGTRACE_CATBOOST_GPU_RAM", raising=False)
+    assert "gpu_ram_part" not in CatBoostSpec().params(0, "Logloss")
+    monkeypatch.setenv("RINGTRACE_CATBOOST_GPU_RAM", "0.4")
+    assert CatBoostSpec().params(0, "Logloss")["gpu_ram_part"] == 0.4
+    assert "gpu_ram_part" not in CatBoostSpec(task_type="CPU").params(0, "Logloss")
