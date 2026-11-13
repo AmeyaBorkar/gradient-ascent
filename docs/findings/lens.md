@@ -68,28 +68,30 @@ adds them at about 50 %, which macro-F1 does not reward.
 
 ## 2. Seed stability (`seeds`, `seedcells`)
 
-TabM is the mean of k seed-set runs: seeds 0-2, 3-5, 6-8. The trees and everything else are
-unchanged.
+TabM is the mean of k seed-set runs: seeds 0-2, 3-5, 6-8, 9-11. The trees and everything else
+are unchanged. The laptop rerun reproduces the box numbers for 3, 6 and 9 seeds exactly.
 
 | TabM seeds | October adds vs trees | October rows vs the 3-seed base | train adds (right, cleaned) | LOMO given / cleaned / gen-only change vs 3 seeds |
 |---|---|---|---|---|
 | 3 | 7 | 0 | 48 (35) | 0 |
 | 6 | 6 | 3 (1 add, 2 removals, all phishing_collect) | 48 (35) | -0.00002 / +0.00004 / 0; +0.00002 / +0.00004 / 0; +0.00001 / +0.00011 / 0 |
 | 9 | 6 | 3 (the same three rows) | 51 (38) | -0.00002 / +0.00007 / +0.00004; +0.00002 / +0.00006 / +0.00004; +0.00001 / +0.00012 / +0.00005 |
+| 12 | 7 | 0 (the same October file as 3 seeds) | 51 (37) | -0.00002 / +0.00004 / 0; +0.00002 / +0.00004 / 0; +0.00001 / +0.00005 / 0 |
 
-- **Single seed sets** add 7, 6 and 8 October rows. Their pairwise Jaccard overlap is 0.62, 0.88
-  and 0.75, so 1-2 of about 7 October adds churn with the seed.
+- **Single seed sets** add 7, 6, 8 and 7 October rows. Their pairwise Jaccard overlap is
+  0.62-1.0 (seeds 0-2 and 9-11 add the same 7 rows), so 1-2 of about 7 October adds churn with the
+  seed.
 - **More seeds:**
-  - from 6 to 9 seeds the add set does not move (Jaccard 1.0);
+  - the add set oscillates rather than converging: Jaccard 0.62 (3 to 6), 1.0 (6 to 9), 0.62
+    (9 to 12), and 12 seeds return the base's own 7 adds;
   - every row that churns is `phishing_collect`, the class where TabM's adds are a coin flip
     (section 3).
 - **October-like, 9 seeds against 3:** TabM is the mean of the three seed-set cells for each
   thinning seed. It changes 5 rows over nine cells: given +0.00001 / -0.00005 / +0.00000 (lb
   -0.00007), cleaned +0.00001 / -0.00005 / -0.00000.
 - **Verdict:** a tie. The 1/2 share is already stable at 3 seeds. More seeds swap one or two
-  `phishing_collect` calls and fail the bar (given Jul -0.00002).
-- **12 seeds:** the seed-set 9-11 run had not landed by the end of the time box, so 12 seeds were
-  not measured.
+  `phishing_collect` calls and fail the bar (given Jul -0.00002 at 6, 9 and 12 seeds). The
+  12-seed October file is identical to `blend-tabmF-bq`, so there is nothing to upload.
 
 ## 3. Where the adds are right (`adds`)
 
