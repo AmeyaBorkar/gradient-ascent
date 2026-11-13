@@ -329,7 +329,39 @@ def _cleaned_target(frame: Frame, log) -> tuple[np.ndarray, dict]:
     return res["label"], res["stats"]
 
 
-def fit(seeds: list[int], cells: list[tuple[str, list[int]]], recipes_dir: Path, log=print) -> dict:
+def train_target(
+    recipe: dict, y: np.ndarray, fit_rows: np.ndarray, cleaned=None, events=None
+) -> np.ndarray:
+    """The target a recipe trains on: given labels, or a cleaned copy where only ``fit_rows``
+    vote and change (so September never shapes them)."""
+    from ringtrace import eventclean
+    from ringtrace.run import EVENT_MODES
+
+    mode = recipe.get("train_on")
+    target = y.copy()
+    if mode in (None, "given"):
+        return target
+    if mode == "cleaned":
+        target[fit_rows] = cleaned()[fit_rows]
+        return target
+    if mode in EVENT_MODES:
+        return eventclean.clean_labels(y, events(), EVENT_MODES[mode], mask=fit_rows)
+    raise ValueError(f"unknown train_on {mode!r}")
+
+
+def fit(
+    seeds: list[int],
+    cells: list[tuple[str, list[int]]],
+    recipes_dir: Path,
+    months: tuple[int, ...] = FIT_PERIODS,
+    use_screen: bool = True,
+    tag: str = "",
+    log=print,
+) -> dict:
+    """Fit cells ``<recipe><tag>_s<seed>_r<r>``. ``months`` (default July + August) are the fit
+    rows; ``use_screen=False`` turns the cascade's screening score off (one month alone cannot
+    be cross-fitted)."""
+    from ringtrace import eventclean
     from ringtrace import run as runner
     from ringtrace.cascade import fit_predict
     from ringtrace.scoring import macro_f1
@@ -340,22 +372,30 @@ def fit(seeds: list[int], cells: list[tuple[str, list[int]]], recipes_dir: Path,
     for seed in seeds:
         frame = Frame(seed)
         y = frame.led["y"].to_numpy().astype(np.int64)
+        fit_rows = frame.fit & np.isin(frame.period, months)
         for recipe_name, sets in cells:
             recipe = runner.load_recipe(recipes_dir / f"{recipe_name}.json")
             X, _ = runner.feature_matrix(recipe)
             log(
-                f"[octlike] s{seed} {recipe_name}: {X.shape[1]} features, fit "
-                f"{int(frame.fit.sum())}, September {int(frame.hold.sum())} "
+                f"[octlike] s{seed} {recipe_name}{tag}: {X.shape[1]} features, fit "
+                f"{int(fit_rows.sum())}, September {int(frame.hold.sum())} "
                 f"({time.time() - t0:.0f}s)"
             )
-            target = y.copy()
-            if recipe.get("train_on") == "cleaned":
-                cleaned, stats = _cleaned_target(frame, log)
-                target[frame.fit] = cleaned[frame.fit]
-                summary[f"{recipe_name}_s{seed}_cleaning"] = stats
+
+            def cleaned(name=recipe_name, frame=frame, seed=seed):
+                lab, stats = _cleaned_target(frame, log)
+                summary[f"{name}_s{seed}_cleaning"] = stats
+                return lab
+
+            target = train_target(recipe, y, fit_rows, cleaned, eventclean.ledger_events)
+            if recipe.get("train_on") not in (None, "given"):
+                changed = int((target != y)[fit_rows].sum())
+                summary[f"{recipe_name}{tag}_s{seed}_changed"] = changed
+                log(f"[octlike] {recipe['train_on']}: {changed} fit rows relabelled")
             spec = runner.cascade_spec(recipe)
+            spec.use_screen = use_screen
             for r in sets:
-                name = f"{recipe_name}_s{seed}_r{r}"
+                name = f"{recipe_name}{tag}_s{seed}_r{r}"
                 path = _out_dir() / f"{name}.npz"
                 if path.exists():
                     log(f"[octlike] {name} exists, skipped")
@@ -363,9 +403,9 @@ def fit(seeds: list[int], cells: list[tuple[str, list[int]]], recipes_dir: Path,
                 t1 = time.time()
                 spec.seeds = (3 * r, 3 * r + 1, 3 * r + 2)
                 (prob,) = fit_predict(
-                    X[frame.fit],
-                    target[frame.fit],
-                    frame.period[frame.fit],
+                    X[fit_rows],
+                    target[fit_rows],
+                    frame.period[fit_rows],
                     [X[frame.hold]],
                     spec,
                     log=lambda *_: None,
@@ -378,6 +418,8 @@ def fit(seeds: list[int], cells: list[tuple[str, list[int]]], recipes_dir: Path,
                 summary[name] = {
                     **scores,
                     "seeds": list(spec.seeds),
+                    "months": list(months),
+                    "screen": use_screen,
                     "rows": int(frame.hold.sum()),
                     "wall_s": time.time() - t1,
                 }
@@ -521,6 +563,9 @@ def main(argv=None) -> dict | None:
     f.add_argument("cells", nargs="+", help="recipe:seedset,seedset ...")
     f.add_argument("--seeds", default=",".join(map(str, SEEDS)))
     f.add_argument("--recipes", default="recipes")
+    f.add_argument("--months", default=",".join(map(str, FIT_PERIODS)))
+    f.add_argument("--no-screen", action="store_true")
+    f.add_argument("--tag", default="", help="cell name suffix after the recipe name")
     s = sub.add_parser("score")
     s.add_argument("base")
     s.add_argument("challenger")
@@ -538,7 +583,14 @@ def main(argv=None) -> dict | None:
         for c in args.cells:
             name, _, sets = c.partition(":")
             cells.append((name, _ints(sets) if sets else list(SEED_SETS)))
-        return fit(_ints(args.seeds), cells, Path(args.recipes))
+        return fit(
+            _ints(args.seeds),
+            cells,
+            Path(args.recipes),
+            tuple(_ints(args.months)),
+            not args.no_screen,
+            args.tag,
+        )
     rep = score(
         args.base,
         args.challenger,
