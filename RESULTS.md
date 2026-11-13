@@ -223,3 +223,23 @@ No model was fitted; the copies failed the check. Details: `docs/findings/octobe
 Mean absolute gap to October, July + August: size 1 raw 2.74 vs copies 5.79; size 2-3 raw 3.77
 vs copies 6.97; size 4-8 raw 0.10 vs copies 0.87; size 9+ raw 1.04 vs copies 1.25. Verdict:
 stopped before any fit (copies depart from October more than raw train does).
+
+### Second artefact check: scale only legit rows outside generator structures
+
+Commit 0eeaa40, box, 24 threads, wall about 3 min (`python -m ringtrace.octshape mix`). The amount
+scale now skips every row with an event id from an evidence module or a row mark (`outside`); a
+control arm has the scale off (`off`). Thinning and QR blanking unchanged. About 0.3% of kept legit
+rows are now left unscaled (for example 680 of 249,556 in July s101).
+
+| frame | size 1 | size 2-3 | size 4-8 | size 9+ | flow rows/event |
+|---|---|---|---|---|---|
+| October (real) | 9.98 | 23.79 | 4.22 | 1.15 | 7.82 |
+| raw July / August | 13.28 / 12.15 | 19.73 / 20.31 | 4.17 / 4.37 | 1.33 / 3.04 | 7.17 / 7.05 |
+| outside: July s101 / s102 | 16.20 / 14.18 | 17.75 / 14.56 | 5.02 / 5.36 | 0.77 / 1.92 | 7.70 / 7.17 |
+| outside: August s101 / s102 | 14.61 / 14.23 | 20.76 / 21.54 | 6.92 / 5.39 | 3.46 / 3.85 | 6.60 / 7.26 |
+| off: July s101 / s102 | 15.82 / 14.18 | 17.75 / 14.56 | 5.02 / 5.36 | 0.77 / 1.92 | 7.70 / 7.17 |
+| off: August s101 / s102 | 14.22 / 13.46 | 20.76 / 21.54 | 6.92 / 5.39 | 3.46 / 3.85 | 6.60 / 7.26 |
+
+Mean absolute gap to October over the July and August frames (raw / outside / off): size 1
+2.74 / 4.83 / 4.44; size 2-3 3.77 / 5.14 / 5.14; size 4-8 0.10 / 1.45 / 1.45; size 9+ 1.03 / 1.54 /
+1.54. Verdict: still further from October than raw train in all four bins; stopped before any fit.

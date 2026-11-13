@@ -1,4 +1,4 @@
-# October-shaped training copies, protected mode: stopped at the artefact check
+# October-shaped training copies, protected mode: stopped at the artefact check (twice)
 
 **Measured in this repository** (`python -m ringtrace.octshape mix`, commit 6fb100d; numbers in
 `RESULTS.md`, "October-shaped copies").
@@ -49,8 +49,41 @@ pieces. This cause is **not measured**: no copy without the scale was built.
 no model was fitted. There are no October-like cells, no leave-one-month-out run and no per-class
 effect on `qr_swap`, `merchant_collusion` and `refund_abuse`.
 
+## Second check: scaling restricted to rows outside generator structures
+
+**Measured in this repository** (commit 0eeaa40; table in `RESULTS.md`).
+
+About 12% of real fraud rows carry a legit label in train, ring rows among them, so the first build
+also scaled generator rows off their round amounts. The fix scales only legit-labelled rows with no
+event id in any evidence module and no row mark (`scale="outside"`). A control arm turns the scale
+off (`scale="off"`). Thinning and QR blanking are unchanged.
+
+Mean absolute gap to real October over the July and August copies (per 100k rows):
+
+| ring size | raw train | first build | outside | off |
+|---|---|---|---|---|
+| 1 | 2.74 | 5.79 | 4.83 | 4.44 |
+| 2-3 | 3.77 | 6.97 | 5.14 | 5.14 |
+| 4-8 | 0.10 | 0.87 | 1.45 | 1.45 |
+| 9+ | 1.04 | 1.25 | 1.54 | 1.54 |
+
+- The fix helps where it can: size-1 rings fall from 5.79 to 4.83, and size 2-3 from 6.97 to 5.14.
+  Flow events are no longer systematically smaller: 6.60-7.70 rows per event against 7.05-7.17 raw.
+- The control shows that the remaining departure comes from the thinning itself, not from the
+  scale. With the scale off, the 2-3, 4-8 and 9+ bins are identical and size 1 is only 0.4 closer.
+- The copies keep their source month's ring mix, and July and August already carry more size-1
+  rings than October (13.3 and 12.2 against 10.0). Whole-unit thinning then adds sampling noise to
+  a ratio that is already off: 4-8 rises to 5.0-6.9 against 4.2, for example.
+- The judge frames thin September, whose raw mix (8.6) is already near October's, which is why they
+  match. This part is an explanation, **not a measured cause**.
+
+**Verdict: stopped again.** The copies sit further from October than raw train in all four ring
+bins, so no model was fitted: no October-like cells, no LOMO and no per-class numbers.
+
 ## Next step, if it is reopened
 
-Rebuild the copies with the amount scale off, or scale only rows outside every ring chain. Repeat
-the check, then fit (octlike r0 on s13-15, then LOMO), with `python -m ringtrace.octshape octlike` and
+Both scale variants are measured above and fail. A copy can only pass if its ring mix moves
+towards October, for example by taking September as the source month: its copies, s101 and s102,
+sit at size 1 8.75 / 6.74 and size 2-3 21.07 / 21.00. The October-like judge cannot score copies of
+September, but leave-one-month-out can. Then fit (octlike r0 on s13-15, then LOMO), with `python -m ringtrace.octshape octlike` and
 `python -m ringtrace.octshape lomo`.
