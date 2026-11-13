@@ -382,11 +382,13 @@ def weight_matching(a: dict, b: dict, sweeps: int = 20) -> tuple[dict, list[floa
     history = [distance(ref, cur)]
     for _ in range(sweeps):
         before = history[-1]
+        # members first: the +-1 member scales carry most of the weight norm, so every later
+        # similarity is dominated by them and needs the member order settled
+        cur = _match_members(ref, cur)
         cur = _match_frequencies(ref, cur)
         cur = _match_embedding(ref, cur)
         for layer in range(n_layers):
             cur = _match_hidden(ref, cur, layer)
-        cur = _match_members(ref, cur)
         history.append(distance(ref, cur))
         if before == 0.0 or (before - history[-1]) / before < 1e-9:
             break
