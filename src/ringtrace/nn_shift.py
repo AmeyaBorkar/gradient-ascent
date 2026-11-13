@@ -63,9 +63,7 @@ def _chunk(chunk: int | None, n: int) -> int:
 def _call(predict_fn, rows: np.ndarray) -> np.ndarray:
     pred = np.asarray(predict_fn(rows))
     if pred.shape[0] != rows.shape[0]:
-        raise ValueError(
-            f"predict_fn returned {pred.shape[0]} rows for {rows.shape[0]} inputs"
-        )
+        raise ValueError(f"predict_fn returned {pred.shape[0]} rows for {rows.shape[0]} inputs")
     return pred
 
 
@@ -158,8 +156,7 @@ def noise_tta(
             pred = _call(predict_fn, block)
             if pred.shape[1:] != acc.shape[1:]:
                 raise ValueError(
-                    f"predict_fn returned shape {pred.shape}, expected "
-                    f"{(width,) + acc.shape[1:]}"
+                    f"predict_fn returned shape {pred.shape}, expected {(width,) + acc.shape[1:]}"
                 )
             acc[start:end] += pred
     acc /= copies + 1
@@ -237,9 +234,7 @@ def rank_by_group(X: np.ndarray, col_mask: np.ndarray, group: np.ndarray) -> np.
         finite = np.isfinite(out[:, j])
         if not finite.any():
             continue
-        ranked = _unit_average_ranks(
-            out[finite, j].astype(np.float64, copy=False), groups[finite]
-        )
+        ranked = _unit_average_ranks(out[finite, j].astype(np.float64, copy=False), groups[finite])
         out[finite, j] = ranked
     return out
 

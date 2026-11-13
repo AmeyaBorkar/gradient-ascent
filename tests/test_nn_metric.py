@@ -154,11 +154,7 @@ def test_each_loss_is_finite_and_reaches_every_parameter():
         loss.backward()
         dead = [pname for pname, p in model.named_parameters() if p.grad is None]
         assert not dead, (name, dead)
-        bad = [
-            pname
-            for pname, p in model.named_parameters()
-            if not torch.isfinite(p.grad).all()
-        ]
+        bad = [pname for pname, p in model.named_parameters() if not torch.isfinite(p.grad).all()]
         assert not bad, (name, bad)
 
 

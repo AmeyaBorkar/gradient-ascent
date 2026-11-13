@@ -64,11 +64,16 @@ def test_bank_keeps_every_rare_row_and_samples_legit_by_seed():
     assert int((y[a] != 0).sum()) == len(rare)
     # fewer legit rows than the cap: take them all
     assert set(tabr.build_bank(np.array([0, 1, 0, 4]), bank_legit=100, seed=0).tolist()) == {
-        0, 1, 2, 3,
+        0,
+        1,
+        2,
+        3,
     }
     # a zero cap keeps rares only
     assert set(tabr.build_bank(np.array([1, 0, 2, 0, 3]), bank_legit=0, seed=0).tolist()) == {
-        0, 2, 4,
+        0,
+        2,
+        4,
     }
     with pytest.raises(ValueError):
         tabr.build_bank(np.array([0]), bank_legit=0, seed=0)

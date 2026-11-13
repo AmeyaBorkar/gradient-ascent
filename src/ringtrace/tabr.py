@@ -315,10 +315,7 @@ def train_one(
     labels = np.asarray(y, dtype=np.int64).reshape(-1)
     bank = build_bank(labels, spec.bank_legit, seed)
     n_legit = int((labels[bank] == 0).sum())
-    log(
-        f"    seed {seed} bank {len(bank)} ({len(bank) - n_legit} rare + {n_legit} legit) "
-        f"on {dev}"
-    )
+    log(f"    seed {seed} bank {len(bank)} ({len(bank) - n_legit} rare + {n_legit} legit) on {dev}")
     model = TabRNet(Z.shape[1], spec).to(dev)
     features = torch.from_numpy(np.ascontiguousarray(Z, dtype=np.float32)).to(dev)
     targets = torch.from_numpy(labels).to(dev)
