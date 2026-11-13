@@ -192,3 +192,39 @@ Positive on every thinning seed for given and cleaned, but the bootstrap lower b
 clear 0, so the gate fails. Only 3 of the 9 cells were fitted (time box); s13 r1-r2 are being
 fitted now. The five-way + tabm October-like gate is not run: the other members' cells do not
 exist locally.
+
+## A-clean proxy and the decoder on the fused mass (laptop CPU, 8 threads, commit 85c2d30)
+
+`python -m ringtrace.aclean rank | mass | sweep | rare` (`src/ringtrace/aclean.py`). The proxy is
+the cleaned labels plus 3,482 hidden ordinary fraud rows, scored as an expected confusion matrix
+(every cleaned-legit row equally likely hidden, by month and class); details in
+`docs/findings/decoder-a-clean.md`. Wall: rank 36 s, mass under 1 min, sweep 58 s, rare under 1 min.
+Arrays read from the laptop's member runs; JSON outputs in the local `outputs/signal/`.
+
+Public files' train-month analogues, macro-F1 Jul / Aug / Sep (mean):
+
+| file | public | given | cleaned | gen-only | A-clean proxy |
+|---|---|---|---|---|---|
+| champion | 0.5470 | 0.5130 / 0.5090 / 0.5146 (0.5122) | 0.5645 / 0.5639 / 0.5712 (0.5665) | 0.9020 / 0.8996 / 0.9014 (0.9010) | 0.5453 / 0.5446 / 0.5520 (0.5473) |
+| five-way | 0.5474 | 0.5130 / 0.5091 / 0.5147 (0.5123) | 0.5647 / 0.5641 / 0.5714 (0.5667) | 0.9022 / 0.9000 / 0.9018 (0.9013) | 0.5455 / 0.5448 / 0.5521 (0.5475) |
+| blend-blankqr | 0.5486 | 0.5130 / 0.5091 / 0.5148 (0.5123) | 0.5647 / 0.5641 / 0.5714 (0.5667) | 0.9022 / 0.9000 / 0.9019 (0.9013) | 0.5455 / 0.5448 / 0.5521 (0.5475) |
+| blend-col7-phishing | 0.5408 | 0.5102 / 0.5084 / 0.5143 (0.5110) | 0.5615 / 0.5627 / 0.5697 (0.5646) | 0.9004 / 0.9019 / 0.9033 (0.9019) | 0.5424 / 0.5433 / 0.5504 (0.5454) |
+| TabM full + QR | 0.5483 | 0.5135 / 0.5093 / 0.5150 (0.5126) | 0.5652 / 0.5643 / 0.5717 (0.5671) | 0.9029 / 0.9000 / 0.9019 (0.9016) | 0.5460 / 0.5450 / 0.5525 (0.5478) |
+| fraud-only TabM + QR | 0.5499 | 0.5137 / 0.5093 / 0.5150 (0.5127) | 0.5654 / 0.5644 / 0.5718 (0.5672) | 0.9031 / 0.9000 / 0.9019 (0.9016) | 0.5462 / 0.5451 / 0.5525 (0.5479) |
+
+The proxy reproduces the public order except TabM full against blankqr (0.0003 apart on public).
+It orders the files exactly as the cleaned target does.
+
+Fraud mass in 0.05-0.95: five-way 0.031% of rows / 0.9% of mass, fused 0.91% / 30%. The fused
+band is mostly confident fraud moved down from >0.95 (0.5-0.95 is 99.4% cleaned fraud). The
+0.05-0.5 band holds 30 rows per 100k, against 17 for the five-way.
+
+Decoder sweep on the fused mass (15 settings, deltas against hf 1 / fs 0.875): table in the
+finding. Best on the proxy is hf 2.7 / fs 0.8: proxy +0.00012 / +0.00012 / +0.000004, cleaned
++0.00010 / +0.00010 / -0.00002, given +0.00019 / -0.00016 / -0.00020, gen-only -0.00070 /
+-0.00053 / -0.00068. **Rejected**, as is every other setting; the rare-only multipliers lose in
+every month on every target. No October file was written, and the October-like cells were not
+scored because nothing passed leave-one-month-out.
+
+Rare classes (loan, collusion, cashback, bot, refund), bands just below each cut-off: every band
+loses or ties on the proxy; table in `docs/findings/rare-classes.md`. **Rejected.**
