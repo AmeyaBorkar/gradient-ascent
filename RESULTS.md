@@ -237,3 +237,13 @@ Generator signatures that the blend (`recipes/blend-blankqr.json`) calls legit i
 | rescue-rule, first launch | 7f3ad0c | failed: out of memory in the 2,000-draw bootstrap matrix on the laptop; draws are now chunked | <1 min |
 | rescue-nonqr (`python -m ringtrace.blend recipes/rescue-nonqr.json`), upload candidate | 7f3ad0c | given 0.5130 / 0.5091 / 0.5148 (0.5123); cleaned 0.5647 / 0.5641 / 0.5714 (0.5667); gen-only 0.9022 / 0.9000 / 0.9019 (0.9013); valid; sha256 `0f0a60e8e86838cb3602f0a8453d14ee767c989cfbf00e5c2dbaa1cc35449206`; against `blend-blankqr`: legit -> phishing_collect 2; `analysis/rescue.py apply` on that file gives the same sha256 | 1.8 min |
 | rescue-nonqr-on-tabmF (`python analysis/rescue.py apply --sig mark:nonqr_check` on the TabM blend upload file), upload candidate | 7f3ad0c | valid; sha256 `715138bd2d1d6bc48338f34873363c310a2493556f1769ec0cc9a94d2f05fc3a`; against its base: legit -> phishing_collect 1 | about 1 min |
+
+### Event completion
+
+Finding: `docs/findings/event-completion.md`. Laptop CPU, 8 threads.
+
+| run | commit | result | wall |
+|---|---|---|---|
+| rescue-evcomp-survey (`python analysis/rescue.py evcomp`, five-way blend and `--base-run tabm`) | 9c9125c | 7 families x q 0.5 / 0.67 / 0.8. Blend leftovers: bot 4 train rows at every q (cleaned fraud 1.00, given 0.50); drain 3 at q 0.5 (1.00, majority type 0.67); collect 1 at q 0.5; everything else 0. TabM: 0 everywhere. October on `blend-tabmF-bq.csv`: 0 rows for every family and q | about 5 min |
+| rescue-rule-evcomp-bot-0.5, leave-one-month-out | 9c9125c | given +0.00000 / +0.00000 / +0.00004 (95 % [+0.00000, +0.00005]); cleaned +0 / +0 / +0.00012; gen-only +0 / +0 / +0.00016; 4 train rows, 0 October rows; nothing to build | about 5 min |
+| rescue-rule-evcomp-drain-0.5, leave-one-month-out | 9c9125c | given +0.00007 / +0.00007 / -0.00002; cleaned +0.00006 / +0.00007 / -0.00002; gen-only +0.00008 / +0.00010 / -0.00006; 3 train rows, 1 October row on the blend; **rejected** | about 5 min |
