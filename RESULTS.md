@@ -258,3 +258,14 @@ The s14 and s15 r1-r2 cells are not on the laptop, so the nine-cell gate is pend
 | 1 | +0.00004 / -0.00027 / -0.00002 | +0.00002 / -0.00024 / -0.00009 | -0.00027 / -0.00069 / -0.00038 |
 
 No share beats 1/2 on given and cleaned in every month; no file written.
+
+### TabM reproducibility: full member rerun (`tabm-repro`, same recipe under another name)
+
+Rerun of `recipes/tabm.json` on the same laptop GPU (commit a423c96 code, same seeds): `oof.npy`
+and `test.npy` are **byte-identical** to run T4. Scores are identical too: given 0.5123, cleaned
+0.5667, gen-only 0.9008. Wall 47.3 min. So the TabM member, and with it `blend-tabmF-bq`,
+rebuilds exactly on this hardware and software. Another GPU model or driver is still unverified.
+
+`tabm-s345` (seeds 3-5): the first attempt died with CUDA out of memory in fold 7, seed 3, after
+epoch 7 (log `tabm-s345-run-oom.log`). No other job of this member was on the GPU at the time.
+It has been relaunched.
