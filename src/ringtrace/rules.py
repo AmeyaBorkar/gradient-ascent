@@ -11,6 +11,11 @@
 * ``anchored_templates``: as ``plain_templates``, except that a template row on a fraud-block phone
   whose counter segment is one of the pair (``ctr_conf >= min_conf``) keeps its segment class and
   hands it to the rest of its family event.
+* ``event_types``: every fraud-called row of a label-free event (the first evidence family that
+  places the row in an event) takes the event's type: the argmax of the fraud-type probabilities
+  summed over the event's fraud-called rows. Legit calls are never touched.
+* ``anchor_rescue``: a row called legit whose family shape or one-class mark anchors a class
+  (``anchors.row_anchor``) is called that class.
 
 Rules only read label-free columns; NaN never triggers one. Each logs the rows it changed.
 """
@@ -126,11 +131,51 @@ def anchored_templates(pred, proba, led, log=print, min_conf: float = 0.8) -> np
     return out
 
 
+EVENT_COLUMNS = ("bot_event", "drn_event", "mf_event", "col_event", "rng_event", "rep_event")
+
+
+def label_free_events(led: pl.DataFrame) -> np.ndarray:
+    """One event id per row from the evidence families alone (no labels), -1 for none: the first
+    family in anchor priority order that places the row in an event."""
+    cols = anchors.family_columns(led, list(EVENT_COLUMNS))
+    out = np.full(led.height, -1, dtype=np.int64)
+    for i, c in enumerate(EVENT_COLUMNS):
+        ev = cols[c].fill_null(-1).to_numpy().astype(np.int64)
+        take = (out < 0) & (ev >= 0)
+        out[take] = ev[take] + (i + 1) * 10_000_000
+    return out
+
+
+def event_types(pred, proba, led, log=print) -> np.ndarray:
+    out = pred.copy()
+    event = label_free_events(led)
+    hit = np.flatnonzero((event >= 0) & (pred > 0))
+    if len(hit) == 0:
+        return out
+    _, g = np.unique(event[hit], return_inverse=True)
+    p = np.asarray(proba, dtype=np.float64)[hit, 1:]
+    summed = np.zeros((int(g.max()) + 1, p.shape[1]))
+    np.add.at(summed, g, p)
+    out[hit] = summed.argmax(axis=1)[g] + 1
+    log(f"  event_types: {int(g.max()) + 1} events hold fraud calls")
+    return out
+
+
+def anchor_rescue(pred, proba, led, log=print) -> np.ndarray:
+    anchor = anchors.row_anchor(led).astype(np.int64)
+    out = pred.copy()
+    hit = (pred == 0) & (anchor > 0)
+    out[hit] = anchor[hit]
+    return out
+
+
 RULES = {
     "counter": counter_rule,
     "legit_block": legit_block_rule,
     "plain_templates": plain_templates,
     "anchored_templates": anchored_templates,
+    "event_types": event_types,
+    "anchor_rescue": anchor_rescue,
 }
 
 
