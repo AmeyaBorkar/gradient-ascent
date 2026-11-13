@@ -38,7 +38,7 @@ CELLS = {
     "clean-event": "clean-event",
     "clean-l2": "clean-l2",
 }
-TABM = "tabm"
+TABM = os.environ.get("RINGTRACE_LENS_TABM", "tabm")
 TABM_SHARE = 0.5
 RULES = ["anchored_templates", "blank_merchant_qr"]
 DECODER = {"fraud_scale": 0.875}
