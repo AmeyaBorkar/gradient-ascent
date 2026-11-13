@@ -1,0 +1,60 @@
+{
+ "name": "tabmF-fourfifths",
+ "members": [
+  {
+   "name": "champion",
+   "run": "blend-champion-m1",
+   "variant": "fold",
+   "cells": "champion"
+  },
+  {
+   "name": "lgbm",
+   "run": "lgbm",
+   "variant": "fold",
+   "cells": "lgbm"
+  },
+  {
+   "name": "catboost",
+   "run": "catboost",
+   "variant": "fold",
+   "cells": "catboost"
+  },
+  {
+   "name": "clean-event",
+   "run": "clean-event",
+   "variant": "fold",
+   "cells": "clean-event"
+  },
+  {
+   "name": "clean-l2",
+   "run": "clean-l2",
+   "variant": "fold",
+   "cells": "clean-l2"
+  },
+  {
+   "name": "tabm",
+   "run": "final-tabm",
+   "variant": "fold",
+   "cells": "tabm",
+   "role": "fraud"
+  }
+ ],
+ "weights": {
+  "mode": "fixed",
+  "values": {
+   "champion": 0.039999999999999994,
+   "lgbm": 0.039999999999999994,
+   "catboost": 0.039999999999999994,
+   "clean-event": 0.039999999999999994,
+   "clean-l2": 0.039999999999999994,
+   "tabm": 0.8
+  }
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ],
+ "base_rate_rules": []
+}

@@ -131,6 +131,10 @@ def mix(arrays: list[np.ndarray], weights, roles=None) -> np.ndarray:
             out += float(w) * a
     if all(r == "full" for r in roles):
         return out
+    if not out.any():
+        # the full members carry no weight: they still set the type split, equally
+        full = [a for a, r in zip(arrays, roles, strict=True) if r == "full"]
+        out = mix(full, [1.0] * len(full))
     legit = sum(float(w) * a[:, 0] for a, w in zip(arrays, weights, strict=True) if w)
     legit = legit / float(sum(weights))
     types = out[:, 1:]
