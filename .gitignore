@@ -13,6 +13,7 @@
 *.bin
 *.zip
 data/
+!docs/knowledge/data/
 cache/
 outputs/
 runs/
