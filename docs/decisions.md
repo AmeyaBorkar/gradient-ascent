@@ -72,3 +72,8 @@ Short records of choices that differ from, or add to, the research notes.
       (September given-label macro-F1 after the fixed-point decoder, and cleaning statistics).
       The template rule is not applied in this mode (it needs the counter's event view of the
       frame); the scores are fixed-point only.
+14. **Event-cleaned training labels are rebuilt inside each month fold** (`ringtrace.eventclean`):
+    only the fit months' rows vote and change, so an event spanning a month boundary cannot carry
+    held-out labels into training. The events are the six event-id modules in the teacher's order
+    (bursts, drains, flows, requests, merchant, repeats). The `l2` minority flip uses the same
+    chosen event (highest fraud share) and needs no fraud-share threshold of its own.

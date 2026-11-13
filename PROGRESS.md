@@ -19,5 +19,5 @@ counter-anchored template rule.
       rule); `recipes/champion.json` reproduces member 1.
 - [ ] Member 2: LightGBM cascade.
 - [ ] Member 3: CatBoost cascade.
-- [ ] Members 4 and 5: event-cleaned labels and their XGBoost cascades.
+- [x] Members 4 and 5: event-cleaned labels and their XGBoost cascades (`recipes/clean-event.json`, `recipes/clean-l2.json`).
 - [ ] The blend, its one-command build, and the README (commands, seeds, versions, hardware).

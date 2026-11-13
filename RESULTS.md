@@ -92,3 +92,22 @@ from July + August only, the teacher fitted on the other month), same scoring:
 Cleantrain mean over the 9 cells 0.5091 against 0.5093 for the given-label champion: a tie on the
 given labels (the cleaned target cannot be scored on September here, which has no cleaned labels
 by protocol). All 18 cells ran in 28 min (16:39-17:07 IST), three frames in parallel.
+
+## Member `clean`: event-cleaned training labels (members 4 and 5)
+
+`python -m ringtrace.run recipes/clean-<v>.json` (champion recipe plus `train_on`), seeds 0/1/2,
+leave-one-month-out, October = fold mean; 3 CPU threads each, two jobs sharing the GPU. Labels are
+recleaned inside each fold from the fit months' labels only (`ringtrace.eventclean`). Scores after
+the template rule (fixed point in brackets); given / cleaned / gen-only, Jul / Aug / Sep (mean).
+
+| run | commit | rows changed (all train; per fold 7/8/9) | given | cleaned | gen-only | wall |
+|---|---|---|---|---|---|---|
+| champion (run 9, reference) | c46528d | 0 | 0.5130 / 0.5090 / 0.5146 (**0.5122**); fp 0.5064 | 0.5645 / 0.5639 / 0.5712 (**0.5665**); fp 0.5601 | 0.9010 | 12.8 min |
+| clean-event, first try | 62c5fdb | — | — | — | — | failed in fold 7: CUDA out of memory (shared GPU); relaunched |
+| clean-event | 62c5fdb | 2,337 (all legit -> fraud); 1,509 / 1,519 / 1,530 | 0.5131 / 0.5091 / 0.5146 (**0.5123**); fp 0.5068 | 0.5646 / 0.5640 / 0.5713 (**0.5666**); fp 0.5604 | 0.9012 | 12.4 min |
+| clean-l2 | 62c5fdb | 2,626 (2,337 legit -> fraud, 289 minority types); 1,697 / 1,727 / 1,710 | 0.5131 / 0.5091 / 0.5146 (**0.5122**); fp 0.5060 | 0.5645 / 0.5642 / 0.5713 (**0.5666**); fp 0.5594 | 0.9012 | 12.0 min |
+
+Both tie the champion after the rule (+0.0001 / +0.0001 and 0.0000 / +0.0001); at the fixed point
+`clean` is +0.0004 / +0.0003 and `l2` -0.0004 / -0.0007. Their value is as blend members.
+Outputs: `~/outputs/runs/clean-event/` and `~/outputs/runs/clean-l2/` (`oof.npy`, `test.npy`,
+`summary.json`, `submission.csv`).
