@@ -217,7 +217,11 @@ def _mitra_predict(
         mitra_deterministic_context,
     )
 
+    np.random.seed(seed)
     torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.use_deterministic_algorithms(True, warn_only=True)
+    torch.backends.cudnn.benchmark = False
     hf = model_id
     if revision:
         from huggingface_hub import snapshot_download
