@@ -11,7 +11,9 @@ Training targets come from a cross-fitted fraud score computed inside the traini
 Validation is leave-one-month-out; test probabilities are the mean of the month-fold models.
 
 The two stages can use XGBoost (``BoosterSpec``) or LightGBM (``LgbmSpec``); the screening score
-has its own spec, so a LightGBM cascade can keep the XGBoost screen of the champion.
+has its own spec, so a LightGBM cascade can keep the XGBoost screen of the champion. The two
+stages can also use CatBoost (``stages="catboost"``, ``CatBoostSpec``); the screening score then
+still comes from ``booster``, so every option trains on the same rows.
 """
 
 from __future__ import annotations
@@ -96,6 +98,33 @@ class LgbmSpec:
         return p
 
 
+@dataclass
+class CatBoostSpec:
+    iterations: int = 300
+    depth: int = 8
+    learning_rate: float = 0.08
+    border_count: int = 254
+    task_type: str = "GPU"
+    devices: str = "0"
+
+    def params(self, seed: int, loss: str) -> dict:
+        p = {
+            "iterations": self.iterations,
+            "depth": self.depth,
+            "learning_rate": self.learning_rate,
+            "border_count": self.border_count,
+            "task_type": self.task_type,
+            "loss_function": loss,
+            "random_seed": seed,
+            "thread_count": threads.budget(),
+            "verbose": False,
+            "allow_writing_files": False,
+        }
+        if self.task_type == "GPU":
+            p["devices"] = self.devices
+        return p
+
+
 Spec = BoosterSpec | LgbmSpec
 
 
@@ -111,6 +140,8 @@ def booster_spec(d: dict | None) -> Spec:
 @dataclass
 class CascadeSpec:
     booster: Spec = field(default_factory=BoosterSpec)
+    stages: str = "booster"  # "booster" (or "xgboost"): use ``booster``; "catboost"
+    catboost: CatBoostSpec = field(default_factory=CatBoostSpec)
     seeds: tuple[int, ...] = (0, 1, 2)
     screen_rounds: int = 150
     type_min_score: float = 0.10
@@ -148,9 +179,34 @@ def _fit_types(X, y_type, spec: Spec, seed: int, rounds: int):
     return _fit(X, y_type, spec, seed, rounds, n_class=N_CLASSES - 1)
 
 
+def _fit_cat(X, y, spec: CatBoostSpec, seed: int, loss: str):
+    from catboost import CatBoostClassifier
+
+    m = CatBoostClassifier(**spec.params(seed, loss))
+    m.fit(X, y)
+    return m
+
+
+def _fit_stages(X_bin, y_bin, X_type, y_type, spec: CascadeSpec, seed: int):
+    if spec.stages == "catboost":
+        return (
+            _fit_cat(X_bin, y_bin.astype(np.int64), spec.catboost, seed, "Logloss"),
+            _fit_cat(X_type, y_type.astype(np.int64), spec.catboost, seed, "MultiClass"),
+        )
+    if spec.stages not in ("booster", "xgboost"):  # "xgboost": the name before LightGBM
+        raise ValueError(f"unknown stage booster {spec.stages!r}")
+    return (
+        _fit_binary(X_bin, y_bin, spec.booster, seed, spec.booster.rounds),
+        _fit_types(X_type, y_type, spec.booster, seed, spec.booster.rounds),
+    )
+
+
 def _predict(model, X) -> np.ndarray:
     if isinstance(model, xgb.Booster):
         return model.inplace_predict(X)
+    if hasattr(model, "predict_proba"):  # CatBoost
+        p = model.predict_proba(X)
+        return p[:, 1] if p.shape[1] == 2 else p
     return model.predict(X, num_threads=threads.budget())
 
 
@@ -195,15 +251,13 @@ def fit_predict(
     )
     outs = [np.zeros((len(X), N_CLASSES), dtype=np.float64) for X in X_out]
     for seed in spec.seeds:
-        mb = _fit_binary(
-            X_tr[keep_bin], target_bin[keep_bin], spec.booster, seed, spec.booster.rounds
-        )
-        mt = _fit_types(
+        mb, mt = _fit_stages(
+            X_tr[keep_bin],
+            target_bin[keep_bin],
             X_tr[type_rows],
             (y_tr[type_rows] - 1).astype(np.float32),
-            spec.booster,
+            spec,
             seed,
-            spec.booster.rounds,
         )
         for o, X in zip(outs, X_out, strict=True):
             pf = _predict(mb, X).astype(np.float64)

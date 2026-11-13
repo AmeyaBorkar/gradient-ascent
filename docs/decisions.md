@@ -70,3 +70,11 @@ Short records of design choices.
       (September given-label macro-F1 after the fixed-point decoder, and cleaning statistics).
       The template rule is not applied in this mode (it needs the counter's event view of the
       frame); the scores are fixed-point only.
+14. **CatBoost stages (member 3, `recipes/catboost.json`).** The cascade's binary and type stages
+    can be CatBoost (`"stages": "catboost"`): 300 iterations, depth 8, learning rate 0.08, 254
+    borders, GPU device 0, Logloss / MultiClass, seed per model, seeds 0-2 averaged. The screening
+    score stays the champion's XGBoost one, so the rows each stage trains on are identical to the
+    champion's. CatBoost on the GPU is not bit-reproducible: two runs of fold September, seed 0
+    (`scripts/catboost_repro.py`) differ by at most 0.165 in one probability, by 4.3e-6 on average,
+    and change the argmax of 2 of 510,143 rows. Scores move in the fourth decimal at most; the
+    saved `oof.npy` / `test.npy` are the reference copy for the blend.

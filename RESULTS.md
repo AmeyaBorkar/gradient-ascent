@@ -111,6 +111,17 @@ On its own the LightGBM member ties the champion: +0.0000 given and +0.0002 clea
 +0.0009 / +0.0010 at the fixed point. CPU only, at 892 % CPU (10 threads), with a peak RSS of 8.0 GB.
 The template rule changed 742 train / 132 test rows. October calls: 3,951 fraud (champion 3,945).
 
+## Member 3: CatBoost cascade
+
+Champion features, screening and folds; both stages CatBoost on the GPU (decision 14), 4 CPU threads.
+Output: `~/outputs/runs/catboost/` (`oof.npy`, `test.npy`, `summary.json`, `submission.csv`).
+
+| run | commit | given Jul / Aug / Sep (mean) | cleaned Jul / Aug / Sep (mean) | gen-only Jul / Aug / Sep (mean) | wall | notes |
+|---|---|---|---|---|---|---|
+| catboost (rules) | e8613ed | 0.5129 / 0.5090 / 0.5141 (**0.5120**) | 0.5644 / 0.5637 / 0.5706 (**0.5662**) | 0.9023 / 0.8995 / 0.9008 (0.9008) | 3.6 min | vs champion 0.5122 / 0.5665: -0.0002 / -0.0003. Rule changed 459 train / 88 test rows |
+| catboost (fixed point) | e8613ed | 0.5098 / 0.5048 / 0.5123 (0.5090) | 0.5611 / 0.5594 / 0.5680 (0.5628) | 0.8994 / 0.8930 / 0.8988 (0.8971) | — | champion fixed point 0.5064 / 0.5601: +0.0026 / +0.0027 |
+| catboost repro (fold Sep, seed 0, twice) | d83b3d7 | — | — | — | 2 x 1 min | max abs prob diff 0.165, mean 4.3e-6, 2 argmax changes |
+
 ## Member `blend` (the blend and the one-command build)
 
 Leave-one-month-out macro-F1 per held-out month Jul / Aug / Sep (mean), after the fixed point
