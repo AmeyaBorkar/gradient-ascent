@@ -1,0 +1,45 @@
+{
+ "name": "hedge",
+ "members": [
+  {
+   "name": "champion",
+   "run": "blend-champion-m1",
+   "variant": "hedge",
+   "cells": "champion"
+  },
+  {
+   "name": "lgbm",
+   "run": "lgbm",
+   "variant": "hedge",
+   "cells": "lgbm"
+  },
+  {
+   "name": "catboost",
+   "run": "catboost",
+   "variant": "hedge",
+   "cells": "catboost"
+  },
+  {
+   "name": "clean-event",
+   "run": "clean-event",
+   "variant": "hedge",
+   "cells": "clean-event"
+  },
+  {
+   "name": "clean-l2",
+   "run": "clean-l2",
+   "variant": "hedge",
+   "cells": "clean-l2"
+  }
+ ],
+ "weights": {
+  "mode": "equal"
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ],
+ "base_rate_rules": []
+}

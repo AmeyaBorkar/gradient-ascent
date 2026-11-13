@@ -1,0 +1,45 @@
+{
+ "name": "refit",
+ "members": [
+  {
+   "name": "champion",
+   "run": "blend-champion-m1",
+   "variant": "refit",
+   "cells": "champion"
+  },
+  {
+   "name": "lgbm",
+   "run": "lgbm",
+   "variant": "refit",
+   "cells": "lgbm"
+  },
+  {
+   "name": "catboost",
+   "run": "catboost",
+   "variant": "refit",
+   "cells": "catboost"
+  },
+  {
+   "name": "clean-event",
+   "run": "clean-event",
+   "variant": "refit",
+   "cells": "clean-event"
+  },
+  {
+   "name": "clean-l2",
+   "run": "clean-l2",
+   "variant": "refit",
+   "cells": "clean-l2"
+  }
+ ],
+ "weights": {
+  "mode": "equal"
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ],
+ "base_rate_rules": []
+}
