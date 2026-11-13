@@ -352,3 +352,6 @@ Positive on every thinning seed for given and cleaned, but the bootstrap lower b
 clear 0, so the gate fails. Only 3 of the 9 cells were fitted (time box); s13 r1-r2 are being
 fitted now. The five-way + tabm October-like gate is not run: the other members' cells do not
 exist locally.
+
+| fresh-blend-col7-phishing (`python -m ringtrace.blend recipes/blend-col7-phishing.json`), upload candidate: col7 template -> phishing_collect | 306885e | given 0.5102 / 0.5084 / 0.5143 (0.5110, vs blend-blankqr -0.0028 / -0.0007 / -0.0005); cleaned 0.5615 / 0.5627 / 0.5697 (0.5646; -0.0032 / -0.0014 / -0.0017); gen-only 0.9004 / 0.9019 / 0.9033 (0.9019; -0.0018 / +0.0019 / +0.0014); valid; sha256 `91d1e767f0e8fe63643251fe7fd72579874a6772c9faa941a6cc1cca1b88fcd8`; 94 October rows fake_cashback -> phishing_collect | about 6 min |
+| fresh-blend-mf23-bot (`python -m ringtrace.blend recipes/blend-mf23-bot.json`), upload candidate: mf2+mf3 template -> velocity_bot | 306885e | given 0.4956 / 0.4924 / 0.4949 (0.4943; -0.0174 / -0.0167 / -0.0199); cleaned 0.5453 / 0.5447 / 0.5483 (0.5461; -0.0194 / -0.0194 / -0.0231); gen-only 0.8678 / 0.8629 / 0.8586 (0.8631; -0.0344 / -0.0371 / -0.0433); valid; sha256 `0cbf7e1b535567b3d6bbc32ef735cf70a7c7f45bc4e4310f69d82100ff635448`; 422 October rows mule_account -> velocity_bot | about 6 min |

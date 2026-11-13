@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import polars as pl
+import pytest
 
 from ringtrace import rules
 from ringtrace.evidence import anchors
@@ -155,3 +156,19 @@ def test_blank_merchant_qr():
     assert out.tolist() == [7, 0, 0, 0]
     pred2 = np.array([9, 0, 0, 0])
     assert rules.blank_merchant_qr(pred2, proba, led, log=lambda *_: None)[0] == 9
+
+
+def test_anchored_templates_class_override():
+    led, pred, proba = frame()
+    base = rules.apply(["anchored_templates"], pred, proba, led, log=lambda m: None)
+    rule = {"name": "anchored_templates", "classes": {"1": MULE}}
+    out = rules.apply([rule], pred, proba, led, log=lambda m: None)
+    assert out[[0, 1, 10]].tolist() == [MULE] * 3  # unanchored chain-hop rows flip
+    assert out[[3, 4, 5]].tolist() == base[[3, 4, 5]].tolist()  # anchored rows keep their class
+    same = np.ones(len(out), dtype=bool)
+    same[[0, 1, 10]] = False
+    assert (out[same] == base[same]).all()
+    with pytest.raises(ValueError):
+        rules.apply(
+            [{"name": "anchored_templates", "classes": {"1": PHISH}}], pred, proba, led, log=print
+        )
