@@ -20,17 +20,27 @@ from __future__ import annotations
 import numpy as np
 
 
-def fixed_point(proba: np.ndarray, fraud_scale: float = 0.875, max_iter: int = 50,
-                damping: float = 0.5, hidden_factor: float = 1.0) -> np.ndarray:
+def fixed_point(
+    proba: np.ndarray,
+    fraud_scale: float = 0.875,
+    max_iter: int = 50,
+    damping: float = 0.5,
+    hidden_factor: float = 1.0,
+) -> np.ndarray:
     """``hidden_factor`` multiplies each fraud class's expected true count: the model is trained
     to give the ordinary-looking fraud rows a legit score, yet they still count as fraud in the
-    labels, so the true class sizes are larger than the probabilities say (1.0 = trust them)."""
+    labels, so the true class sizes are larger than the probabilities say (1.0 = trust them).
+    It is a scalar for every fraud class, or a length-k vector of per-class multipliers."""
     p = np.asarray(proba, dtype=np.float64).copy()
     p[:, 1:] /= fraud_scale
     p /= p.sum(axis=1, keepdims=True)
     k = p.shape[1]
     expected = p.sum(axis=0)
-    expected[1:] *= hidden_factor
+    hf = np.asarray(hidden_factor, dtype=np.float64)
+    if hf.ndim == 0:
+        expected[1:] *= hf
+    else:  # one multiplier per class (legit included)
+        expected *= hf
     pred = p.argmax(axis=1)
     weight_prev = None
     for _ in range(max_iter):
