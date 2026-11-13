@@ -66,7 +66,15 @@ def test_entity_inputs_pool_strictly_earlier_rows_of_each_entity():
 
 
 def test_every_family_is_wired():
-    assert set(nnexp.FAMILIES) == {"selftrain", "entity", "tabr", "shift", "metric"}
+    assert set(nnexp.FAMILIES) == {
+        "selftrain",
+        "entity",
+        "entitypool",
+        "entityemb",
+        "tabr",
+        "shift",
+        "metric",
+    }
 
 
 def test_domain_weights_upweight_rows_that_look_like_the_target():

@@ -210,14 +210,14 @@ def entity_inputs(led: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     return ids, np.hstack(pooled)
 
 
-def _fit_entity(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
+def _fit_entity(c: str, cell, X: np.ndarray, spec, log, pool: bool = True) -> np.ndarray:
     """TabM with id embeddings (fit on the fit rows' labels only) and past-pooled history."""
     from dataclasses import asdict
 
     from ringtrace import nn_entity
 
     ids, pooled = entity_inputs(cell.led)
-    Xe = np.hstack([X, pooled])
+    Xe = np.hstack([X, pooled]) if pool else X
     seen = {
         e: float(np.isin(ids[cell.hold, j], ids[cell.fit, j]).mean())
         for j, e in enumerate(ENTITY_IDS)
@@ -235,6 +235,28 @@ def _fit_entity(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
         log=log,
     )
     return prob
+
+
+def _fit_entity_pool(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
+    """Ablation: the past-pooled history columns alone, in the plain TabM."""
+    from ringtrace import tabm
+
+    _, pooled = entity_inputs(cell.led)
+    Xe = np.hstack([X, pooled])
+    (prob,) = tabm.fit_predict(
+        Xe[cell.fit],
+        cell.targets["given"][cell.fit],
+        cell.period[cell.fit],
+        [Xe[cell.hold]],
+        spec,
+        log=log,
+    )
+    return prob
+
+
+def _fit_entity_emb(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
+    """Ablation: the id embeddings alone, on the plain TabM inputs."""
+    return _fit_entity(c, cell, X, spec, log, pool=False)
 
 
 def _fit_tabr(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
@@ -300,6 +322,8 @@ def _fit_metric(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
 FAMILIES = {
     "selftrain": _fit_selftrain,
     "entity": _fit_entity,
+    "entitypool": _fit_entity_pool,
+    "entityemb": _fit_entity_emb,
     "tabr": _fit_tabr,
     "shift": _fit_shift,
     "metric": _fit_metric,
