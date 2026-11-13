@@ -238,3 +238,23 @@ Wall time 51.5 min (3 folds x 3 seeds, about 17 min per fold).
 October-like s13, seed sets r1 and r2 (TabM seeds 3-5 and 6-8): given / cleaned / gen-only
 0.5243 / 0.5829 / 0.9062 and 0.5241 / 0.5830 / 0.9063, 15.5-16 min each. The champion's r1 and
 r2 in the same frame: 0.5241 / 0.5824 / 0.9057 and 0.5240 / 0.5827 / 0.9060.
+
+### October-like gate on s13, all three seed sets (`score champion <c> --seeds 13 --sets 0,1,2`)
+
+| challenger vs champion | given change (lower bound) | cleaned | gen-only | verdict |
+|---|---|---|---|---|
+| tabm | +0.0001 (-0.0003) | +0.0005 (-0.0001) | +0.0004 (-0.0006) | FAIL |
+| champion+tabm | +0.0003 (-0.0001) | +0.0005 (+0.0000) | +0.0006 (-0.0001) | FAIL |
+
+The s14 and s15 r1-r2 cells are not on the laptop, so the nine-cell gate is pending.
+
+### TabM share of the fraud mass (fraud-only split, both rules), change vs w = 1/2
+
+| w | given Jul / Aug / Sep | cleaned | gen-only |
+|---|---|---|---|
+| 1/3 | +0.00000 / -0.00001 / -0.00002 | +0.00000 / -0.00004 / -0.00006 | +0.00000 / +0.00017 / +0.00007 |
+| 2/3 | -0.00014 / -0.00005 / +0.00010 | -0.00015 / -0.00005 / +0.00004 | -0.00047 / -0.00014 / +0.00003 |
+| 4/5 | -0.00007 / -0.00027 / +0.00006 | -0.00008 / -0.00028 / -0.00001 | -0.00039 / -0.00071 / -0.00015 |
+| 1 | +0.00004 / -0.00027 / -0.00002 | +0.00002 / -0.00024 / -0.00009 | -0.00027 / -0.00069 / -0.00038 |
+
+No share beats 1/2 on given and cleaned in every month; no file written.
