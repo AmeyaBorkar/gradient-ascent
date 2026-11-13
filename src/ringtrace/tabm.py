@@ -43,6 +43,10 @@ class TabMSpec:
     weight_decay: float = 3e-4
     class_weight_power: float = 0.0
     quantiles: int = 1000
+    embedding: str = "periodic"  # or "ple": piecewise-linear over quantile bins
+    n_bins: int = 48
+    two_stage: bool = False
+    recent_weight: float = 1.0  # sample weight of the latest training month
     device: str = "cuda"
 
 
@@ -102,7 +106,17 @@ def _torch():
     return torch
 
 
-def build_model(n_in: int, spec: TabMSpec, n_out: int = N_CLASSES):
+def ple_edges(Z: np.ndarray, n_bins: int, sample: int = 200_000, seed: int = 0) -> np.ndarray:
+    """(n_cols, n_bins + 1) bin edges at quantiles of the transformed training values; repeated
+    edges (discrete columns) are spread by a tiny step so every bin has a positive width."""
+    rng = np.random.default_rng(seed)
+    S = Z[np.sort(rng.choice(len(Z), sample, replace=False))] if len(Z) > sample else Z
+    edges = np.quantile(S, np.linspace(0, 1, n_bins + 1), axis=0).T.astype(np.float64)
+    step = 1e-4 * np.arange(n_bins + 1)[None, :]
+    return np.maximum.accumulate(edges + step, axis=1)
+
+
+def build_model(n_in: int, spec: TabMSpec, n_out: int = N_CLASSES, edges=None):
     torch = _torch()
     nn = torch.nn
 
@@ -118,6 +132,27 @@ def build_model(n_in: int, spec: TabMSpec, n_out: int = N_CLASSES):
         def forward(self, x):  # (B, n_in) -> (B, n_in * d_embed)
             z = 2 * math.pi * x[..., None] * self.c
             z = torch.cat([torch.sin(z), torch.cos(z)], dim=-1)
+            e = torch.einsum("bfq,fqd->bfd", z, self.w) + self.b
+            return torch.relu(e).flatten(1)
+
+    class PiecewiseLinear(nn.Module):
+        """x -> ReLU(Linear(ple(x))): ple has one entry per bin, 0 below it, 1 above it and the
+        position inside it, with bin edges at quantiles of the training values."""
+
+        def __init__(self, edges):
+            super().__init__()
+            self.register_buffer("lo", torch.as_tensor(edges[:, :-1], dtype=torch.float32))
+            width = edges[:, 1:] - edges[:, :-1]
+            self.register_buffer(
+                "inv", torch.as_tensor(1 / np.maximum(width, 1e-6), dtype=torch.float32)
+            )
+            nb = edges.shape[1] - 1
+            self.w = nn.Parameter(torch.empty(n_in, nb, spec.d_embed))
+            self.b = nn.Parameter(torch.zeros(n_in, spec.d_embed))
+            nn.init.uniform_(self.w, -1 / math.sqrt(nb), 1 / math.sqrt(nb))
+
+        def forward(self, x):
+            z = ((x[..., None] - self.lo) * self.inv).clamp(0.0, 1.0)
             e = torch.einsum("bfq,fqd->bfd", z, self.w) + self.b
             return torch.relu(e).flatten(1)
 
@@ -141,7 +176,7 @@ def build_model(n_in: int, spec: TabMSpec, n_out: int = N_CLASSES):
     class TabM(nn.Module):
         def __init__(self):
             super().__init__()
-            self.embed = Periodic()
+            self.embed = PiecewiseLinear(edges) if spec.embedding == "ple" else Periodic()
             d = n_in * spec.d_embed
             layers = []
             for _ in range(spec.blocks):
@@ -169,17 +204,27 @@ def _seed_all(seed: int) -> None:
     torch.backends.cuda.matmul.allow_tf32 = False
 
 
-def train_one(Z: np.ndarray, y: np.ndarray, spec: TabMSpec, seed: int, log=print):
+def train_one(
+    Z: np.ndarray,
+    y: np.ndarray,
+    spec: TabMSpec,
+    seed: int,
+    log=print,
+    n_out: int = N_CLASSES,
+    row_weight: np.ndarray | None = None,
+):
     torch = _torch()
     _seed_all(seed)
     dev = torch.device(spec.device if torch.cuda.is_available() else "cpu")
-    model = build_model(Z.shape[1], spec).to(dev)
+    edges = ple_edges(Z, spec.n_bins, seed=seed) if spec.embedding == "ple" else None
+    model = build_model(Z.shape[1], spec, n_out, edges).to(dev)
     Zt = torch.from_numpy(Z).to(dev)
     yt = torch.from_numpy(y.astype(np.int64)).to(dev)
-    counts = np.bincount(y, minlength=N_CLASSES).astype(np.float64)
+    counts = np.bincount(y, minlength=n_out).astype(np.float64)
     w = np.where(counts > 0, (counts.sum() / np.maximum(counts, 1)) ** spec.class_weight_power, 0)
     w = w / (w * counts).sum() * counts.sum()
     cw = torch.tensor(w, dtype=torch.float32, device=dev)
+    rw = None if row_weight is None else torch.from_numpy(row_weight.astype(np.float32)).to(dev)
     opt = torch.optim.AdamW(model.parameters(), lr=spec.lr, weight_decay=spec.weight_decay)
     steps_per = math.ceil(len(Z) / spec.batch)
     total = steps_per * spec.epochs
@@ -196,9 +241,17 @@ def train_one(Z: np.ndarray, y: np.ndarray, spec: TabMSpec, seed: int, log=print
             b = perm[i * spec.batch : (i + 1) * spec.batch]
             logits = model(Zt[b])
             yb = yt[b]
-            loss = torch.nn.functional.cross_entropy(
-                logits.reshape(-1, N_CLASSES), yb.repeat_interleave(spec.k), weight=cw
+            per = (
+                torch.nn.functional.cross_entropy(
+                    logits.reshape(-1, n_out), yb.repeat_interleave(spec.k), reduction="none"
+                )
+                * cw[yb.repeat_interleave(spec.k)]
             )
+            if rw is not None:
+                per = per * rw[b].repeat_interleave(spec.k)
+                loss = per.sum() / (rw[b].sum() * spec.k)
+            else:
+                loss = per.mean()
             opt.zero_grad(set_to_none=True)
             loss.backward()
             opt.step()
@@ -216,13 +269,22 @@ def predict(model, Z: np.ndarray, spec: TabMSpec, batch: int = 16384) -> np.ndar
     torch = _torch()
     dev = next(model.parameters()).device
     model.eval()
-    out = np.empty((len(Z), N_CLASSES), dtype=np.float64)
+    out = None
     with torch.no_grad():
         for i in range(0, len(Z), batch):
             x = torch.from_numpy(Z[i : i + batch]).to(dev)
             p = torch.softmax(model(x).float(), dim=-1).mean(dim=1)
+            if out is None:
+                out = np.empty((len(Z), p.shape[1]), dtype=np.float64)
             out[i : i + batch] = p.cpu().numpy()
     return out
+
+
+def recency_weight(period: np.ndarray, w: float) -> np.ndarray | None:
+    """Weight ``w`` on the rows of the latest month, 1 elsewhere (None when ``w`` is 1)."""
+    if w == 1.0 or period is None or len(period) == 0:
+        return None
+    return np.where(period == period.max(), w, 1.0)
 
 
 def fit_predict(
@@ -239,16 +301,49 @@ def fit_predict(
     prep = fit_prep(X_tr, spec.quantiles)
     Z = transform(prep, X_tr)
     Zo = [transform(prep, X) for X in X_out]
+    if spec.two_stage:
+        return _two_stage(Z, y_tr, period_tr, X_tr, Zo, spec, log, t0)
     log(
         f"  tabm: {Z.shape[1]} inputs ({len(prep.gap_cols)} gap flags), {len(Z)} rows "
         f"({time.time() - t0:.0f}s)"
     )
     outs = [np.zeros((len(X), N_CLASSES), dtype=np.float64) for X in X_out]
+    rw = recency_weight(period_tr, spec.recent_weight)
     for seed in spec.seeds:
-        model = train_one(Z, y_tr, spec, seed, log=log)
+        model = train_one(Z, y_tr, spec, seed, log=log, row_weight=rw)
         for o, z in zip(outs, Zo, strict=True):
             o += predict(model, z, spec)
         del model
         _torch().cuda.empty_cache()
     log(f"  tabm fitted with {len(spec.seeds)} seeds ({time.time() - t0:.0f}s)")
+    return [o / len(spec.seeds) for o in outs]
+
+
+def _two_stage(Z, y_tr, period_tr, X_tr, Zo, spec: TabMSpec, log, t0) -> list[np.ndarray]:
+    """P(fraud) x P(type | fraud) with the cascade's screening rows: the XGBoost screen
+    (cross-fitted over the training months) drops likely-fraud legit rows from the binary stage,
+    and fraud rows it cannot see are legit there and left out of the type stage."""
+    from ringtrace.cascade import CascadeSpec, screen_score
+
+    cs = CascadeSpec()
+    fraud = (y_tr > 0).astype(np.float32)
+    score = screen_score(X_tr, fraud, period_tr, cs)
+    keep_bin = (fraud == 1) | (score < cs.drop_legit_min_score)
+    type_rows = (fraud == 1) & (score >= cs.type_min_score)
+    log(
+        f"  two-stage screen: binary rows {int(keep_bin.sum())}, type rows {int(type_rows.sum())}"
+        f" ({time.time() - t0:.0f}s)"
+    )
+    outs = [np.zeros((len(z), N_CLASSES), dtype=np.float64) for z in Zo]
+    for seed in spec.seeds:
+        mb = train_one(Z[keep_bin], type_rows[keep_bin].astype(np.int64), spec, seed, log, 2)
+        pf = [predict(mb, z, spec)[:, 1] for z in Zo]
+        del mb
+        mt = train_one(Z[type_rows], y_tr[type_rows] - 1, spec, seed, log, N_CLASSES - 1)
+        for o, z, f in zip(outs, Zo, pf, strict=True):
+            o[:, 0] += 1 - f
+            o[:, 1:] += f[:, None] * predict(mt, z, spec)
+        del mt
+        _torch().cuda.empty_cache()
+    log(f"  two-stage tabm fitted with {len(spec.seeds)} seeds ({time.time() - t0:.0f}s)")
     return [o / len(spec.seeds) for o in outs]
