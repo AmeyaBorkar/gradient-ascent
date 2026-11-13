@@ -192,3 +192,71 @@ Positive on every thinning seed for given and cleaned, but the bootstrap lower b
 clear 0, so the gate fails. Only 3 of the 9 cells were fitted (time box); s13 r1-r2 are being
 fitted now. The five-way + tabm October-like gate is not run: the other members' cells do not
 exist locally.
+
+### TabM: where the gain comes from (`python -m ringtrace.tabmwhy`, commit 161757a)
+
+Laptop CPU, about 25 min, on the r0 October-like cells and the leave-one-month-out runs of
+`champion` and `tabm`; details in `docs/findings/tabm-why.md`.
+
+- **Pocket (b)**, generator rows called legit: 135 -> 107 on October-like (3 cells), 285 -> 249
+  on Jul-Sep.
+- **Pocket (c)**, wrong type, cleaned: 906 -> 908 and 1722 -> 1731. The template pairs are
+  identical after the rule.
+- **Pocket (d)**, legit called fraud, cleaned: 68 -> 89 and 178 -> 194.
+- **Disagreements:** 59 rows on October-like (TabM right 31, champion right 23) and 106 on
+  Jul-Sep (55 / 41). Nearly all are legit -> fraud adds outside the templates.
+- **Champion smoothed toward its prior** (e = 0.01-0.05, all 9 champion cells): change at most
+  ±0.0002 on every target. **Rejected** as the mechanism.
+
+### TabM config sweep (one fit, seed 0, July + August; `python -m ringtrace.tabmsweep <config>`)
+
+Each config is the base `recipes/tabm.json` plus the overrides in `tabmsweep.CONFIGS`.
+
+- **Parts:** September of the normal ledger (as leave-one-month-out fold 9) and the three
+  October-like frames, seeds 13 / 14 / 15.
+- **Arrays (box):** `~/outputs/runs/tabm2-sw-<config>/` (`sep.npy`, `summary.json`) and
+  `~/outputs/octlike/tabm2-sw-<config>_s<seed>_r0.npz`. Here r0 holds the one sweep seed.
+- **Base, absolute:** September 0.5149 given / 0.5716 cleaned / 0.9017 gen-only. October-like
+  s13 0.5236 / 0.5826, s14 0.5092 / 0.5670, s15 0.5140 / 0.5712.
+- **Wall time:** about 4-5 min per part on the RTX 4090. Box 4 was shared and 3-10x slower.
+
+Change against the base config:
+
+| config | Sep given | oct-like given s13 / s14 / s15 (mean) | Sep cleaned | oct-like cleaned s13 / s14 / s15 (mean) | commit, box |
+|---|---|---|---|---|---|
+| base | 0 (0.5149) | 0 (0.5236 / 0.5092 / 0.5140) | 0 (0.5716) | 0 (0.5826 / 0.5670 / 0.5712) | 3acbd77, box 3 |
+| **k32** (k = 32) | +0.0003 | +0.0007 / +0.0003 / +0.0003 (+0.0004) | +0.0003 | +0.0002 / +0.0003 / +0.0003 (+0.0003) | 3acbd77, box 3 |
+| short (6 epochs, lr 3e-3) | +0.0001 | +0.0007 / +0.0004 / +0.0002 (+0.0004) | +0.0001 | +0.0003 / +0.0004 / +0.0002 (+0.0003) | 3acbd77, box 4 |
+| small (width 256, 2 blocks) | +0.0002 | +0.0007 / +0.0004 / -0.0002 (+0.0003) | -0.0001 | +0.0002 / +0.0000 / -0.0001 (+0.0001) | 3acbd77, box 3 |
+| long (20 epochs, lr 1e-3) | -0.0003 | -0.0034 / - / - | -0.0003 | -0.0034 / - / - | 3acbd77, box 3; stopped after s13 |
+| ple (piecewise-linear embeddings) | -0.0124 | -0.0099 / - / - | -0.0142 | -0.0113 / - / - | 3acbd77, box 3; stopped after s13 |
+| two-stage (screened rows) | -0.0077 | - | -0.0082 | - | 3acbd77, box 4; stopped after Sep |
+| l2 (event-cleaned `l2` labels) | -0.00003 | - | -0.00002 | - | f862ff0, box 3; Sep only |
+| recent2 (August x2) | +0.00000 | - | +0.00001 | - | f862ff0, box 3; Sep only |
+| k64, cw-sqrt, cw-full, large | - | - | - | - | not finished in the time box (box 4 ran 3-10x slower than box 3) |
+
+Fraud-only role on September (TabM sets the fraud mass at 1/2, the five trees at 1/10 each, and
+types come from the five-way blend), change against the five-way blend, given / cleaned /
+gen-only:
+
+| config | role score |
+|---|---|
+| base | +0.00030 / +0.00044 / +0.00008 |
+| k32 | +0.00029 / +0.00043 / +0.00004 |
+| short | +0.00027 / +0.00041 / +0.00001 |
+| long | +0.00030 / +0.00040 / +0.00015 |
+| l2 | +0.00030 / +0.00045 / +0.00023 |
+| recent2 | +0.00025 / +0.00040 / +0.00014 |
+| ple | +0.00029 / +0.00043 / +0.00004 |
+| two-stage | +0.00007 / +0.00015 / +0.00013 |
+
+In that role every config except two-stage ties the base within ±0.00005, because the role uses
+only the legit column. September is one month, so these are point values with no bounds.
+
+October-like gates on the one-seed sweep cells (r0 = seed 0 only; the champion uses seeds 0-2):
+
+| challenger vs base | given per seed (lower bound) | cleaned (lower bound) | gen-only (lower bound) | verdict |
+|---|---|---|---|---|
+| k32 vs tabm base | +0.0007 / +0.0003 / +0.0003 (-0.0000) | +0.0002 / +0.0003 / +0.0003 (-0.0003) | +0.0012 / +0.0003 / +0.0011 (-0.0001) | FAIL (bounds) |
+| k32 vs champion | +0.0003 / +0.0003 / +0.0009 (-0.0001) | +0.0006 / +0.0010 / +0.0008 (+0.0000) | +0.0006 / +0.0005 / -0.0002 (-0.0009) | FAIL (bounds) |
+| champion + k32 1:1 vs champion | +0.0004 / +0.0005 / +0.0006 (+0.000014) | +0.0007 / +0.0008 / +0.0006 (+0.000089) | +0.0010 / +0.0005 / -0.0003 (-0.0005) | PASS (gate rule: given and cleaned) |
