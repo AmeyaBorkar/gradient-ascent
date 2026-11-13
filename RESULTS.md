@@ -204,3 +204,17 @@ rule. Details and per-class tables: `docs/findings/more-data.md`.
 | clean-event-refit / clean-event-hedge | 031e194 | — | — | — | 5.0 min | 48 / 24 argmax rows changed |
 | clean-l2-refit / clean-l2-hedge | 031e194 | — | — | — | 7.1 min | 61 / 38 argmax rows changed |
 | refit-october, first launch | ec37c9d | — | — | — | <1 min | failed: shell quoting in the recipe loop; relaunched via `scripts/refit_october.sh` |
+
+## In-context member: Mitra-2 (`python -m ringtrace.icl`, job `icl-mitra`)
+
+Rented RTX 4090 24 GB, 32 threads; separate model environment (decision 16); design in decision
+17; finding `docs/findings/icl-mitra.md`. Decoded as the champion (fixed point 0.875, anchored
+templates); bootstrap 2,000 event draws, 5-95 %.
+
+| run | commit | given Jul / Aug / Sep (mean) | cleaned Jul / Aug / Sep (mean) | gen-only Jul / Aug / Sep (mean) | wall | notes |
+|---|---|---|---|---|---|---|
+| icl-mitra (member alone) | ea2c63d | 0.4962 / 0.4798 / 0.4837 (0.4866) | 0.5475 / 0.5342 / 0.5406 (0.5408) | 0.8960 / 0.9009 / 0.8987 (0.8985) | 1,136 s model time (Jul 252, Aug 217, Sep 272, Oct 396) | vs champion -0.0256 [-0.0273, -0.0241] given, -0.0258 [-0.0274, -0.0243] cleaned |
+| blend + icl-mitra at 1/6 | 0b7fe9a | 0.5133 / 0.5091 / 0.5147 (0.5124) | 0.5649 / 0.5641 / 0.5714 (0.5668) | 0.9026 / 0.9001 / 0.9020 (0.9016) | about 15 min scoring (all variants) | vs blend +0.0001 [+0.00001, +0.0002] given, +0.0001 [+0.00002, +0.0002] cleaned; 3 October calls changed; October-like not run |
+| blend + icl-mitra at 1/3 | 0b7fe9a | 0.5133 / 0.5086 / 0.5145 (0.5121) | 0.5650 / 0.5637 / 0.5710 (0.5666) | 0.9028 / 0.8999 / 0.9016 (0.9014) | (same) | vs blend -0.0001 / -0.0002: tie; 15 October calls changed |
+| fold-9 timing, 100 features, 1 legit per fraud | ea2c63d | — | — | — | <1 min | failed: out of GPU memory (31k context) |
+| determinism repeats (Sep, 2,048 queries) | ea2c63d / 060f6ce | — | — | — | 51 s each | before seeding: max diff 0.34; after: bit-identical (16 features; 32 ran out of memory beside another GPU tenant) |
