@@ -21,3 +21,19 @@ counter-anchored template rule.
 - [ ] Member 3: CatBoost cascade.
 - [ ] Members 4 and 5: event-cleaned labels and their XGBoost cascades.
 - [ ] The blend, its one-command build, and the README (commands, seeds, versions, hardware).
+
+## Screen of five more neural techniques (14 Nov)
+
+Each technique is a variant of `python -m ringtrace.nnexp`, fitted once on July + August (seed 0)
+and scored on `sep`, `s13`, `s14`, `s15`, alone and as the fraud-mass source, against the plain
+TabM fitted on the same machine (`<job>-base-sd0`).
+
+| technique | where | status |
+|---|---|---|
+| soft self-training on the scored rows' features (teacher: plain TabM, w 0.3) | laptop GPU | fitting |
+| entity embeddings (sender, receiver, device) + strictly-past pooled history | box GPU | fitting |
+| TabR-style retrieval | laptop GPU, after self-training and the laptop base | queued |
+| shift reweighting (domain classifier toward the scored rows) | box GPU, after entity and the box base | queued |
+| REINFORCE macro-F1 term (lam 0.5) | laptop GPU, after TabR | queued |
+
+Current best idea: none yet; the bar is a non-negative fraud-only change in every cell and target.
