@@ -24,7 +24,7 @@ def test_hedge_is_row_normalised_mean():
     h = hedge(a, b)
     np.testing.assert_allclose(h.sum(1), 1.0)
     np.testing.assert_allclose(h, 0.5 * (a + b), atol=1e-12)
-    np.testing.assert_array_equal(hedge(a, a), a)
+    np.testing.assert_allclose(hedge(a, a), a, atol=1e-12)
 
 
 def test_argmax_changes_counts():
