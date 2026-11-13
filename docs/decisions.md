@@ -104,3 +104,22 @@ Short records of design choices.
     held-out labels into training. The events are the six event-id modules in the teacher's order
     (bursts, drains, flows, requests, merchant, repeats). The `l2` minority flip uses the same
     chosen event (highest fraud share) and needs no fraud-share threshold of its own.
+16. **Mitra-2 as an in-context member (licence and versions).** Model `autogluon/mitra-classifier-2`
+    on Hugging Face, revision `edada0d20759c58ada8c8605c25f22f6e98ea5f0`, source
+    https://huggingface.co/autogluon/mitra-classifier-2, licence Apache-2.0, not gated. It may go
+    into a submitted file (Apache-2.0 allows any use with attribution). It runs through
+    `autogluon.tabular` 1.6.3 (its `mitra` module; Tab2D, dim 512, 12 layers, 10 output classes)
+    with torch 2.13.0+cu130, in a separate environment: installing AutoGluon into the main
+    environment would downgrade torch and pandas. The main environment builds the candidate
+    matrix (`python -m ringtrace.icl prepare`); the model environment only reads that file. Mitra
+    is used purely in context: the pretrained weights are not tuned (no fine-tuning steps), the
+    whole subsampled context is the support set, and only the Mitra preprocessor (mean imputation,
+    scaling) is fitted, on context rows. Its class limit is 10, so only the binary target is run.
+17. **The in-context member design** (`ringtrace.icl`): candidate rows are those with champion
+    fraud probability at or above tau = 2.18e-5 (the train 95 % quantile; 78,296 train rows, 5.0 %,
+    covering 41.0 % of fraud-labelled rows; 15,013 October rows). The context is every fraud row
+    plus legit rows drawn at 0.5 per fraud row (seeded per fold) and the probability is corrected
+    for the legit keep rate; the features are the top 32 of the champion's 230 by |AUC - 1/2| on
+    the context rows. Both limits come from GPU memory: 100 features with one legit row per fraud
+    row (31k context rows) runs out of memory on 24 GB, and October's context (23.6k fraud rows
+    alone) only fits at 32 features.
