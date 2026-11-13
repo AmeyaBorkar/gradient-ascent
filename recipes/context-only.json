@@ -1,0 +1,7 @@
+{
+  "name": "context-only",
+  "families": ["context"],
+  "drop": [],
+  "cascade": {"seeds": [0, 1, 2], "booster": {"rounds": 300, "eta": 0.08}},
+  "decoder": {"fraud_scale": 0.875}
+}

@@ -1,0 +1,32 @@
+# Data, derived tables and model outputs never enter git.
+*.csv
+*.parquet
+*.feather
+*.arrow
+*.npy
+*.npz
+*.pkl
+*.joblib
+*.json.gz
+*.ubj
+*.model
+*.bin
+*.zip
+data/
+cache/
+outputs/
+runs/
+submissions/
+# local scratch notes
+notes/
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.coverage
