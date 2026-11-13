@@ -150,3 +150,19 @@ Leave-one-month-out macro-F1 per held-out month Jul / Aug / Sep (mean), after th
 |---|---|---|---|---|---|---|
 | blend-champion (`~/outputs/runs/blend-champion-m1`), tries 1-6 | b893b74 / 50c44a6 | — | — | — | — | failed: CUDA out of memory in fold 7 (GPU shared with another member's job; the retry gate first watched the wrong device). Logs `~/logs/blend-champion-oom{1,2}.log` |
 | **blend-champion-m1**: `python -m ringtrace.run recipes/champion.json --name blend-champion-m1` | d02e04b | 0.5130 / 0.5090 / 0.5146 (**0.5122**) | 0.5645 / 0.5639 / 0.5712 (**0.5665**) | 0.9020 / 0.8996 / 0.9014 (**0.9010**) | 10.7 min (4 threads, shared GPU) | member 1 from this branch: identical to `champion` (run 9). Fixed point 0.5064 / 0.5601 / 0.8921. Submission VALID against the sample, sha256 `a36833d5fb8c497ff3b6e7ea116226796ec8892ad661c17afa87bf92fb8e380e` (same as run 9) |
+| **blend-champion-fmt**: champion from the merged and `ruff format`-ed tree (`~/outputs/runs/blend-champion-fmt`) | dbc304e | 0.5130 / 0.5090 / 0.5146 (**0.5122**) | 0.5645 / 0.5639 / 0.5712 (**0.5665**) | 0.9020 / 0.8996 / 0.9014 (**0.9010**) | 11.8 min (incl. 38 s feature rebuild) | formatting changed the source hash of every family, so all nine were rebuilt under new cache keys (38 s in total). `oof.npy` and `test.npy` byte-identical to `blend-champion-m1`; submission sha256 `a36833d5...` unchanged: the merges and the formatting leave the champion recipe's output unchanged |
+| **blend** (`python -m ringtrace.blend recipes/blend.json`, `~/outputs/runs/blend`): members `blend-champion-m1`, `lgbm`, `catboost`, `clean-event`, `clean-l2`, weights 1/5 | 3d9edb9 | 0.5130 / 0.5091 / 0.5147 (**0.5123**) | 0.5647 / 0.5641 / 0.5714 (**0.5667**) | 0.9022 / 0.9000 / 0.9018 (**0.9013**) | 22 s (4 threads, CPU) | every member passed the alignment check. Submission VALID (260,582 rows, sample order), sha256 `c3af1418ffab08f7843b1813359ad7353ee0ac6676f4293609d3cf530a696c05`. October calls: legit 256,636; mule 789, bot 318, chain 556, sim 370, takeover 230, phishing 498, qr 517, refund 279, cashback 207, loan 99, collusion 83 (3,946 fraud). October rows changed vs each member's own decode: champion 20, lgbm 11, catboost 10, clean-event 5, clean-l2 4 (train rows: 39 / 37 / 69 / 44 / 46) |
+
+### The members as re-decoded by the blend (fixed point + template rule, from their saved arrays)
+
+| member | given Jul / Aug / Sep (mean) | cleaned Jul / Aug / Sep (mean) | gen-only Jul / Aug / Sep (mean) |
+|---|---|---|---|
+| champion (`blend-champion-m1`) | 0.5130 / 0.5090 / 0.5146 (0.5122) | 0.5645 / 0.5639 / 0.5712 (0.5665) | 0.9020 / 0.8996 / 0.9014 (0.9010) |
+| lgbm | 0.5130 / 0.5092 / 0.5146 (0.5122) | 0.5646 / 0.5642 / 0.5712 (0.5667) | 0.9021 / 0.9000 / 0.9012 (0.9011) |
+| catboost | 0.5129 / 0.5090 / 0.5141 (0.5120) | 0.5644 / 0.5637 / 0.5706 (0.5662) | 0.9023 / 0.8995 / 0.9008 (0.9008) |
+| clean-event | 0.5131 / 0.5091 / 0.5146 (0.5123) | 0.5646 / 0.5640 / 0.5713 (0.5666) | 0.9021 / 0.8997 / 0.9017 (0.9012) |
+| clean-l2 | 0.5131 / 0.5091 / 0.5146 (0.5122) | 0.5645 / 0.5642 / 0.5713 (0.5666) | 0.9019 / 0.8999 / 0.9016 (0.9012) |
+| **blend** | 0.5130 / 0.5091 / 0.5147 (**0.5123**) | 0.5647 / 0.5641 / 0.5714 (**0.5667**) | 0.9022 / 0.9000 / 0.9018 (**0.9013**) |
+
+The blend ties its best member (+0.0001 given, +0.0000 to +0.0002 cleaned): the five members agree
+on all but a few dozen October rows.

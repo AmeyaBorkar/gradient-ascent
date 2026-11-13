@@ -20,4 +20,4 @@ counter-anchored template rule.
 - [x] Member 2: LightGBM cascade (`recipes/lgbm.json`; results in RESULTS.md).
 - [x] Member 3: CatBoost cascade (`recipes/catboost.json`; results in RESULTS.md).
 - [x] Members 4 and 5: event-cleaned labels and their XGBoost cascades (`recipes/clean-event.json`, `recipes/clean-l2.json`).
-- [~] The blend (`ringtrace.blend`, `recipes/blend.json`), the one-command build (`scripts/build_submission.sh`) and the README drafted; member 1 rerun from this branch (`blend-champion-m1`, same sha256). Blend run waits for members 2-5.
+- [x] The blend (`ringtrace.blend`, `recipes/blend.json`): given 0.5123 / cleaned 0.5667, submission sha256 `c3af1418...`; the one-command build (`scripts/build_submission.sh`); the README. Member 1 rerun from this branch gives the champion's sha256; the four member branches are merged and the repository is `ruff format`-clean.

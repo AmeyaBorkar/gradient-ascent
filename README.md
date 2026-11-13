@@ -46,17 +46,50 @@ sha256, the October calls per class and the rows changed against each member's o
 A single member: `python -m ringtrace.build recipes/champion.json` (features, cleaned labels,
 run, validated submission).
 
+## Results
+
+Leave-one-month-out macro-F1 (train on two months, score the third), after the fixed point and
+the template rule; mean of July / August / September. Details per month in `RESULTS.md`.
+
+| model | given | cleaned | gen-only | wall |
+|---|---|---|---|---|
+| 1 `champion` (run `blend-champion-m1`) | 0.5122 | 0.5665 | 0.9010 | 10.7 min |
+| 2 `lgbm` | 0.5122 | 0.5667 | 0.9011 | 14.9 min (CPU, 10 threads) |
+| 3 `catboost` | 0.5120 | 0.5662 | 0.9008 | 3.6 min |
+| 4 `clean-event` | 0.5123 | 0.5666 | 0.9012 | 12.4 min |
+| 5 `clean-l2` | 0.5122 | 0.5666 | 0.9012 | 12.0 min |
+| **blend** | **0.5123** | **0.5667** | **0.9013** | 22 s |
+
+The submission (`~/outputs/runs/blend/submission.csv`) has 260,582 rows in the sample's id order
+and sha256 `c3af1418ffab08f7843b1813359ad7353ee0ac6676f4293609d3cf530a696c05`.
+
+## Verifying the submission
+
+```bash
+sha256sum ~/outputs/runs/blend/submission.csv          # or ~/outputs/submission.csv after --final
+python -m ringtrace.blend recipes/blend.json           # re-blend the saved member arrays
+```
+
+Re-blending the five saved runs is deterministic and reproduces the sha256 above byte for byte;
+`summary.json` records it with the scores. A full rebuild reproduces members 1, 2, 4 and 5 exactly
+(member 1 from a clean checkout and an empty cache gives the champion's sha256
+`a36833d5...`), but CatBoost on the GPU is not bit-reproducible (decision 14: a few rows per
+month can move), so a rebuilt member 3, and through it the blend, can differ in a handful of
+October rows. Compare such a rebuild through the scores and October calls in `summary.json`.
+
 ## Reproducibility
 
-- Seeds: cascade seeds 0, 1, 2 for every member; every other random step is seeded; the decoder
-  and rules are deterministic. Rebuilding member 1 from a clean checkout and an empty cache gives
-  a byte-identical submission (see `RESULTS.md`).
+- Seeds: cascade seeds 0, 1, 2 for every member, averaged; every other random step is seeded;
+  the decoder, the template rule and the blend are deterministic. LightGBM runs with
+  `deterministic` and row-wise histograms; XGBoost on the GPU reproduced byte for byte here.
 - Libraries (box): Python 3.13.18, numpy 2.5.4, polars 2.1.0, xgboost 3.4.1, lightgbm 4.7.0,
   catboost 1.2.10, scikit-learn 1.9.1, pyarrow and scipy as installed with them.
-- Hardware: one NVIDIA RTX 5060 Ti 16 GB and a shared AMD EPYC CPU; `RINGTRACE_THREADS` sets the
-  CPU thread budget (Polars, BLAS/OpenMP and the boosters).
-- Wall times: member 1 about 11-13 min with the GPU shared by other jobs (`RESULTS.md`); the
-  other members and the full build are recorded there as they are run.
+- Hardware: one NVIDIA RTX 5060 Ti 16 GB (XGBoost and CatBoost) and a shared AMD EPYC CPU
+  (LightGBM, features, decoding). `RINGTRACE_THREADS` sets the CPU thread budget (Polars,
+  BLAS/OpenMP and the boosters).
+- Wall times: as in the table above, with the GPU shared by other jobs; building every feature
+  family into an empty cache adds about 40 s (all nine families; the cleaned labels are built once, a few minutes). The one command runs the members one after
+  another: about an hour in total.
 
 ## Layout
 
@@ -67,7 +100,8 @@ run, validated submission).
 | `ringtrace.evidence.*` | label-free generator evidence: row marks, drains, bot bursts, money flow, collect requests, merchant rings, repeat payers, the device-number counter |
 | `ringtrace.store` | builds and caches feature families |
 | `ringtrace.silver` / `ringtrace.teacher` | cleaned labels for scoring, from an independent teacher |
-| `ringtrace.cascade` | P(fraud) x P(type given fraud), XGBoost on the GPU |
+| `ringtrace.cascade` | P(fraud) x P(type given fraud): XGBoost on the GPU, LightGBM, or CatBoost stages |
+| `ringtrace.eventclean` | event-cleaned training labels (members 4 and 5), rebuilt inside each fold |
 | `ringtrace.decode` | label-free fixed-point rule for macro-F1, per month |
 | `ringtrace.rules` | counter-anchored look-alike template rule |
 | `ringtrace.run` | one recipe end to end on month folds |
