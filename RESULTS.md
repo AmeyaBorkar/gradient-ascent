@@ -92,3 +92,14 @@ from July + August only, the teacher fitted on the other month), same scoring:
 Cleantrain mean over the 9 cells 0.5091 against 0.5093 for the given-label champion: a tie on the
 given labels (the cleaned target cannot be scored on September here, which has no cleaned labels
 by protocol). All 18 cells ran in 28 min (16:39-17:07 IST), three frames in parallel.
+
+## Member 3: CatBoost cascade
+
+Champion features, screening and folds; both stages CatBoost on the GPU (decision 14), 4 CPU threads.
+Output: `~/outputs/runs/catboost/` (`oof.npy`, `test.npy`, `summary.json`, `submission.csv`).
+
+| run | commit | given Jul / Aug / Sep (mean) | cleaned Jul / Aug / Sep (mean) | gen-only Jul / Aug / Sep (mean) | wall | notes |
+|---|---|---|---|---|---|---|
+| catboost (rules) | e8613ed | 0.5129 / 0.5090 / 0.5141 (**0.5120**) | 0.5644 / 0.5637 / 0.5706 (**0.5662**) | 0.9023 / 0.8995 / 0.9008 (0.9008) | 3.6 min | vs champion 0.5122 / 0.5665: -0.0002 / -0.0003. Rule changed 459 train / 88 test rows |
+| catboost (fixed point) | e8613ed | 0.5098 / 0.5048 / 0.5123 (0.5090) | 0.5611 / 0.5594 / 0.5680 (0.5628) | 0.8994 / 0.8930 / 0.8988 (0.8971) | — | champion fixed point 0.5064 / 0.5601: +0.0026 / +0.0027 |
+| catboost repro (fold Sep, seed 0, twice) | d83b3d7 | — | — | — | 2 x 1 min | max abs prob diff 0.165, mean 4.3e-6, 2 argmax changes |
