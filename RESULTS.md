@@ -243,3 +243,8 @@ Paired event bootstrap (`python -m ringtrace.compare`, 2,000 draws, 5-95 %):
 October-like: not run to the end. The four tree members' cells were completed (s13 fitted here,
 the rest copied from the gate run); the member's cells were stopped before the first one finished,
 because every variant already fails the leave-one-month-out part of the bar.
+
+Fraud-only role (`python analysis/icl_fraud_role.py`, laptop, 8 threads, commit 7329c93):
+stopped after about 45 min with no output, on a laptop busy with other work. Not scored. It needs
+a rerun on an idle machine with the five trees' and TabM's arrays; the role's
+`blank_merchant_qr` rule is not in this tree, so the script applies the template rule only.
