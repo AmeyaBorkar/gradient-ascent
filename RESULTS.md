@@ -218,3 +218,14 @@ templates); bootstrap 2,000 event draws, 5-95 %.
 | blend + icl-mitra at 1/3 | 0b7fe9a | 0.5133 / 0.5086 / 0.5145 (0.5121) | 0.5650 / 0.5637 / 0.5710 (0.5666) | 0.9028 / 0.8999 / 0.9016 (0.9014) | (same) | vs blend -0.0001 / -0.0002: tie; 15 October calls changed |
 | fold-9 timing, 100 features, 1 legit per fraud | ea2c63d | — | — | — | <1 min | failed: out of GPU memory (31k context) |
 | determinism repeats (Sep, 2,048 queries) | ea2c63d / 060f6ce | — | — | — | 51 s each | before seeding: max diff 0.34; after: bit-identical (16 features; 32 ran out of memory beside another GPU tenant) |
+
+## In-context member: TabDPT (job `icl-mitra`, run `icl-mitra-tabdpt`)
+
+Same machine, design and decoding as the Mitra section; finding `docs/findings/icl-tabdpt.md`.
+
+| run | commit | given Jul / Aug / Sep (mean) | cleaned Jul / Aug / Sep (mean) | gen-only Jul / Aug / Sep (mean) | wall | notes |
+|---|---|---|---|---|---|---|
+| icl-mitra-tabdpt (member alone) | 060f6ce | 0.4932 / 0.4781 / 0.4788 (0.4834) | 0.5441 / 0.5315 / 0.5340 (0.5365) | 0.8933 / 0.8985 / 0.8905 (0.8941) | 35 s model time (Jul 15, Aug 7, Sep 8, Oct 5) | vs champion -0.0288 [-0.0305, -0.0273] given, -0.0300 [-0.0317, -0.0285] cleaned |
+| blend + icl-mitra-tabdpt at 1/6 | 060f6ce | 0.5132 / 0.5091 / 0.5147 (0.5124) | 0.5649 / 0.5642 / 0.5714 (0.5668) | 0.9026 / 0.9001 / 0.9020 (0.9016) | about 15 min scoring | vs blend +0.0001 [+0.0000, +0.0002] given (lower bound not above 0), +0.0001 [+0.00001, +0.0002] cleaned; 2 October calls changed |
+| blend + icl-mitra-tabdpt at 1/3 | 060f6ce | 0.5133 / 0.5088 / 0.5146 (0.5122) | 0.5650 / 0.5638 / 0.5710 (0.5666) | 0.9029 / 0.9001 / 0.9015 (0.9015) | (same) | tie; 14 October calls changed |
+| determinism repeats (Sep, all queries) | 060f6ce | — | — | — | — | bit-identical |
