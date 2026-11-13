@@ -1,7 +1,7 @@
 """Weight-space methods on the TabM member: change the trained weights, not the predictions.
 
     python -m ringtrace.wspace fit fold9 s13 ...     # train the endpoints, write every arm
-    python -m ringtrace.wspace rebasin fold9 ...     # weight-matched seed average, from saved weights
+    python -m ringtrace.wspace rebasin fold9 ...     # weight-matched seed average (saved weights)
     python -m ringtrace.wspace score                 # every arm against the base (fraud-only)
 
 Four methods, all on the network of ``ringtrace.tabm``:
