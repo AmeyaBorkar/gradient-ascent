@@ -234,3 +234,18 @@ Nothing is adopted. The adopted combination is therefore the blend itself:
 - the event-types file (`~/outputs/runs/squeeze-event-types/`) has the same sha256.
 
 Findings: `docs/findings/squeeze-*.md`.
+
+## Fresh look: error anatomy, October profiles, one rule
+
+Analysis of the saved blend run (`blend`), no refits. Box CPU, 16 threads. Findings:
+`docs/findings/fresh-*.md`.
+
+| run | commit | result | wall |
+|---|---|---|---|
+| fresh-anatomy (`python analysis/fresh.py anatomy`) | 2f71e67 | blend given 0.5130 / 0.5091 / 0.5147, cleaned 0.5647 / 0.5641 / 0.5714; loss pockets (cleaned): ordinary 0.3874, generator rows called legit 0.0025, wrong type 0.0206, legit called fraud 0.0018 | about 4 min |
+| fresh-october (`python analysis/fresh.py october`) | 2f71e67 | no class departs from out-of-fold calls in a way the model gets wrong; sim-like evidence at 22:00-24:00 is called sim_swap 22 / 24 in October (98.2 % at 00:00-05:30) | about 4 min |
+| fresh-anatomy, first launch | bde7602 | failed: new files were not shipped (untracked); relaunched after commit | <1 min |
+| fresh-rule-bq: blend + `blank_merchant_qr` vs blend, leave-one-month-out | 07333a3 | given +0.00000 / +0.00000 / +0.00004 (mean +0.00001, 95 % [+0.00000, +0.00004]); cleaned +0.00000 / +0.00000 / +0.00003 ([+0.00000, +0.00004]); gen-only +0.00000 / +0.00000 / +0.00004; 1 train row and 20 October rows changed | about 10 min |
+| fresh-octlike-bq: champion + `blank_merchant_qr` vs champion, 9 cells | ffbdfb7 | +0.0000 in every seed on given, cleaned and gen-only; lower bound +0.0000; 0 rows changed; **FAIL** (not positive) | about 10 min |
+| fresh-octlike-bq, first two launches | ffbdfb7 | failed: missing frames in the shared cache, then cells from an older frame build (251,860 vs 252,462 September rows); scored on current-frame champion cells | <2 min |
+| fresh-blend-blankqr (`python -m ringtrace.blend recipes/blend-blankqr.json`), upload candidate | 92735ae | given 0.5130 / 0.5091 / 0.5148 (0.5123); cleaned 0.5647 / 0.5641 / 0.5714 (0.5667); gen-only 0.9022 / 0.9000 / 0.9019 (0.9013); valid; sha256 `e7c594672f0921e6def080f0c06347144cd848282b10c9fe6e384416eed043d0`; against the blend's file: 20 October rows legit -> fraud (13 qr_swap, 7 refund_abuse) | about 5 min |

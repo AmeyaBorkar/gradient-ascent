@@ -8,6 +8,8 @@
 * ``legit_block``: a one-row phone in a legit block is legit.
 * ``plain_templates``: inside each of the six look-alike templates, every call of the template's
   pair takes the template's class.
+* ``blank_merchant_qr``: a QR payment to a merchant with a blank QR check, called legit, takes its
+  most likely fraud class.
 * ``anchored_templates``: as ``plain_templates``, except that a template row on a fraud-block phone
   whose counter segment is one of the pair (``ctr_conf >= min_conf``) keeps its segment class and
   hands it to the rest of its family event.
@@ -169,7 +171,24 @@ def anchor_rescue(pred, proba, led, log=print) -> np.ndarray:
     return out
 
 
+def blank_merchant_qr(pred, proba, led, log=print) -> np.ndarray:
+    """A QR payment to a merchant whose QR check is blank is generator-made (every such train row
+    is fraud on the cleaned labels); one called legit takes its most likely fraud class."""
+    hit = (
+        (led["txn_type"] == "QR").to_numpy()
+        & (led["receiver_type"] == "MERCHANT").to_numpy()
+        & led["qr_vpa_mismatch"].is_null().to_numpy()
+        & (pred == 0)
+    )
+    out = pred.copy()
+    if hit.any():
+        out[hit] = np.asarray(proba)[hit, 1:].argmax(axis=1) + 1
+    log(f"  blank merchant QR called legit {_split_counts(hit, led['is_test'].to_numpy())}")
+    return out
+
+
 RULES = {
+    "blank_merchant_qr": blank_merchant_qr,
     "counter": counter_rule,
     "legit_block": legit_block_rule,
     "plain_templates": plain_templates,

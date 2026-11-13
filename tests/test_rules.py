@@ -136,3 +136,22 @@ def test_nan_never_triggers():
     out = rules.apply(["anchored_templates"], pred, proba, led, log=lambda m: None)
     plain = rules.apply(["plain_templates"], pred, proba, led, log=lambda m: None)
     assert out.tolist() == plain.tolist()
+
+
+def test_blank_merchant_qr():
+    led = pl.DataFrame(
+        {
+            "txn_type": ["QR", "QR", "QR", "PAY"],
+            "receiver_type": ["MERCHANT", "MERCHANT", "P2P", "MERCHANT"],
+            "qr_vpa_mismatch": [None, 1.0, None, None],
+            "is_test": [False, True, True, False],
+        }
+    )
+    proba = np.full((4, 12), 0.01)
+    proba[:, 0] = 0.5
+    proba[:, 7] = 0.2
+    pred = np.zeros(4, dtype=np.int64)
+    out = rules.blank_merchant_qr(pred, proba, led, log=lambda *_: None)
+    assert out.tolist() == [7, 0, 0, 0]
+    pred2 = np.array([9, 0, 0, 0])
+    assert rules.blank_merchant_qr(pred2, proba, led, log=lambda *_: None)[0] == 9
