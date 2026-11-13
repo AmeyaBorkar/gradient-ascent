@@ -900,7 +900,9 @@ def score(
     bench = ArmBench.from_store(paths.out_dir() / "runs", cells, log=log)
     base_full = bench.member({"run": base_run, "variant": "fold"})
     for arm in dict.fromkeys(a for a in (base, *arms) if a != "stored"):
-        bench.arm_arrays[arm] = arm_matrix(base_full, bench.te, folds, arm)
+        # a fold that lacks an arm keeps the base arm there, so only the arm's own rows differ
+        start = base_full if arm == base else bench.arm_arrays[base]
+        bench.arm_arrays[arm] = arm_matrix(start, bench.te, folds, arm)
         for seed, loaded in frames.items():
             if arm in loaded["arms"]:
                 write_cell(cells, arm, seed, loaded["rows"], loaded["arms"][arm])
