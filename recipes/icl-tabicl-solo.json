@@ -1,0 +1,17 @@
+{
+ "name": "icl-tabicl-solo",
+ "members": [
+  {
+   "name": "icl-tabicl",
+   "recipe": "recipes/champion.json",
+   "run": "icl-tabicl",
+   "weight": 1.0
+  }
+ ],
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ]
+}
