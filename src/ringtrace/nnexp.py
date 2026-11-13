@@ -157,7 +157,13 @@ def fit(variant: str, cells: list[str], seeds: tuple[int, ...], log=print) -> No
     from ringtrace import run, tabm
 
     recipe = run.load_recipe(Path("recipes") / "tabm.json")
-    spec = replace(variant_spec(variant, recipe), seeds=seeds)
+    fit_predict = tabm.fit_predict
+    if variant == "realmlp":  # the second neural family, on the same features
+        from ringtrace import realmlp
+
+        spec, fit_predict = realmlp.RealMLPSpec(seeds=seeds), realmlp.fit_predict
+    else:
+        spec = replace(variant_spec(variant, recipe), seeds=seeds)
     for c in cells:
         path = _dir() / f"{variant}_{c}.npz"
         if path.exists():
@@ -168,15 +174,15 @@ def fit(variant: str, cells: list[str], seeds: tuple[int, ...], log=print) -> No
         X, _ = run.feature_matrix(recipe)
         y = cell.targets["given"]
         ex = tabm.Extras()
-        if spec.distill_alpha > 0:
+        if getattr(spec, "distill_alpha", 0) > 0:
             ex.teacher = np.load(_dir() / f"teacher_{c}.npy")
-        if spec.qr_blank_p > 0:
+        if getattr(spec, "qr_blank_p", 0) > 0:
             ex.X_blank = blanked_matrix(recipe)[cell.fit]
             ex.blank_rows = np.flatnonzero(qr_person(cell.led)[cell.fit])
             log(f"[nnexp] {c}: {len(ex.blank_rows)} QR-to-person fit rows can be blanked")
-        if spec.pretrain_epochs > 0:
+        if getattr(spec, "pretrain_epochs", 0) > 0:
             ex.X_unlabelled = X[~cell.fit]  # September and October: inputs only
-        (prob,) = tabm.fit_predict(
+        (prob,) = fit_predict(
             X[cell.fit],
             y[cell.fit],
             cell.period[cell.fit],

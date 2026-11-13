@@ -194,3 +194,19 @@ def test_nnexp_variants_build_and_fraud_only_keeps_tree_types():
     p = nnexp.fraud_only(nn, trees)
     assert p[0, 0] == pytest.approx(0.6)
     assert p[0, 1] / p[0, 2] == pytest.approx(3.0) and p[0, 5] == 0
+
+
+def test_realmlp_prep_and_learning():
+    from ringtrace import realmlp
+
+    X, y = _problem(3000, 1)
+    Xh, yh = _problem(1000, 2)
+    prep = realmlp.fit_prep(X)
+    Z = realmlp.transform(prep, X)
+    assert Z.shape == (3000, 6) and np.isfinite(Z).all() and np.abs(Z[:, :5]).max() < 3.01
+    spec = realmlp.RealMLPSpec(seeds=(0,), width=32, epochs=15, batch=256, lr=3e-3, device="cpu")
+    (p1,) = realmlp.fit_predict(X, y, np.full(len(y), 7), [Xh], spec, log=lambda *_: None)
+    (p2,) = realmlp.fit_predict(X, y, np.full(len(y), 7), [Xh], spec, log=lambda *_: None)
+    np.testing.assert_array_equal(p1, p2)
+    np.testing.assert_allclose(p1.sum(1), 1.0, atol=1e-5)
+    assert macro_f1(yh, p1.argmax(1)) > 0.7
