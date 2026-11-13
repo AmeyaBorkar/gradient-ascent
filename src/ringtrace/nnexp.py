@@ -177,6 +177,10 @@ def fit(variant: str, cells: list[str], seeds: tuple[int, ...], log=print) -> No
         y = cell.targets["given"]
         ex = tabm.Extras()
         if getattr(spec, "distill_alpha", 0) > 0:
+            teacher([c], log)  # built once per cell, then read back
+            store_recipe = run.load_recipe(Path("recipes") / "tabm.json")
+            cell = open_cell(c)
+            X, _ = run.feature_matrix(store_recipe)
             ex.teacher = np.load(_dir() / f"teacher_{c}.npy")
         if getattr(spec, "qr_blank_p", 0) > 0:
             ex.X_blank = blanked_matrix(recipe)[cell.fit]
