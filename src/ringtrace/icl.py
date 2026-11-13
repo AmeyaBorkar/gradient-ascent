@@ -251,9 +251,61 @@ def tabicl_predictor(estimators: int, gpu_fraction: float) -> Predictor:
     return predict
 
 
+def octlike_cells(args, predictor: Predictor, log=print) -> dict:
+    """The member on the October-like frames: context = July + August candidates, queries =
+    the thinned September's candidates, written as ``<name>_s<seed>_r<r>.npz`` cells next to
+    the champion's. September's candidates use the champion cell's probabilities; the context
+    rows use the champion's ordinary out-of-fold array (July and August are complete in every
+    frame), and ``tau`` is the one chosen on the full train rows."""
+    from ringtrace import octlike, paths, store
+    from ringtrace.run import feature_matrix, load_recipe
+
+    store.use_frame(None)
+    base = store.ledger()
+    tr = np.flatnonzero(~base["is_test"].to_numpy())
+    oof_full = np.zeros((base.height, N_CLASSES))
+    oof_full[tr] = np.load(Path(args.champion_dir) / "oof.npy")
+    tau = choose_tau(fraud_prob(oof_full[tr]))
+    out_dir = paths.out_dir() / "octlike"
+    report: dict = {"tau": tau}
+    for seed in (int(s) for s in args.seeds.split(",")):
+        frame = octlike.Frame(seed)
+        X, _ = feature_matrix(load_recipe(args.recipe))
+        y = (frame.led["y"].to_numpy() != LEGIT).astype(np.int64)
+        ctx_rows = np.flatnonzero(frame.fit)
+        ctx = ctx_rows[fraud_prob(oof_full[frame.stacked[ctx_rows]]) >= tau]
+        hold = np.flatnonzero(frame.hold)
+        for r in (int(x) for x in args.sets.split(",")):
+            name = f"{args.name}_s{seed}_r{r}"
+            cell = np.load(out_dir / f"champion_s{seed}_r{r}.npz")
+            if not np.array_equal(cell["rows"], frame.stacked[hold]):
+                raise ValueError(f"{name}: champion cell rows differ from the frame")
+            champ = cell["prob"].astype(np.float64)
+            cand = fraud_prob(champ) >= tau
+            t0 = time.time()
+            p, fi = fold_predict(
+                X[ctx], y[ctx], X[hold[cand]], predictor, args.k, args.max_context,
+                args.seed + 100 * seed + r,
+            )  # fmt: skip
+            prob = compose(champ, cand, p)
+            np.savez(out_dir / f"{name}.npz", rows=cell["rows"], prob=prob.astype(np.float32))
+            fi["seconds"] = time.time() - t0
+            fi.pop("columns")
+            report[name] = fi
+            log(
+                f"[icl] {name}: context {fi['context_rows']} ({fi['context_fraud']} fraud), "
+                f"queries {len(p)} of {len(hold)}, {fi['seconds']:.0f}s"
+            )
+    store.use_frame(None)
+    (out_dir / f"{args.name}_cells.json").write_text(json.dumps(report, indent=1))
+    return report
+
+
 def main(argv=None) -> dict:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["run"])
+    ap.add_argument("cmd", choices=["run", "octlike"])
+    ap.add_argument("--seeds", default="13,14,15")
+    ap.add_argument("--sets", default="0,1,2")
     ap.add_argument("--name", required=True)
     ap.add_argument("--recipe", default="recipes/champion.json")
     ap.add_argument("--champion-run", default="champion", help="dir under $RINGTRACE_OUT/runs")
@@ -271,14 +323,17 @@ def main(argv=None) -> dict:
     from ringtrace.run import feature_matrix, load_recipe
 
     threads.pin()
+    if args.champion_dir is None:
+        args.champion_dir = str(paths.out_dir() / "runs" / args.champion_run)
+    if args.cmd == "octlike":
+        return octlike_cells(args, tabicl_predictor(args.estimators, args.gpu_fraction))
     t0 = time.time()
     led = store.ledger()
     is_test = led["is_test"].to_numpy()
     period = led["period"].to_numpy()
     y = led["y"].to_numpy().astype(np.int64)
     tr, te = np.flatnonzero(~is_test), np.flatnonzero(is_test)
-    cdir = Path(args.champion_dir) if args.champion_dir else paths.out_dir() / "runs"
-    cdir = cdir if args.champion_dir else cdir / args.champion_run
+    cdir = Path(args.champion_dir)
     champ = np.zeros((led.height, N_CLASSES))
     champ[tr] = np.load(cdir / "oof.npy")
     champ[te] = np.load(cdir / "test.npy")
