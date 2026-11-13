@@ -78,7 +78,7 @@ def main(argv: list[str] | None = None) -> dict:
     ap.add_argument("--without", default="",
                     help="comma list of families to leave out (ablation); renames the run")
     ap.add_argument("--rules", default=None, help="comma list replacing the recipe's rules")
-    ap.add_argument("--name", default=None, help="run name (output directory) replacing the recipe's")
+    ap.add_argument("--name", default=None, help="run name replacing the recipe's")
     args = ap.parse_args(argv)
     recipe = load_recipe(args.recipe)
     if args.name:
