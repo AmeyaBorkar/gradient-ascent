@@ -564,6 +564,7 @@ Finding: `docs/findings/lens.md`.
 | nested stacker, C = 0.01 | 133 / 35 | +0.00027 / -0.00012 / +0.00007 [-0.00013, +0.00029] | +0.00023 / +0.00009 / +0.00018 [-0.00007, +0.00039] | -0.00044 / -0.00055 / -0.00051 | +0.00025 / +0.00011 / +0.00020 | -0.00236 / -0.00116 / -0.00146 (-0.00241) | -0.00186 / -0.00033 / -0.00121 (-0.00206) | rejected |
 | nested stacker, C = 1 | 124 / 33 | +0.00028 / -0.00011 / +0.00003 [-0.00015, +0.00028] | +0.00024 / +0.00010 / +0.00010 [-0.00008, +0.00038] | -0.00037 / -0.00051 / -0.00050 | +0.00025 / +0.00012 / +0.00012 | -0.00240 / -0.00119 / -0.00149 (-0.00245) | -0.00189 / -0.00039 / -0.00134 (-0.00211) | rejected |
 | TabM 6 seeds (0-5) | 6 / 3 | -0.00002 / +0.00004 / +0.00000 [-0.00004, +0.00005] | +0.00002 / +0.00004 / +0.00000 [-0.00002, +0.00007] | +0.00001 / +0.00011 / +0.00000 | +0.00002 / +0.00004 / +0.00000 | n/a | n/a | tie |
+| TabM 12 seeds (0-11; laptop, 6 threads, fee3fa8, about 7 min) | 3 / 0 | -0.00002 / +0.00004 / +0.00000 [-0.00002, +0.00004] | +0.00002 / +0.00004 / +0.00000 [-0.00001, +0.00006] | +0.00001 / +0.00005 / +0.00000 | +0.00002 / +0.00003 / +0.00000 | n/a | n/a | tie (fails given Jul; October file identical to the base) |
 | TabM 9 seeds (0-8) | 5 / 3 | -0.00002 / +0.00007 / +0.00004 [-0.00001, +0.00008] | +0.00002 / +0.00006 / +0.00004 [+0.00000, +0.00009] | +0.00001 / +0.00012 / +0.00005 | +0.00002 / +0.00006 / +0.00004 | +0.00001 / -0.00005 / +0.00000 (-0.00007) | +0.00001 / -0.00005 / -0.00000 (-0.00006) | tie (fails given Jul, October-like) |
 | family gate (TabM mass only in families whose adds were >= 50 % right, nested) | 34 / 6 | -0.00068 / -0.00018 / -0.00023 [-0.00061, -0.00018] | -0.00064 / -0.00016 / -0.00030 [-0.00059, -0.00018] | -0.00086 / -0.00011 / +0.00004 | -0.00062 / -0.00016 / -0.00029 | not run | not run | rejected |
 | class gate (adds of classes < 50 % right in both fit months back to legit, nested) | 0 / 0 | 0 | 0 | 0 | 0 | - | - | no class qualifies |
@@ -573,5 +574,5 @@ Finding: `docs/findings/lens.md`.
 The October-like cells for the 9-seed TabM are the mean of the three seed-set cells for each
 thinning seed (5 rows changed over nine cells). The 9-seed rows count is against the 3-seed base;
 6- and 9-seed October rows are 1 legit -> phishing_collect and 2 phishing_collect -> legit. The
-seed-set 9-11 run had not landed; 12 seeds were not measured. Per-class type-share lines for every
+12-seed rerun on the laptop reproduces the 3-, 6- and 9-seed lines exactly. Per-class type-share lines for every
 class and the add tables are in the finding.
