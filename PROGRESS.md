@@ -17,7 +17,7 @@ counter-anchored template rule.
 ## Status
 - [x] Import of the standalone pipeline (features, evidence modules, cascade, decoder, template
       rule); `recipes/champion.json` reproduces member 1.
-- [ ] Member 2: LightGBM cascade.
+- [x] Member 2: LightGBM cascade (`recipes/lgbm.json`; results in RESULTS.md).
 - [ ] Member 3: CatBoost cascade.
 - [ ] Members 4 and 5: event-cleaned labels and their XGBoost cascades.
 - [ ] The blend, its one-command build, and the README (commands, seeds, versions, hardware).

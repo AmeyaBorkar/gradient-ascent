@@ -92,3 +92,22 @@ from July + August only, the teacher fitted on the other month), same scoring:
 Cleantrain mean over the 9 cells 0.5091 against 0.5093 for the given-label champion: a tie on the
 given labels (the cleaned target cannot be scored on September here, which has no cleaned labels
 by protocol). All 18 cells ran in 28 min (16:39-17:07 IST), three frames in parallel.
+
+## Member 2: LightGBM cascade (`lgbm`)
+
+`python -m ringtrace.run recipes/lgbm.json` with `RINGTRACE_THREADS=10`. This is the champion recipe (families,
+drop list, XGBoost screening score and cut-offs, month folds, seeds 0/1/2, decoder, template rule)
+with both cascade stages on CPU LightGBM: lr 0.05, 63 leaves, min_data_in_leaf 30, feature/bagging
+fraction 0.5/0.8 (freq 1), lambda_l2 2.0, max_bin 255, 300 rounds, deterministic, row-wise. Outputs:
+`~/outputs/runs/lgbm/` (oof.npy, test.npy, summary.json, submission.csv).
+
+| run | commit | stage | given Jul / Aug / Sep (mean) | cleaned Jul / Aug / Sep (mean) | gen-only Jul / Aug / Sep (mean) | wall |
+|---|---|---|---|---|---|---|
+| lgbm | 363eab3 | argmax | 0.5077 / 0.5039 / 0.5108 (0.5075) | 0.5588 / 0.5588 / 0.5661 (0.5612) | 0.8949 / 0.8925 / 0.8954 (0.8942) | 14.9 min |
+| lgbm | 363eab3 | fixed point | 0.5076 / 0.5034 / 0.5110 (0.5073) | 0.5586 / 0.5583 / 0.5664 (0.5611) | 0.8945 / 0.8914 / 0.8958 (0.8939) | |
+| lgbm | 363eab3 | **rules (final)** | 0.5130 / 0.5092 / 0.5146 (**0.5122**) | 0.5646 / 0.5642 / 0.5712 (**0.5667**) | 0.9021 / 0.9000 / 0.9012 (0.9011) | |
+| champion (run 9) | c46528d | rules (final) | 0.5130 / 0.5090 / 0.5146 (0.5122) | 0.5645 / 0.5639 / 0.5712 (0.5665) | — / — / — (0.9010) | 12.8 min |
+
+On its own the LightGBM member ties the champion: +0.0000 given and +0.0002 cleaned after the rule, and
++0.0009 / +0.0010 at the fixed point. CPU only, at 892 % CPU (10 threads), with a peak RSS of 8.0 GB.
+The template rule changed 742 train / 132 test rows. October calls: 3,951 fraud (champion 3,945).
