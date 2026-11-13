@@ -104,3 +104,25 @@ Short records of design choices.
     held-out labels into training. The events are the six event-id modules in the teacher's order
     (bursts, drains, flows, requests, merchant, repeats). The `l2` minority flip uses the same
     chosen event (highest fraud share) and needs no fraud-share threshold of its own.
+16. **TabM member** (`"model": "tabm"` in a recipe; `ringtrace.tabm`), a neural model for blend
+    diversity, written in plain PyTorch.
+    - **Versions.** torch 2.14.1+cu130 (the CUDA 13.0 wheel from the PyTorch index; it runs on
+      the Blackwell laptop GPU, compute capability 12.0). Pinned in the `nn` extra of
+      `pyproject.toml`.
+    - **Inputs.** The champion's feature matrix (same families, same drop list). Fitted on the
+      training rows of each fold only: a 0/1 gap flag for every column with a missing value, median
+      fill, then a 1,000-point quantile map to a standard normal (ties in discrete columns take
+      the mean of the left and right interpolation; out-of-range values clip). Categorical
+      columns are already integer codes in the matrix and are embedded as numbers, not looked up.
+    - **Network.** Per-feature periodic embedding (24 learned frequencies, sin/cos, a linear map
+      to 8 dims, ReLU), then 3 BatchEnsemble blocks (width 512, ReLU, dropout 0.1) with k = 16
+      members sharing every weight matrix; each member has its own input scale, output scale and
+      bias (scales initialised to random signs) and its own 12-way head. Loss is the mean
+      cross-entropy over members; the prediction is the mean of their softmaxes.
+    - **Target.** A direct 12-class softmax on the given labels, unweighted: the decoder maximises
+      expected macro-F1 from calibrated probabilities, and class weights would bias them.
+    - **Training.** AdamW (lr 2e-3, weight decay 3e-4), 5 % linear warm-up then linear decay,
+      batch 2,048, 10 epochs, no early stopping (nothing to stop on without peeking at the held
+      month). Seeds set numpy and torch, deterministic algorithms are requested and TF32 is off.
+    - **Folds and seeds** are the cascade's: `fit_predict` has the same signature, so `run`
+      (leave-one-month-out, October as the fold mean) and `octlike fit` call it unchanged.

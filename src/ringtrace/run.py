@@ -48,6 +48,18 @@ def cascade_spec(recipe: dict) -> CascadeSpec:
     return CascadeSpec(booster=booster, **c)
 
 
+def model(recipe: dict):
+    """(spec, fit_predict) of the recipe's model: the cascade, or ``"model": "tabm"``."""
+    if recipe.get("model") == "tabm":
+        from ringtrace import tabm
+
+        t = dict(recipe.get("tabm", {}))
+        if "seeds" in t:
+            t["seeds"] = tuple(t["seeds"])
+        return tabm.TabMSpec(**t), tabm.fit_predict
+    return cascade_spec(recipe), fit_predict
+
+
 def feature_matrix(recipe: dict) -> tuple[np.ndarray, list[str]]:
     feats = store.frame(recipe["families"])
     drop = set(recipe.get("drop", []))
@@ -73,11 +85,12 @@ def score_block(
     period: np.ndarray,
     report: dict,
     log=print,
+    months: tuple[int, ...] = TRAIN_MONTHS,
 ) -> None:
     line = [f"{name:<14}"]
     for tname, y in targets.items():
         per = []
-        for m in TRAIN_MONTHS:
+        for m in months:
             sel = period == m
             per.append(macro_f1(y[sel], pred[sel]))
         report.setdefault(name, {})[tname] = {"months": per, "mean": float(np.mean(per))}
@@ -96,6 +109,11 @@ def main(argv: list[str] | None = None) -> dict:
     )
     ap.add_argument("--rules", default=None, help="comma list replacing the recipe's rules")
     ap.add_argument("--name", default=None, help="run name replacing the recipe's")
+    ap.add_argument(
+        "--folds",
+        default="",
+        help="comma list of held-out months to run (default all); renames the run",
+    )
     args = ap.parse_args(argv)
     recipe = load_recipe(args.recipe)
     if args.name:
@@ -106,6 +124,9 @@ def main(argv: list[str] | None = None) -> dict:
         recipe["name"] = f"{recipe['name']}-without-{'-'.join(gone)}"
     if args.rules is not None:
         recipe["rules"] = [r for r in args.rules.split(",") if r]
+    folds = tuple(int(m) for m in args.folds.split(",") if m) or TRAIN_MONTHS
+    if folds != TRAIN_MONTHS:
+        recipe["name"] = f"{recipe['name']}-fold-{'-'.join(map(str, folds))}"
     t0 = time.time()
     out = paths.out_dir() / "runs" / recipe["name"]
     out.mkdir(parents=True, exist_ok=True)
@@ -123,7 +144,7 @@ def main(argv: list[str] | None = None) -> dict:
     y = led["y"].to_numpy().astype(np.int64)
     tr_idx = np.flatnonzero(~is_test)
     te_idx = np.flatnonzero(is_test)
-    spec = cascade_spec(recipe)
+    spec, fit_fn = model(recipe)
     train_target = y.copy()
     if recipe.get("train_on") == "cleaned":
         cl = cleaned_labels(led)
@@ -144,7 +165,7 @@ def main(argv: list[str] | None = None) -> dict:
 
     oof = np.zeros((len(y), len(CLASSES)), dtype=np.float64)
     test_sum = np.zeros((len(te_idx), len(CLASSES)), dtype=np.float64)
-    for m in TRAIN_MONTHS:
+    for m in folds:
         fit = tr_idx[period[tr_idx] != m]
         hold = tr_idx[period[tr_idx] == m]
         log(f"fold {m}: train {len(fit)} rows, hold {len(hold)}")
@@ -155,11 +176,11 @@ def main(argv: list[str] | None = None) -> dict:
             train_target = eventclean.clean_labels(y, events, event_mode, mask=fit_mask)
             log(f"  {event_mode} labels: {int((train_target[fit] != y[fit]).sum())} rows changed")
         outs = [X[hold]] + ([] if args.no_test else [X[te_idx]])
-        res = fit_predict(X[fit], train_target[fit], period[fit], outs, spec, log=log)
+        res = fit_fn(X[fit], train_target[fit], period[fit], outs, spec, log=log)
         oof[hold] = res[0]
         if not args.no_test:
             test_sum += res[1]
-    test_proba = test_sum / len(TRAIN_MONTHS)
+    test_proba = test_sum / len(folds)
 
     targets = {"given": y[tr_idx]}
     from ringtrace import silver
@@ -168,13 +189,13 @@ def main(argv: list[str] | None = None) -> dict:
         arr = silver.load(led, which)
         if arr is not None:
             targets[tname] = arr[tr_idx]
-    report: dict = {"recipe": recipe, "features": cols, "cascade": asdict(spec)}
+    report: dict = {"recipe": recipe, "features": cols, "model": asdict(spec)}
     per_tr = period[tr_idx]
     p_tr = oof[tr_idx]
-    score_block("argmax", p_tr.argmax(1), targets, per_tr, report, log)
+    score_block("argmax", p_tr.argmax(1), targets, per_tr, report, log, folds)
     dec = recipe.get("decoder", {"fraud_scale": 0.875})
     pred_tr = decode_by_period(p_tr, per_tr, **dec)
-    score_block("fixed_point", pred_tr, targets, per_tr, report, log)
+    score_block("fixed_point", pred_tr, targets, per_tr, report, log, folds)
 
     rules = recipe.get("rules", [])
     pred_all = np.zeros(len(y), dtype=np.int64)
@@ -187,7 +208,7 @@ def main(argv: list[str] | None = None) -> dict:
         proba_all = oof.copy()
         proba_all[te_idx] = test_proba
         pred_all = rulebook.apply(rules, pred_all, proba_all, led, log=log)
-        score_block("rules", pred_all[tr_idx], targets, per_tr, report, log)
+        score_block("rules", pred_all[tr_idx], targets, per_tr, report, log, folds)
 
     final_name = "rules" if rules else "fixed_point"
     for tname, yt in targets.items():
