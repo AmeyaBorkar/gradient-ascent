@@ -21,3 +21,6 @@ and starter notebook. External sources used:
 - Hanley and MacGibbon (2006), "Creating non-parametric bootstrap samples using Poisson
   frequencies", Computer Methods and Programs in Biomedicine 83(1): Poisson(1) weights per
   resampling unit, used by `ringtrace.compare` with generator events as units.
+- Dietterich (2000), "Ensemble Methods in Machine Learning", MCS 2000, LNCS 1857: averaging the
+  probabilities of models with partly independent errors lowers variance; the basis of the
+  equal-weight five-member blend (`ringtrace.blend`).
