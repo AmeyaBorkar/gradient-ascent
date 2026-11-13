@@ -147,6 +147,7 @@ class CascadeSpec:
     type_min_score: float = 0.10
     drop_legit_min_score: float = 0.70
     screen: Spec | None = None  # booster of the screening score; None = same as ``booster``
+    use_screen: bool = True  # False: every fraud row is a type row and no legit row is dropped
 
 
 def _fit(X, y, spec: Spec, seed: int, rounds: int, n_class: int = 0):
@@ -240,7 +241,8 @@ def fit_predict(
     """Train on (X_tr, y_tr) and return 12-class probabilities for every matrix in X_out."""
     t0 = time.time()
     fraud = (y_tr > 0).astype(np.float32)
-    score = screen_score(X_tr, fraud, period_tr, spec)
+    # screen off (one month cannot be cross-fitted): every label is taken as it is
+    score = screen_score(X_tr, fraud, period_tr, spec) if spec.use_screen else fraud.copy()
     keep_bin = (fraud == 1) | (score < spec.drop_legit_min_score)
     type_rows = (fraud == 1) & (score >= spec.type_min_score)
     # fraud-labelled rows the screen cannot see are the ordinary-looking ones: legit for stage one
