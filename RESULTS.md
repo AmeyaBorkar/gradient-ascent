@@ -537,3 +537,94 @@ started).
 
 - 2026-11-14 00:40 IST: first `recipes/final.json` = the five-way blend + `blank_merchant_qr`
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+## Weight-space methods (`ringtrace.wspace`)
+
+Finding: `docs/findings/weight-space.md`. All **measured in this repo**. The base is the blend with
+TabM in the fraud-only role (five tree members at 1/10, TabM at 1/2, fixed point 0.875, anchored
+rule, `blank_merchant_qr`); every arm replaces only TabM's legit probability. The paired base is a
+re-fit of the given-label TabM (seeds 0-2, arm `base`): given 0.51371 / 0.50940 / 0.51500, cleaned
+0.56535 / 0.56440 / 0.57179, gen-only 0.90302 / 0.90005 / 0.90185. Harness: per-month change
+Jul / Aug / Sep, [95 % event bootstrap of the mean, 2,000 draws]; October-like cells s13 / s14 /
+s15 of seed set r0 (mean 95 % lower bound, 1,000 draws); calls changed (train / October). torch
+2.14.1+cu130 on every machine.
+
+### Runs
+
+| run | command | commit | wall | notes |
+|---|---|---|---|---|
+| W1 | `wspace fit fold7 fold8 fold9 s13 s14 s15` (theta_g, theta_c, theta_r per seed; arms `ta*`, `ti*`) | 2e4a5e1 | 26 min per context with two jobs on an RTX 4090 (13 min alone); 31 min for s15 on an RTX 5060 Ti | 337 inputs; fit rows 1.04-1.05 M; `event_l2` relabels 1,697-1,727 fit rows (1,509-1,530 legit to fraud) |
+| W2 | `wspace vector fold9 s13 s14 s15` (arms `ft_g`, `ft_c`, `tv*`) | ecb0bea | 94-101 s per seed on an RTX 4070 Ti SUPER; 4.1-4.4 min per seed with two jobs on an RTX 5060 Ti | starts from W1's theta_g |
+| W3 | `wspace rebasin fold9 s13 s14 s15` (arms `rb_naive`, `rb_wm`) | ecb0bea | 70-136 s per context | from W1's theta_g, seeds 0-2 |
+| W4 | `wspace head` (arm `head` against `head_base`) | a27dfec | 9 min, laptop RTX 5070 Ti | from W1's theta_g, all six contexts; `head_base` equals `base` on every call |
+| W5 | `wspace score`, three tables | 9894783 | 9-12 min each, laptop CPU | reports under `$RINGTRACE_OUT/wspace/score_*.json` |
+
+### Weights (mean over seeds; the same within 1 % in every context)
+
+| quantity | value |
+|---|---|
+| norm of theta_g | 301.4 (2.25 M weights; the 84,096 member scales hold 91.4 % of the squared norm, mean absolute value 0.992) |
+| theta_c - theta_g (same seed, cleaned labels) | 60.2-61.2 |
+| theta_r - theta_g (2 epochs on the nearest month) | 2.90-2.97; cosine with theta_c - theta_g -0.05 |
+| fine-tunes of theta_g: given, cleaned, and between the two | 3.7, 5.4, 4.8; cosine of (cleaned - given) with theta_c - theta_g 0.10 (s15) |
+| two independent seeds | 426; 307 after weight matching (5-7 sweeps); member scales agree in sign on 49.9 % of entries |
+| barrier theta_g to theta_c (held-out loss, given labels) | 0 on the folds, at most 0.002 on the frames; loss 0.1725 -> 0.1922 along the path on September |
+| barrier theta_g to theta_r | at most 0.0004 |
+| barrier seed 0 to seed 1 | 0.98-0.99 before matching, 0.88-0.90 after (ends 0.172, midpoint 1.17 -> 1.06) |
+| held-out loss of the seed average | 1.26-1.28 unaligned, 1.22-1.25 aligned; mean of the seeds' predictions 0.171-0.173 |
+
+### Task arithmetic and time interpolation against the base (W1; three folds, three cells)
+
+| arm | given | cleaned | gen-only | October-like given (LB) | October-like cleaned (LB) | calls | verdict |
+|---|---|---|---|---|---|---|---|
+| stored member (same recipe, earlier fit) | +0.00000 / -0.00005 / +0.00000 [-0.00007, +0.00004] | +0.00001 / -0.00001 / +0.00000 [-0.00005, +0.00006] | +0.00009 / -0.00007 / +0.00000 [-0.00010, +0.00012] | 0 / 0 / 0 (0) | 0 / 0 / 0 (0) | 8 / 1 | the noise floor |
+| `ta0.5` | -0.00008 / -0.00014 / -0.00006 [-0.00022, +0.00003] | -0.00005 / -0.00012 / -0.00003 [-0.00021, +0.00007] | -0.00033 / -0.00052 / -0.00027 [-0.00074, -0.00006] | -0.00008 / -0.00003 / -0.00008 (-0.00017) | +0.00001 / -0.00003 / -0.00009 (-0.00017) | 31 / 4 | fails |
+| `ta1` (the cleaned-label network) | +0.00006 / +0.00004 / +0.00001 [+0.00000, +0.00009] | +0.00006 / +0.00009 / +0.00001 [+0.00001, +0.00011] | +0.00014 / +0.00020 / +0.00004 [+0.00003, +0.00025] | 0 / 0 / -0.00006 (-0.00008) | 0 / 0 / -0.00005 (-0.00007) | 8 / 1 | fails (October-like) |
+| `ta1.5` | -0.00001 / -0.00003 / -0.00004 [-0.00013, +0.00007] | -0.00001 / +0.00003 / -0.00008 [-0.00013, +0.00008] | +0.00000 / +0.00006 / +0.00004 [-0.00015, +0.00022] | -0.04608 / -0.02006 / -0.00175 (-0.02427) | -0.04963 / -0.02100 / -0.00176 (-0.02597) | 21 / 8 | fails |
+| `ta2` | -0.13494 / -0.17025 / -0.16003 | -0.15100 / -0.19135 / -0.17925 | -0.27897 / -0.35131 / -0.31926 | -0.33730 / -0.32354 / -0.24945 | -0.37673 / -0.36212 / -0.27863 | 257,041 / 73,631 | broken |
+| `ti0.5` | -0.00003 / -0.00001 / +0.00001 [-0.00004, +0.00001] | -0.00003 / -0.00001 / +0.00001 [-0.00004, +0.00001] | -0.00009 / -0.00004 / +0.00004 [-0.00012, +0.00003] | 0 / 0 / 0 (0) | 0 / 0 / 0 (0) | 3 / 0 | tie |
+| `ti1` | +0.00000 / -0.00001 / +0.00001 [-0.00001, +0.00001] | +0.00000 / -0.00001 / +0.00001 [-0.00001, +0.00001] | +0.00000 / -0.00004 / +0.00004 [-0.00003, +0.00004] | +0.00003 / 0 / 0 (0) | +0.00003 / 0 / 0 (0) | 2 / 0 | tie |
+| `ti1.5` | +0.00000 / -0.00001 / +0.00003 [-0.00003, +0.00004] | +0.00001 / -0.00001 / +0.00003 [-0.00003, +0.00004] | +0.00009 / -0.00004 / +0.00008 [-0.00003, +0.00014] | +0.00003 / 0 / 0 (0) | +0.00003 / 0 / 0 (0) | 6 / 0 | tie |
+| `ti2` | +0.00000 / +0.00003 / +0.00000 [-0.00003, +0.00005] | +0.00001 / +0.00003 / -0.00004 [-0.00005, +0.00005] | +0.00009 / +0.00008 / +0.00007 [-0.00002, +0.00019] | -0.00006 / 0 / 0 (-0.00009) | -0.00005 / 0 / 0 (-0.00008) | 8 / 1 | tie |
+| `ta1+ti1` | +0.00005 / +0.00003 / +0.00001 [-0.00001, +0.00008] | +0.00004 / +0.00003 / +0.00001 [-0.00002, +0.00008] | +0.00009 / +0.00009 / +0.00004 [-0.00004, +0.00020] | 0 / 0 / -0.00006 (-0.00008) | 0 / 0 / -0.00005 (-0.00007) | 10 / 1 | fails (October-like) |
+
+Held-out loss against the given labels, mean over seeds, September fold: base 0.1725, `ta0.5`
+0.1801, `ta1` 0.1922, `ta1.5` 0.2183, `ta2` 0.9208, `ti0.5` 0.1725, `ti1` 0.1726, `ti1.5` 0.1728,
+`ti2` 0.1733. On the frames `ta1.5` is 0.25-0.38 and `ta2` 2.4-5.9.
+
+### Fine-tuned label vector and re-basin against the base (W2, W3; September fold and three cells)
+
+July and August keep the base arm, so only September changes.
+
+| arm | given Sep | cleaned Sep | gen-only Sep | October-like given (LB) | October-like cleaned (LB) | train calls | verdict |
+|---|---|---|---|---|---|---|---|
+| `ft_g` (given-label fine-tune) | +0.00001 | +0.00001 | +0.00004 | 0 / 0 / 0 (0) | 0 / 0 / 0 (0) | 1 | tie |
+| `ft_c` (cleaned-label fine-tune) | -0.00001 | -0.00001 | -0.00008 | 0 / -0.00008 / 0 (-0.00009) | 0 / +0.00030 / 0 (0) | 3 | tie |
+| `tv1` | -0.00001 | -0.00001 | -0.00008 | 0 / -0.00008 / 0 (-0.00009) | 0 / +0.00030 / 0 (0) | 3 | tie |
+| `tv2` | +0.00006 | +0.00005 | -0.00001 | -0.00009 / -0.00008 / -0.00008 (-0.00027) | +0.00026 / +0.00030 / -0.00009 (-0.00010) | 4 | fails |
+| `tv4` | +0.00002 | +0.00001 | -0.00012 | -0.02219 / -0.01224 / -0.02642 (-0.02214) | -0.02326 / -0.01233 / -0.02854 (-0.02336) | 7 | fails |
+| `tv8` | -0.29559 | -0.32995 | -0.60860 | -0.32384 / -0.35350 / -0.38467 | -0.36160 / -0.39569 / -0.42608 | 196,280 | broken |
+| `rb_naive` (plain weight mean of three seeds) | -0.24927 | -0.27806 | -0.52240 | -0.27200 / -0.26727 / -0.24442 | -0.30310 / -0.29896 / -0.27316 | 163,306 | broken |
+| `rb_wm` (weight-matched mean) | -0.24340 | -0.27150 | -0.51046 | -0.26757 / -0.26141 / -0.23700 | -0.29813 / -0.29240 / -0.26487 | 159,997 | broken |
+
+Held-out loss, September fold: `ft_g` 0.1726, `ft_c` 0.1786, `tv1` 0.1781, `tv2` 0.1894, `tv4`
+0.2070, `tv8` 2.12 (10-13 on the frames; `tv4` 0.25-0.31 there).
+
+### Head re-optimisation against its own base (W4; three folds, three cells)
+
+Grid a in {0.8, 0.9, 1, 1.1, 1.25} x c in {-0.6 ... 0.6 by 0.2}; chosen on two months, given labels.
+
+| held-out month | chosen (a, c) | fit months: chosen / (1, 0) | held-out month: chosen / (1, 0) |
+|---|---|---|---|
+| July | (1.1, -0.2) | 0.51222 / 0.51220 | 0.51372 / 0.51371 |
+| August | (0.8, 0) | 0.51443 / 0.51436 | 0.50930 / 0.50940 |
+| September | (0.8, -0.2) | 0.51162 / 0.51156 | 0.51485 / 0.51500 |
+| October | (0.8, 0) | best mean of three months +0.00002 over (1, 0) | - |
+
+Over the grid the change against (1, 0) is -0.00041 to +0.00023 in any month.
+
+| arm | given | cleaned | gen-only | October-like given (LB) | October-like cleaned (LB) | calls | verdict |
+|---|---|---|---|---|---|---|---|
+| `head` | +0.00000 / -0.00010 / -0.00015 [-0.00024, +0.00008] | +0.00001 / -0.00010 / -0.00001 [-0.00021, +0.00014] | +0.00009 / -0.00064 / -0.00060 [-0.00081, -0.00002] | -0.00050 / -0.00021 / -0.00035 (-0.00083) | +0.00022 / +0.00040 / -0.00033 (-0.00049) | 56 / 8 | fails |
+
+No arm passes the fast judge; no candidate file was written.
