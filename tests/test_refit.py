@@ -53,3 +53,11 @@ def test_screen_off_fits_one_period_deterministically():
     np.testing.assert_array_equal(p1, p2)
     np.testing.assert_allclose(p1.sum(1), 1.0, atol=1e-5)
     assert (p1.argmax(1) == y[:200]).mean() > 0.9
+
+
+def test_catboost_gpu_ram_part_only_when_set():
+    from ringtrace.cascade import CatBoostSpec
+
+    assert "gpu_ram_part" not in CatBoostSpec().params(0, "Logloss")
+    assert CatBoostSpec(gpu_ram_part=0.45).params(0, "Logloss")["gpu_ram_part"] == 0.45
+    assert "gpu_ram_part" not in CatBoostSpec(task_type="CPU", gpu_ram_part=0.45).params(0, "x")

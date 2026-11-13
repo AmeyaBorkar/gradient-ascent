@@ -106,6 +106,7 @@ class CatBoostSpec:
     border_count: int = 254
     task_type: str = "GPU"
     devices: str = "0"
+    gpu_ram_part: float | None = None  # share of GPU memory CatBoost may take (None: its default)
 
     def params(self, seed: int, loss: str) -> dict:
         p = {
@@ -122,6 +123,8 @@ class CatBoostSpec:
         }
         if self.task_type == "GPU":
             p["devices"] = self.devices
+            if self.gpu_ram_part is not None:
+                p["gpu_ram_part"] = self.gpu_ram_part
         return p
 
 
