@@ -29,8 +29,9 @@ def _problem(n: int, seed: int):
 def test_cascade_learns_and_is_deterministic():
     X, y, period = _problem(6000, 0)
     Xt, yt, _ = _problem(2000, 1)
-    spec = CascadeSpec(booster=BoosterSpec(rounds=30, depth=4, device="cpu"), seeds=(0,),
-                       screen_rounds=20)
+    spec = CascadeSpec(
+        booster=BoosterSpec(rounds=30, depth=4, device="cpu"), seeds=(0,), screen_rounds=20
+    )
     (p1,) = fit_predict(X, y, period, [Xt], spec, log=lambda *_: None)
     (p2,) = fit_predict(X, y, period, [Xt], spec, log=lambda *_: None)
     assert p1.shape == (2000, N_CLASSES)
@@ -38,3 +39,41 @@ def test_cascade_learns_and_is_deterministic():
     np.testing.assert_array_equal(p1, p2)
     pred = decode_by_period(p1, np.full(2000, 10))
     assert macro_f1(yt, pred) > 0.8
+
+
+def test_lightgbm_cascade_learns_and_is_deterministic():
+    pytest.importorskip("lightgbm")
+    from ringtrace.cascade import LgbmSpec
+
+    X, y, period = _problem(6000, 0)
+    Xt, yt, _ = _problem(2000, 1)
+    spec = CascadeSpec(
+        booster=LgbmSpec(rounds=30, num_leaves=15),
+        seeds=(0, 1),
+        screen=BoosterSpec(rounds=30, depth=4, device="cpu"),
+        screen_rounds=20,
+    )
+    (p1,) = fit_predict(X, y, period, [Xt], spec, log=lambda *_: None)
+    (p2,) = fit_predict(X, y, period, [Xt], spec, log=lambda *_: None)
+    np.testing.assert_allclose(p1.sum(1), 1.0, atol=1e-5)
+    np.testing.assert_array_equal(p1, p2)
+    assert macro_f1(yt, decode_by_period(p1, np.full(2000, 10))) > 0.8
+
+
+def test_lgbm_recipe_keeps_the_champion_screen_and_features():
+    from ringtrace.cascade import LgbmSpec
+    from ringtrace.run import cascade_spec, load_recipe
+
+    champ, lg = load_recipe("recipes/champion.json"), load_recipe("recipes/lgbm.json")
+    assert (lg["families"], lg["drop"]) == (champ["families"], champ["drop"])
+    c, s = cascade_spec(champ), cascade_spec(lg)
+    assert isinstance(s.booster, LgbmSpec) and s.seeds == c.seeds == (0, 1, 2)
+    assert s.screen == c.booster and c.screen is None
+    assert (s.screen_rounds, s.type_min_score, s.drop_legit_min_score) == (
+        c.screen_rounds,
+        c.type_min_score,
+        c.drop_legit_min_score,
+    )
+    p = s.booster.params(2)
+    assert p["seed"] == p["bagging_seed"] == p["feature_fraction_seed"] == 2
+    assert p["deterministic"] and p["force_row_wise"]

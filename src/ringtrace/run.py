@@ -20,7 +20,7 @@ import numpy as np
 import polars as pl
 
 from ringtrace import paths, store
-from ringtrace.cascade import BoosterSpec, CascadeSpec, fit_predict
+from ringtrace.cascade import CascadeSpec, booster_spec, fit_predict
 from ringtrace.classes import CLASSES
 from ringtrace.decode import decode_by_period
 from ringtrace.scoring import macro_f1, per_class_f1
@@ -37,7 +37,9 @@ def load_recipe(path: str | Path) -> dict:
 
 def cascade_spec(recipe: dict) -> CascadeSpec:
     c = dict(recipe.get("cascade", {}))
-    booster = BoosterSpec(**c.pop("booster", {}))
+    booster = booster_spec(c.pop("booster", {}))
+    if "screen" in c:
+        c["screen"] = booster_spec(c["screen"])
     if "seeds" in c:
         c["seeds"] = tuple(c["seeds"])
     return CascadeSpec(booster=booster, **c)
@@ -46,8 +48,11 @@ def cascade_spec(recipe: dict) -> CascadeSpec:
 def feature_matrix(recipe: dict) -> tuple[np.ndarray, list[str]]:
     feats = store.frame(recipe["families"])
     drop = set(recipe.get("drop", []))
-    cols = [c for c in feats.columns
-            if c not in drop and not c.startswith("_") and not c.endswith("_event")]
+    cols = [
+        c
+        for c in feats.columns
+        if c not in drop and not c.startswith("_") and not c.endswith("_event")
+    ]
     X = feats.select(cols).to_numpy().astype(np.float32)
     return X, cols
 
@@ -58,8 +63,14 @@ def cleaned_labels(led: pl.DataFrame) -> np.ndarray | None:
     return silver.load(led, "label")
 
 
-def score_block(name: str, pred: np.ndarray, targets: dict[str, np.ndarray],
-                period: np.ndarray, report: dict, log=print) -> None:
+def score_block(
+    name: str,
+    pred: np.ndarray,
+    targets: dict[str, np.ndarray],
+    period: np.ndarray,
+    report: dict,
+    log=print,
+) -> None:
     line = [f"{name:<14}"]
     for tname, y in targets.items():
         per = []
@@ -75,8 +86,11 @@ def main(argv: list[str] | None = None) -> dict:
     ap = argparse.ArgumentParser()
     ap.add_argument("recipe")
     ap.add_argument("--no-test", action="store_true", help="skip the October submission")
-    ap.add_argument("--without", default="",
-                    help="comma list of families to leave out (ablation); renames the run")
+    ap.add_argument(
+        "--without",
+        default="",
+        help="comma list of families to leave out (ablation); renames the run",
+    )
     ap.add_argument("--rules", default=None, help="comma list replacing the recipe's rules")
     args = ap.parse_args(argv)
     recipe = load_recipe(args.recipe)
@@ -97,8 +111,7 @@ def main(argv: list[str] | None = None) -> dict:
 
     led = store.ledger()
     X, cols = feature_matrix(recipe)
-    log(f"[{recipe['name']}] {X.shape[1]} features, {X.shape[0]} rows "
-        f"({time.time() - t0:.0f}s)")
+    log(f"[{recipe['name']}] {X.shape[1]} features, {X.shape[0]} rows ({time.time() - t0:.0f}s)")
     is_test = led["is_test"].to_numpy()
     period = led["period"].to_numpy()
     y = led["y"].to_numpy().astype(np.int64)
@@ -154,22 +167,24 @@ def main(argv: list[str] | None = None) -> dict:
     final_name = "rules" if rules else "fixed_point"
     for tname, yt in targets.items():
         f1s = per_class_f1(yt, pred_all[tr_idx])
-        report.setdefault("per_class", {})[tname] = dict(zip(CLASSES, map(float, f1s),
-                                                             strict=True))
+        report.setdefault("per_class", {})[tname] = dict(zip(CLASSES, map(float, f1s), strict=True))
     report["final"] = report[final_name]
     np.save(out / "oof.npy", oof[tr_idx].astype(np.float32))
     if not args.no_test:
         np.save(out / "test.npy", test_proba.astype(np.float32))
-        sub = pl.DataFrame({
-            "id": led["txn_id"].to_numpy()[te_idx],
-            "label": np.asarray(CLASSES)[pred_all[te_idx]],
-        })
+        sub = pl.DataFrame(
+            {
+                "id": led["txn_id"].to_numpy()[te_idx],
+                "label": np.asarray(CLASSES)[pred_all[te_idx]],
+            }
+        )
         sub_path = out / "submission.csv"
         sub.write_csv(sub_path)
         report["submission_sha256"] = hashlib.sha256(sub_path.read_bytes()).hexdigest()
         counts = sub.group_by("label").len().sort("label")
-        report["test_calls"] = dict(zip(counts["label"].to_list(), counts["len"].to_list(),
-                                        strict=True))
+        report["test_calls"] = dict(
+            zip(counts["label"].to_list(), counts["len"].to_list(), strict=True)
+        )
         log(f"test calls: {report['test_calls']}")
     report["runtime_s"] = time.time() - t0
     report["log"] = log_lines
