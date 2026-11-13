@@ -204,3 +204,18 @@ rule. Details and per-class tables: `docs/findings/more-data.md`.
 | clean-event-refit / clean-event-hedge | 031e194 | — | — | — | 5.0 min | 48 / 24 argmax rows changed |
 | clean-l2-refit / clean-l2-hedge | 031e194 | — | — | — | 7.1 min | 61 / 38 argmax rows changed |
 | refit-october, first launch | ec37c9d | — | — | — | <1 min | failed: shell quoting in the recipe loop; relaunched via `scripts/refit_october.sh` |
+
+## Member: refit, October refit blends
+
+Every member is refitted on all train rows (450 rounds or CatBoost iterations, the screen
+cross-fitted over the three months, seeds 0, 1, 2), and each blend is decoded like `recipes/blend.json`.
+The train scores are the members' unchanged out-of-fold files, so they match the five-way blend and do
+not validate the refit. The change tables compare against the five-way blend (`runs/blend`, sha256
+c3af1418...).
+
+| run | commit | given Jul / Aug / Sep (mean) | cleaned (mean) | gen-only (mean) | wall | notes |
+|---|---|---|---|---|---|---|
+| lgbm-refit / lgbm-hedge | 18b268b | — | — | — | 7.2 min | 450 rounds; 50 / 19 argmax rows and 14 / 7 decoded calls changed vs its fold mean |
+| catboost-refit / catboost-hedge | 18b268b | — | — | — | 1.8 min | 450 iterations, gpu_ram_part 0.45; 24 / 11 argmax rows and 9 / 6 decoded calls changed |
+| refit-blend (five -refit members) | 18b268b | 0.5130 / 0.5091 / 0.5147 (0.5123) | 0.5667 | 0.9013 | <2 min | VALID, sha256 `7557112ae26186658e6c9640f5181ddc2a86483c30fdb562b972f6880ec349a4`; 11 October calls changed vs blend (10 legit -> fraud: qr 4, phishing 2, refund 2, cashback 1, collusion 1; 1 cashback -> refund) |
+| hedge-blend (five -hedge members) | 18b268b | 0.5130 / 0.5091 / 0.5147 (0.5123) | 0.5667 | 0.9013 | <2 min | VALID, sha256 `28d9544465b36b028cb6c91069b4af26dc361d6978d5a4401e41f0d6ec7507ad`; 6 October calls changed vs blend (5 legit -> fraud, one each: cashback, phishing, qr, collusion, refund; 1 cashback -> refund) |
