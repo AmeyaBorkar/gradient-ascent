@@ -123,3 +123,16 @@ Short records of design choices.
     the context rows. Both limits come from GPU memory: 100 features with one legit row per fraud
     row (31k context rows) runs out of memory on 24 GB, and October's context (23.6k fraud rows
     alone) only fits at 32 features.
+18. **TabDPT as an in-context member (licence and versions).** Weights `tabdpt1_3.safetensors` from
+    Hugging Face `Layer6/TabDPT`, revision `a5ca6e01c0fa09ec68c73e958e5199d1932abb3a`, source
+    https://huggingface.co/Layer6/TabDPT, licence Apache-2.0, not gated; pip package `tabdpt`
+    1.3.2, in the same model environment as Mitra (torch 2.13.0+cu130). It may go into a
+    submitted file. The design is decision 17 unchanged (same candidates, context, 32 features),
+    one ensemble member, the whole fixed context for every query, no compilation. Its output head
+    has 10 classes (more are handled by a digit decomposition, not natively), so only the binary
+    target is run.
+19. **Mitra is seeded in full.** AutoGluon's Mitra wrapper leaves its "deterministic context"
+    empty, and two repeat runs of one fold slice differed by up to 0.34 in one probability. The
+    member seeds numpy's global generator and torch (CPU and CUDA), and turns on deterministic
+    algorithms (warn only) with cuDNN benchmarking off. Jobs set `CUBLAS_WORKSPACE_CONFIG=:4096:8`.
+    Repeats are then bit-identical.
