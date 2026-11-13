@@ -97,7 +97,15 @@ def _event_class(event: np.ndarray, cls: np.ndarray, conf: np.ndarray) -> dict[i
     return dict(zip(votes["ev"].to_list(), votes["c"].to_list(), strict=True))
 
 
-def anchored_templates(pred, proba, led, log=print, min_conf: float = 0.8) -> np.ndarray:
+def anchored_templates(
+    pred, proba, led, log=print, min_conf: float = 0.8, classes: dict | None = None
+) -> np.ndarray:
+    """``classes`` overrides the class a template gives its unanchored rows, e.g. ``{"4": 6}``;
+    rows held by a counter anchor keep their segment class."""
+    cls_of = {**TEMPLATE_CLASS, **{int(k): int(v) for k, v in (classes or {}).items()}}
+    for t, c in cls_of.items():
+        if c not in TEMPLATE_PAIR[t]:
+            raise ValueError(f"template {t}: class {c} is not one of its pair {TEMPLATE_PAIR[t]}")
     tmpl, event = anchors.templates(led)
     c = _counter(led)
     is_test = led["is_test"].to_numpy()
@@ -108,7 +116,7 @@ def anchored_templates(pred, proba, led, log=print, min_conf: float = 0.8) -> np
             inside & (c["block"] == 2) & np.isin(c["seg_class"], pair) & (c["conf"] >= min_conf)
         )
         by_event = _event_class(event[anchor], c["seg_class"][anchor], c["conf"][anchor])
-        target = np.full(len(pred), TEMPLATE_CLASS[t], dtype=np.int64)
+        target = np.full(len(pred), cls_of[t], dtype=np.int64)
         if by_event:
             ev_ids = np.fromiter(by_event.keys(), dtype=np.int64)
             ev_cls = np.fromiter(by_event.values(), dtype=np.int64)
