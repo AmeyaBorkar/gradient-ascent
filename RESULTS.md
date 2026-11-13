@@ -204,3 +204,22 @@ rule. Details and per-class tables: `docs/findings/more-data.md`.
 | clean-event-refit / clean-event-hedge | 031e194 | — | — | — | 5.0 min | 48 / 24 argmax rows changed |
 | clean-l2-refit / clean-l2-hedge | 031e194 | — | — | — | 7.1 min | 61 / 38 argmax rows changed |
 | refit-october, first launch | ec37c9d | — | — | — | <1 min | failed: shell quoting in the recipe loop; relaunched via `scripts/refit_october.sh` |
+
+## October-shaped copies
+
+Copies of the train months built in octlike's protected mode (`python -m ringtrace.octshape mix`,
+commit 6fb100d, box, 24 threads, wall about 2 min including the three octlike frames). Artefact
+check only: aggregates of the label-free merchant ring events, per 100k rows of the month.
+No model was fitted; the copies failed the check. Details: `docs/findings/october-shaped-copies.md`.
+
+| frame | size 1 | size 2-3 | size 4-8 | size 9+ | mean size |
+|---|---|---|---|---|---|
+| October (real) | 9.98 | 23.79 | 4.22 | 1.15 | 3.25 |
+| raw July / August | 13.28 / 12.15 | 19.73 / 20.31 | 4.17 / 4.37 | 1.33 / 3.04 | 2.88 / 3.62 |
+| copies July s101 / s102 | 16.98 / 14.18 | 16.59 / 13.03 | 4.24 / 5.36 | 0.77 / 1.53 | 2.31 / 3.02 |
+| copies August s101 / s102 | 16.91 / 15.00 | 17.68 / 20.00 | 6.15 / 4.62 | 3.07 / 3.46 | 3.45 / 3.48 |
+| octlike September s13 / s14 / s15 (judge) | 9.51 / 10.72 / 9.52 | 21.39 / 22.24 / 23.40 | 2.77 / 3.57 / 3.57 | 3.56 / 3.18 / 3.17 | 4.03 / 3.67 / 3.80 |
+
+Mean absolute gap to October, July + August: size 1 raw 2.74 vs copies 5.79; size 2-3 raw 3.77
+vs copies 6.97; size 4-8 raw 0.10 vs copies 0.87; size 9+ raw 1.04 vs copies 1.25. Verdict:
+stopped before any fit (copies depart from October more than raw train does).
