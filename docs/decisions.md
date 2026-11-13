@@ -104,3 +104,33 @@ Short records of design choices.
     held-out labels into training. The events are the six event-id modules in the teacher's order
     (bursts, drains, flows, requests, merchant, repeats). The `l2` minority flip uses the same
     chosen event (highest fraud share) and needs no fraud-share threshold of its own.
+16. **TabICL v2 as an in-context blend member (`ringtrace.icl`, experiment only so far).**
+    - **Model.** TabICL v2 classifier from the `tabicl` package, version 2.2.0
+      (https://pypi.org/project/tabicl/), licence BSD 3-Clause. Weights: checkpoint
+      `tabicl-classifier-v2-20260212.ckpt` (the package default), downloaded by the package from
+      its default Hugging Face model repository at revision
+      `4dcd344ece2c00be9e831fdd35bed57b5ad83e19`; file sha256
+      `bdc7dbd5e4ff21f8f0456fcf90c6b7cdf72dbea960f2d05b19bec19f9b3d4ed0`; the repository's card
+      gives the licence as BSD 3-Clause and it is not gated (no token, no terms to accept).
+    - **Submitted file.** The licence allows it. The member did not pass the validation bar
+      (`docs/findings/icl-tabicl.md`), so it is not in any submitted file.
+    - **Environment.** Python 3.13, torch 2.14.1+cu130, one RTX 4090 (24 GB, held to half by
+      `torch.cuda.set_per_process_memory_fraction(0.5)`), 24 CPU threads. Installed with
+      `uv pip install tabicl` into the box venv; it pulled `huggingface-hub` 2.4.0, `einops`
+      0.8.2 and their dependencies.
+    - **Class limit.** The checkpoint's `max_classes` is 10, below the 12 labels, so only the
+      binary fraud vs legit target is used (no 12-class variant).
+    - **Design.** Candidate rows: champion fraud probability `1 - p(legit)` at least tau, tau
+      chosen once on the champion's out-of-fold train array so that 5 % of train rows qualify
+      (tau = 2.18e-5). Features: the champion recipe's 230 columns, cut per fold to the 100
+      with the largest `|AUC - 0.5|` on the context rows, missing and infinite values replaced
+      by the context median; TabICL does its own normalisation. Context: the candidates of the
+      other train months (all three for October), every row (49,878-78,296 rows, no
+      subsampling needed). 8 estimators, `random_state` = seed + month. The member's 12-class
+      row is `p_icl(fraud)` spread over the champion's fraud-type shares, `1 - p_icl(fraud)` on
+      legit, and the champion's row outside the candidates.
+    - **October-like cells.** The context is the July + August candidates; September's
+      candidates come from each champion cell's probabilities with the same tau. Which July
+      and August rows are candidates is read from the champion's ordinary out-of-fold array
+      (no out-of-fold array exists for them inside a frame); this only picks context rows,
+      whose labels are the given ones in any case.
