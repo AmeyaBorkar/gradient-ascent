@@ -269,3 +269,17 @@ rebuilds exactly on this hardware and software. Another GPU model or driver is s
 `tabm-s345` (seeds 3-5): the first attempt died with CUDA out of memory in fold 7, seed 3, after
 epoch 7 (log `tabm-s345-run-oom.log`). No other job of this member was on the GPU at the time.
 It has been relaunched.
+
+### tabm-s345: TabM seeds 3-5 (`run recipes/tabm-s345.json`, relaunch after the out-of-memory crash)
+
+| run | given Jul / Aug / Sep (mean) | cleaned (mean) | gen-only (mean) | wall |
+|---|---|---|---|---|
+| tabm-s345 | 0.5136 / 0.5086 / 0.5151 (0.5124) | 0.5651 / 0.5636 / 0.5719 (0.5669) | 0.9025 / 0.8987 / 0.9017 (0.9010) | 45.4 min |
+| tabm + tabm-s345 (six seeds) | 0.5135 / 0.5086 / 0.5150 (0.5124) | 0.5649 / 0.5636 / 0.5718 (0.5668) | 0.9023 / 0.8986 / 0.9019 (0.9009) | - |
+| champion + six-seed tabm (1:1) | 0.5135 / 0.5091 / 0.5149 (0.5125) | 0.5652 / 0.5642 / 0.5717 (0.5670) | 0.9031 / 0.8997 / 0.9017 (0.9015) | - |
+
+Six-seed TabM in `blend-tabmF-bq` (the two runs at 1/4 each, the fraud-only split otherwise
+unchanged), change vs the uploaded recipe: given -0.00002 / +0.00004 / 0.00000, cleaned
++0.00002 / +0.00004 / 0.00000, gen-only +0.00001 / +0.00011 / 0.00000. That is a tie, and it
+loses July on given, so `blend-tabmF-bq` (three seeds) stays. Seed variance is not what limits
+TabM here.
