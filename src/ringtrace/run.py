@@ -26,6 +26,7 @@ from ringtrace.decode import decode_by_period
 from ringtrace.scoring import macro_f1, per_class_f1
 
 TRAIN_MONTHS = (7, 8, 9)
+EVENT_MODES = {"event_clean": "clean", "event_l2": "l2"}
 
 
 def load_recipe(path: str | Path) -> dict:
@@ -109,6 +110,17 @@ def main(argv: list[str] | None = None) -> dict:
     if recipe.get("train_on") == "cleaned":
         cl = cleaned_labels(led)
         train_target[tr_idx] = cl[tr_idx]
+    event_mode = EVENT_MODES.get(recipe.get("train_on", ""))
+    if recipe.get("train_on") not in (None, "given", "cleaned") and event_mode is None:
+        raise ValueError(f"unknown train_on {recipe['train_on']!r}")
+    events = None
+    if event_mode is not None:
+        from ringtrace import eventclean
+
+        events = eventclean.ledger_events()
+        whole = eventclean.clean_labels(y, events, event_mode, mask=~is_test)
+        log(f"[{event_mode}] all train months: {int((whole != y)[tr_idx].sum())} rows changed, "
+            f"{int(((whole != y) & (y == 0))[tr_idx].sum())} legit -> fraud")
 
     oof = np.zeros((len(y), len(CLASSES)), dtype=np.float64)
     test_sum = np.zeros((len(te_idx), len(CLASSES)), dtype=np.float64)
@@ -116,6 +128,12 @@ def main(argv: list[str] | None = None) -> dict:
         fit = tr_idx[period[tr_idx] != m]
         hold = tr_idx[period[tr_idx] == m]
         log(f"fold {m}: train {len(fit)} rows, hold {len(hold)}")
+        if events is not None:
+            # only the fit months' labels vote, so the held-out month never shapes them
+            fit_mask = np.zeros(len(y), dtype=bool)
+            fit_mask[fit] = True
+            train_target = eventclean.clean_labels(y, events, event_mode, mask=fit_mask)
+            log(f"  {event_mode} labels: {int((train_target[fit] != y[fit]).sum())} rows changed")
         outs = [X[hold]] + ([] if args.no_test else [X[te_idx]])
         res = fit_predict(X[fit], train_target[fit], period[fit], outs, spec, log=log)
         oof[hold] = res[0]
