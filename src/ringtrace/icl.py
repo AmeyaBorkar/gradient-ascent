@@ -249,10 +249,11 @@ def _tabdpt_predict(X_ctx, y_ctx, X_q, seed: int, n_ensembles: int, context_size
     from tabdpt import TabDPTClassifier
 
     torch.manual_seed(seed)
-    clf = TabDPTClassifier(compile=False)
+    clf = TabDPTClassifier(compile=False, verbose=False)
     clf.fit(X_ctx, y_ctx)
+    # context_size 0 = the whole (already subsampled) context, the same rows for every query
     p = clf.ensemble_predict_proba(
-        X_q, n_ensembles=n_ensembles, context_size=context_size, seed=seed
+        X_q, n_ensembles=n_ensembles, context_size=context_size or len(X_ctx), seed=seed
     )
     return np.asarray(p, dtype=np.float64)[:, 1]
 
@@ -451,7 +452,7 @@ def main(argv=None) -> None:
     f.add_argument("--revision", default=None)
     f.add_argument("--query-batch", type=int, default=1024)
     f.add_argument("--n-ensembles", type=int, default=1)
-    f.add_argument("--context-size", type=int, default=2048)
+    f.add_argument("--context-size", type=int, default=0)
     a = sub.add_parser("assemble")
     a.add_argument("job")
     a.add_argument("--tag", required=True)
