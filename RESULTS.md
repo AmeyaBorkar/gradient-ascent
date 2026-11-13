@@ -89,3 +89,29 @@ are skipped), with identical outputs.
 Self-check `score champion champion`: change +0.0000 on every thinning seed and target, averaged
 lower bound +0.0000 (given, cleaned, gen-only) -> FAIL, as it should (the gate needs a positive
 change).
+
+## TabM member (member tabm, laptop: RTX 5070 Ti, 16 threads)
+
+Model: `ringtrace.tabm` (`docs/decisions.md` item 14), recipe `recipes/tabm.json`: the champion's
+230 features (337 inputs with 107 gap flags), k = 16 weight-sharing members, 10 epochs, direct
+12-class softmax; decoded like the champion (fixed point 0.875 + anchored template rule).
+torch 2.14.1+cu130. Two reruns on the GPU give bit-identical probabilities (synthetic check,
+no nondeterminism warnings).
+
+Macro-F1 after the rule, per held-out month Jul / Aug / Sep (mean):
+
+| # | run | commit | given | cleaned | gen-only | wall | notes |
+|---|---|---|---|---|---|---|---|
+| T1 | champion, local rerun (`run recipes/champion.json`) | 25a768c | 0.5130 / 0.5090 / 0.5146 (0.5122) | 0.5645 / 0.5639 / 0.5712 (0.5665) | 0.9020 / 0.8996 / 0.9014 (0.9010) | 6.5 min | matches run 9 exactly; the base for everything below |
+| T2 | go/no-go trial: tabm, fold 9 only (fit Jul + Aug), seed 0 (`run recipes/tabm-trial.json --folds 9 --no-test`) | 56fc386 | - / - / 0.5150 | - / - / 0.5717 | - / - / 0.9014 | 5.5 min | champion Sep 0.5146 / 0.5712 / 0.9014: +0.0004 / +0.0005 / 0.0000. **Pass** |
+| T3 | trial blend champion + tabm 1:1, Sep (`blend champion+tabm-trial-fold-9 --months 9`) | 56fc386 | - / - / 0.5152 | - / - / 0.5719 | - / - / 0.9018 | <1 min | +0.0006 / +0.0007 / +0.0004 over the champion. **Pass**; 325 Sep argmax calls differ |
+| T4 | **tabm**, seeds 0-2, leave-one-month-out + October (`run recipes/tabm.json`) | 56fc386 | 0.5134 / 0.5084 / 0.5151 (**0.5123**) | 0.5649 / 0.5635 / 0.5718 (**0.5667**) | 0.9023 / 0.8984 / 0.9019 (0.9008) | 51.5 min | fixed point alone 0.5070 / 0.5609 (champion 0.5064 / 0.5601); 786 argmax calls differ from the champion over 1.56 M train rows |
+| T5 | **champion + tabm** 1:1 (`blend champion+tabm`) | 967c773 | 0.5134 / 0.5092 / 0.5149 (**0.5125**) | 0.5652 / 0.5643 / 0.5716 (**0.5670**) | 0.9031 / 0.9000 / 0.9017 (0.9016) | <1 min | +0.0003 / +0.0005 / +0.0006 over the champion; Aug and Sep given within ±0.0004 |
+
+Probability check: the trial's decoder warning (`invalid value in divide`) came from the
+1,053,917 July + August rows of the one-fold run (never predicted, all-zero, unscored), not from
+TabM: September had 0 zero-sum and 0 non-finite rows, max |row sum - 1| = 1.5e-7. Fixed in
+`run.py` (967c773): only held-out months are decoded, and every held-out and October row must be
+finite and sum to 1 before decoding (`check_proba`). Re-decoding the trial gives the same
+0.5150 / 0.5717 / 0.9014; the full run's `oof.npy` (1,564,060 rows) and `test.npy` (260,582)
+pass the check.
