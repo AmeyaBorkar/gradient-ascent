@@ -126,7 +126,7 @@ def find_blocks(device: np.ndarray, split: np.ndarray) -> Blocks:
         if not mine.any():
             continue
         lo, hi = int(nums[mine].min()), int(nums[mine].max())
-        holes = np.flatnonzero(~used[lo - base:hi - base + 1]) + lo
+        holes = np.flatnonzero(~used[lo - base : hi - base + 1]) + lo
         edge = lo - 1  # no fraud phase unless a sparse hole is found
         for b in holes[::-1]:
             start = max(lo, int(b) - OCC_WINDOW + 1)
@@ -207,7 +207,7 @@ def change_point(nums: np.ndarray) -> int | None:
     gaps = (np.diff(nums) - 1).astype(np.float64)  # gaps[i] sits between phones i and i + 1
     best, best_j = -np.inf, None
     for j in range(CUT_MIN_SIDE, m - CUT_MIN_SIDE + 1):
-        left, right = gaps[:j - 1], gaps[j:]
+        left, right = gaps[: j - 1], gaps[j:]
         score = _geom_ll(left) + _geom_ll(right)
         # a drop: the takeover side must be the sparser one
         if right.mean() > left.mean() and score > best:
@@ -245,8 +245,7 @@ class Phase:
     cut: int | None
 
 
-def decode_phase(nums: np.ndarray, counts: np.ndarray, blocks: Blocks, lo: int,
-                 hi: int) -> Phase:
+def decode_phase(nums: np.ndarray, counts: np.ndarray, blocks: Blocks, lo: int, hi: int) -> Phase:
     """Segment one fraud phase. ``counts[i, c]`` = rows of phone i with anchor c (0 = none)."""
     loge = emission_table()
     ll = counts @ loge.T
@@ -320,5 +319,6 @@ def build(led: pl.DataFrame, anchor: np.ndarray | None = None) -> pl.DataFrame:
         anchor = anchors.row_anchor(led)
     cols = counter(led["device"].to_numpy(), led["is_test"].to_numpy().astype(np.int64), anchor)
     dtypes = {"block": pl.Int8, "dev_rows": pl.Int32, "dev_single": pl.Int8}
-    return pl.DataFrame({f"{PREFIX}_{k}": pl.Series(v, dtype=dtypes.get(k, pl.Float64))
-                         for k, v in cols.items()})
+    return pl.DataFrame(
+        {f"{PREFIX}_{k}": pl.Series(v, dtype=dtypes.get(k, pl.Float64)) for k, v in cols.items()}
+    )

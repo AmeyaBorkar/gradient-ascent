@@ -51,21 +51,42 @@ def _kind(led: pl.DataFrame) -> pl.Expr:
     refund = (ttype == "REFUND") & ~to_person & cat.is_in(REFUND_CATEGORIES)
     lending = (ttype == "PAY") & ~to_person & (cat == LENDING) & whole & evening
     lending_p2p = (
-        (ttype == "PAY") & to_person & evening & (pl.col("new_payee") == 1) & whole
-        & (pl.col("amount") >= P2P_MIN) & (pl.col("amount") <= P2P_MAX)
+        (ttype == "PAY")
+        & to_person
+        & evening
+        & (pl.col("new_payee") == 1)
+        & whole
+        & (pl.col("amount") >= P2P_MIN)
+        & (pl.col("amount") <= P2P_MAX)
         & ((rupees % 10 != 0) | ratio_110.fill_null(False))
     )
     return (
-        pl.when(refund.fill_null(False)).then(KIND_REFUND)
-        .when(lending.fill_null(False)).then(KIND_LENDING)
-        .when(lending_p2p.fill_null(False)).then(KIND_LENDING_P2P)
-        .otherwise(0).cast(pl.Int8)
+        pl.when(refund.fill_null(False))
+        .then(KIND_REFUND)
+        .when(lending.fill_null(False))
+        .then(KIND_LENDING)
+        .when(lending_p2p.fill_null(False))
+        .then(KIND_LENDING_P2P)
+        .otherwise(0)
+        .cast(pl.Int8)
     )
 
 
 def build(led: pl.DataFrame) -> pl.DataFrame:
-    base = led.select("row", "is_test", "ts", "timestamp", "sender", "receiver", "to_person",
-                      "txn_type", "merchant_category", "amount", "balance_before", "new_payee")
+    base = led.select(
+        "row",
+        "is_test",
+        "ts",
+        "timestamp",
+        "sender",
+        "receiver",
+        "to_person",
+        "txn_type",
+        "merchant_category",
+        "amount",
+        "balance_before",
+        "new_payee",
+    )
     base = base.with_columns(_kind(base).alias("kind"))
     cand = base.filter(pl.col("kind") > 0).sort("is_test", "sender", "kind", "ts", "row")
     new = (
@@ -89,15 +110,19 @@ def build(led: pl.DataFrame) -> pl.DataFrame:
     cand = cand.with_columns(
         pl.when(is_event).then(pl.col("kind")).otherwise(0).cast(pl.Int8).alias("shape"),
         pl.when(is_event).then(pl.col("chain_n")).alias("size"),
-        *(pl.when(is_event).then(pl.col(c)).alias(c)
-          for c in ("event", "span_s", "receivers", "days", "rank")),
+        *(
+            pl.when(is_event).then(pl.col(c)).alias(c)
+            for c in ("event", "span_s", "receivers", "days", "rank")
+        ),
     ).select(
-        "row", "kind", pl.col("chain_n").cast(pl.Int32), "event", "shape",
+        "row",
+        "kind",
+        pl.col("chain_n").cast(pl.Int32),
+        "event",
+        "shape",
         pl.col("size").cast(pl.Int32),
         *(pl.col(c).cast(pl.Float32) for c in ("span_s", "receivers", "days", "rank")),
     )
     out = led.select("row").join(cand, on="row", how="left", maintain_order="left")
     out = out.with_columns(pl.col("shape").fill_null(0), pl.col("kind").fill_null(0))
-    return out.select(
-        pl.col(c).alias(f"{PREFIX}_{c}") for c in (*_EVENT_COLS, "kind", "chain_n")
-    )
+    return out.select(pl.col(c).alias(f"{PREFIX}_{c}") for c in (*_EVENT_COLS, "kind", "chain_n"))

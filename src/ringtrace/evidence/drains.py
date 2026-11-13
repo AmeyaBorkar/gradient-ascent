@@ -47,8 +47,9 @@ def _sender_order(led: pl.DataFrame) -> tuple[np.ndarray, np.ndarray]:
     return order, (sender * 2 + split)[order]
 
 
-def _links(grp: np.ndarray, bal: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray,
-                                                      np.ndarray]:
+def _links(
+    grp: np.ndarray, bal: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Edges in sorted positions (src, dst, code) and the step to the immediate next row."""
     n = len(grp)
     step1 = np.zeros(n, dtype=np.int8)
@@ -93,31 +94,47 @@ def build(led: pl.DataFrame) -> pl.DataFrame:
 
     nodes = np.unique(np.concatenate([src, dst]))
     take = order[nodes]
-    members = pl.DataFrame({
-        "pos": nodes,
-        "comp": comp[nodes],
-        "row": led["row"].to_numpy().astype(np.int64)[take],
-        "ts": led["ts"].to_numpy().astype(np.int64)[take],
-        "sim": led["sim_age_hours"].to_numpy()[take],
-        "device": led["device"].to_numpy().astype(np.int64)[take],
-    })
+    members = pl.DataFrame(
+        {
+            "pos": nodes,
+            "comp": comp[nodes],
+            "row": led["row"].to_numpy().astype(np.int64)[take],
+            "ts": led["ts"].to_numpy().astype(np.int64)[take],
+            "sim": led["sim_age_hours"].to_numpy()[take],
+            "device": led["device"].to_numpy().astype(np.int64)[take],
+        }
+    )
     # a chain's constant is the one of its earliest link
-    edge_c = (pl.DataFrame({"comp": comp[src], "src": src, "c": code})
-              .sort("src").group_by("comp").agg(pl.col("c").first()))
-    chains = (members.group_by("comp").agg(
-        pl.col("row").min().alias("event"),
-        pl.len().alias("size"),
-        (pl.col("ts").max() - pl.col("ts").min()).alias("span"),
-        (pl.col("sim") < SIM_FRESH_H).all().alias("sim_fresh"),
-        ((pl.col("device").n_unique() == 1) & (pl.col("device").min() >= HOME_DEVICES))
-        .alias("one_phone"),
-    ).join(edge_c, on="comp").filter(pl.col("span") <= MAX_SPAN_S).with_columns(
-        pl.when(pl.col("c") == 25)
-        .then(pl.when(pl.col("sim_fresh")).then(1).otherwise(2))
-        .otherwise(pl.when(pl.col("one_phone")).then(3).otherwise(4))
-        .cast(pl.Int8).alias("shape")))
-    rows = (members.join(chains, on="comp", how="inner")
-            .with_columns((pl.col("pos").rank("ordinal").over("comp") - 1).alias("rank_in")))
+    edge_c = (
+        pl.DataFrame({"comp": comp[src], "src": src, "c": code})
+        .sort("src")
+        .group_by("comp")
+        .agg(pl.col("c").first())
+    )
+    chains = (
+        members.group_by("comp")
+        .agg(
+            pl.col("row").min().alias("event"),
+            pl.len().alias("size"),
+            (pl.col("ts").max() - pl.col("ts").min()).alias("span"),
+            (pl.col("sim") < SIM_FRESH_H).all().alias("sim_fresh"),
+            ((pl.col("device").n_unique() == 1) & (pl.col("device").min() >= HOME_DEVICES)).alias(
+                "one_phone"
+            ),
+        )
+        .join(edge_c, on="comp")
+        .filter(pl.col("span") <= MAX_SPAN_S)
+        .with_columns(
+            pl.when(pl.col("c") == 25)
+            .then(pl.when(pl.col("sim_fresh")).then(1).otherwise(2))
+            .otherwise(pl.when(pl.col("one_phone")).then(3).otherwise(4))
+            .cast(pl.Int8)
+            .alias("shape")
+        )
+    )
+    rows = members.join(chains, on="comp", how="inner").with_columns(
+        (pl.col("pos").rank("ordinal").over("comp") - 1).alias("rank_in")
+    )
     at = order[rows["pos"].to_numpy()]  # input positions of chain rows
     in_chain = np.zeros(n, dtype=bool)
     in_chain[at] = True
@@ -127,11 +144,18 @@ def build(led: pl.DataFrame) -> pl.DataFrame:
 
     # chains paying this row's receiver (whole ledger), the row's own chain excluded
     receiver = led["receiver"].to_numpy().astype(np.int64)
-    pays = (pl.DataFrame({"receiver": receiver[at], "event": rows["event"].to_numpy()})
-            .unique().group_by("receiver").agg(pl.len().alias("k")))
-    k = (pl.DataFrame({"receiver": receiver})
-         .join(pays, on="receiver", how="left", maintain_order="left")["k"]
-         .fill_null(0).to_numpy())
+    pays = (
+        pl.DataFrame({"receiver": receiver[at], "event": rows["event"].to_numpy()})
+        .unique()
+        .group_by("receiver")
+        .agg(pl.len().alias("k"))
+    )
+    k = (
+        pl.DataFrame({"receiver": receiver})
+        .join(pays, on="receiver", how="left", maintain_order="left")["k"]
+        .fill_null(0)
+        .to_numpy()
+    )
     rcv_chains = k.astype(np.int64) - in_chain
 
     device = led["device"].to_numpy().astype(np.int64)
@@ -140,15 +164,17 @@ def build(led: pl.DataFrame) -> pl.DataFrame:
 
     shape = np.zeros(n, dtype=np.int8)
     shape[at] = rows["shape"].to_numpy()
-    return pl.DataFrame([
-        on_chain(rows["event"].to_numpy(), pl.Int64).alias(f"{PREFIX}_event"),
-        pl.Series(f"{PREFIX}_shape", shape, dtype=pl.Int8),
-        on_chain(rows["size"].to_numpy(), pl.Int16).alias(f"{PREFIX}_size"),
-        on_chain(rows["span"].to_numpy(), pl.Float32).alias(f"{PREFIX}_span_s"),
-        on_chain(rows["c"].to_numpy(), pl.Int8).alias(f"{PREFIX}_c"),
-        on_chain(rows["rank_in"].to_numpy(), pl.Int16).alias(f"{PREFIX}_pos"),
-        pl.Series(f"{PREFIX}_step_prev", step_prev[rank], dtype=pl.Int8),
-        pl.Series(f"{PREFIX}_step_next", step_next[rank], dtype=pl.Int8),
-        pl.Series(f"{PREFIX}_rcv_chains", rcv_chains, dtype=pl.Int32),
-        pl.Series(f"{PREFIX}_phone", phone, dtype=pl.Int8),
-    ])
+    return pl.DataFrame(
+        [
+            on_chain(rows["event"].to_numpy(), pl.Int64).alias(f"{PREFIX}_event"),
+            pl.Series(f"{PREFIX}_shape", shape, dtype=pl.Int8),
+            on_chain(rows["size"].to_numpy(), pl.Int16).alias(f"{PREFIX}_size"),
+            on_chain(rows["span"].to_numpy(), pl.Float32).alias(f"{PREFIX}_span_s"),
+            on_chain(rows["c"].to_numpy(), pl.Int8).alias(f"{PREFIX}_c"),
+            on_chain(rows["rank_in"].to_numpy(), pl.Int16).alias(f"{PREFIX}_pos"),
+            pl.Series(f"{PREFIX}_step_prev", step_prev[rank], dtype=pl.Int8),
+            pl.Series(f"{PREFIX}_step_next", step_next[rank], dtype=pl.Int8),
+            pl.Series(f"{PREFIX}_rcv_chains", rcv_chains, dtype=pl.Int32),
+            pl.Series(f"{PREFIX}_phone", phone, dtype=pl.Int8),
+        ]
+    )

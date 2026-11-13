@@ -66,9 +66,13 @@ def test_catboost_stages_learn_and_are_deterministic_on_cpu():
 
     X, y, period = _problem(6000, 0)
     Xt, yt, _ = _problem(2000, 1)
-    spec = CascadeSpec(booster=BoosterSpec(rounds=30, depth=4, device="cpu"), seeds=(0, 1),
-                       screen_rounds=20, stages="catboost",
-                       catboost=CatBoostSpec(iterations=40, depth=4, task_type="CPU"))
+    spec = CascadeSpec(
+        booster=BoosterSpec(rounds=30, depth=4, device="cpu"),
+        seeds=(0, 1),
+        screen_rounds=20,
+        stages="catboost",
+        catboost=CatBoostSpec(iterations=40, depth=4, task_type="CPU"),
+    )
     (p1,) = fit_predict(X, y, period, [Xt], spec, log=lambda *_: None)
     (p2,) = fit_predict(X, y, period, [Xt], spec, log=lambda *_: None)
     assert p1.shape == (2000, N_CLASSES)
@@ -103,6 +107,10 @@ def test_catboost_recipe_parses():
     assert spec.stages == "catboost"
     assert spec.seeds == (0, 1, 2)
     p = spec.catboost.params(1, "Logloss")
-    assert (p["iterations"], p["depth"], p["learning_rate"], p["border_count"]) == (300, 8, 0.08,
-                                                                                    254)
+    assert (p["iterations"], p["depth"], p["learning_rate"], p["border_count"]) == (
+        300,
+        8,
+        0.08,
+        254,
+    )
     assert p["task_type"] == "GPU" and p["random_seed"] == 1 and p["verbose"] is False

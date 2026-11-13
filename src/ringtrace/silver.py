@@ -61,8 +61,9 @@ def _isotonic(score: np.ndarray, target: np.ndarray) -> np.ndarray:
     return iso.fit(score, target).predict(score)
 
 
-def _ratio_table(values: np.ndarray, gen: np.ndarray, made_legit: np.ndarray,
-                 edges: np.ndarray) -> np.ndarray:
+def _ratio_table(
+    values: np.ndarray, gen: np.ndarray, made_legit: np.ndarray, edges: np.ndarray
+) -> np.ndarray:
     """Likelihood ratio P(bin | G) / P(bin | legit-made) per bin, smoothed and made monotone."""
     b = np.clip(np.searchsorted(edges, values, side="right") - 1, 0, len(edges) - 1)
     k = len(edges)
@@ -72,8 +73,13 @@ def _ratio_table(values: np.ndarray, gen: np.ndarray, made_legit: np.ndarray,
     return lr[b]
 
 
-def build(led: pl.DataFrame, teacher: np.ndarray, events: np.ndarray, log=print,
-          mask: np.ndarray | None = None) -> dict:
+def build(
+    led: pl.DataFrame,
+    teacher: np.ndarray,
+    events: np.ndarray,
+    log=print,
+    mask: np.ndarray | None = None,
+) -> dict:
     """Compute silver labels from the teacher's out-of-fold probabilities, which are given for
     the rows in ``mask`` (default: every train row), in ledger order. Other rows get -1."""
     train = ~led["is_test"].to_numpy() if mask is None else np.asarray(mask, dtype=bool)
@@ -88,9 +94,11 @@ def build(led: pl.DataFrame, teacher: np.ndarray, events: np.ndarray, log=print,
     ip = led["ip_risk_score"].to_numpy()[train]
     confident_gen = fraud_label & (q >= 0.8)
     confident_legit = ~fraud_label & (q < 0.01)
-    lr_app = np.where(app_old,
-                      app_old[confident_gen].mean() / app_old[confident_legit].mean(),
-                      (1 - app_old[confident_gen].mean()) / (1 - app_old[confident_legit].mean()))
+    lr_app = np.where(
+        app_old,
+        app_old[confident_gen].mean() / app_old[confident_legit].mean(),
+        (1 - app_old[confident_gen].mean()) / (1 - app_old[confident_legit].mean()),
+    )
     edges = np.r_[0.0, np.arange(0.15, 0.80, 0.05)]
     lr_ip = _ratio_table(ip, confident_gen, confident_legit, edges)
     lr_label = np.where(fraud_label, (1 - UNREPORTED) / RHO, UNREPORTED / (1 - RHO))
@@ -110,8 +118,12 @@ def build(led: pl.DataFrame, teacher: np.ndarray, events: np.ndarray, log=print,
         df = pl.DataFrame({"e": ev[voters], "t": y[voters]})
         cnt = df.group_by("e", "t").len()
         tot = cnt.group_by("e").agg(pl.col("len").sum().alias("tot"))
-        top = cnt.sort(["e", "len", "t"], descending=[False, True, False]).group_by(
-            "e", maintain_order=True).first().join(tot, on="e")
+        top = (
+            cnt.sort(["e", "len", "t"], descending=[False, True, False])
+            .group_by("e", maintain_order=True)
+            .first()
+            .join(tot, on="e")
+        )
         lut = pl.DataFrame({"e": ev}).with_row_index("i").join(top, on="e", how="left").sort("i")
         majority = lut["t"].fill_null(-1).to_numpy().astype(np.int64)
         share = (lut["len"] / lut["tot"]).fill_null(0).to_numpy()
@@ -123,8 +135,9 @@ def build(led: pl.DataFrame, teacher: np.ndarray, events: np.ndarray, log=print,
     silver[unreported & ~use_event] = teacher_type[unreported & ~use_event]
 
     structured = fraud_label & gen
-    flip_event = (structured & (majority > 0) & (majority != y) & (share >= EVENT_MAJORITY)
-                  & (others >= 2))
+    flip_event = (
+        structured & (majority > 0) & (majority != y) & (share >= EVENT_MAJORITY) & (others >= 2)
+    )
     fraud_p = p[:, 1:] / np.maximum(p[:, 1:].sum(axis=1, keepdims=True), 1e-12)
     given_p = fraud_p[np.arange(len(y)), np.clip(y - 1, 0, None)]
     flip_floor = structured & ~flip_event & (given_p < NOISE_FLOOR) & (teacher_type != y)
@@ -145,8 +158,10 @@ def build(led: pl.DataFrame, teacher: np.ndarray, events: np.ndarray, log=print,
         "ordinary_fraud_rows": int(ordinary.sum()),
         "ordinary_share_of_fraud": float(ordinary.sum() / fraud_label.sum()),
         "p_gen_middle": int(((p_gen > 0.2) & (p_gen < 0.8)).sum()),
-        "lr_app_old_new": [float(lr_app[app_old][0]) if app_old.any() else None,
-                           float(lr_app[~app_old][0]) if (~app_old).any() else None],
+        "lr_app_old_new": [
+            float(lr_app[app_old][0]) if app_old.any() else None,
+            float(lr_app[~app_old][0]) if (~app_old).any() else None,
+        ],
     }
     log(f"[silver] {json.dumps(stats)}")
     n = led.height
@@ -155,8 +170,12 @@ def build(led: pl.DataFrame, teacher: np.ndarray, events: np.ndarray, log=print,
     full["structured"][train] = structured_only
     pgen_full = np.full(n, np.nan, dtype=np.float32)
     pgen_full[train] = p_gen
-    return {"label": full["label"], "structured": full["structured"], "p_gen": pgen_full,
-            "stats": stats}
+    return {
+        "label": full["label"],
+        "structured": full["structured"],
+        "p_gen": pgen_full,
+        "stats": stats,
+    }
 
 
 def save(result: dict) -> None:

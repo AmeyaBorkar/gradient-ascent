@@ -56,24 +56,44 @@ def _chain(cand: pl.DataFrame, key: str, gap: int) -> pl.DataFrame:
 
 
 def build(led: pl.DataFrame) -> pl.DataFrame:
-    base = led.select("row", "is_test", "ts", "sender", "receiver", "to_person", "txn_type",
-                      "merchant_category", "amount")
+    base = led.select(
+        "row",
+        "is_test",
+        "ts",
+        "sender",
+        "receiver",
+        "to_person",
+        "txn_type",
+        "merchant_category",
+        "amount",
+    )
     cents = (pl.col("amount") * 100).round().cast(pl.Int64)
     to_merchant = ~pl.col("to_person")
     pay_qr = pl.col("txn_type").is_in(["PAY", "QR"])
     ring_amount = cents.is_in(RING_CENTS)
     base = base.with_columns(
         (to_merchant & pay_qr & ring_amount).alias("_ring"),
-        (pl.col("to_person") & (pl.col("txn_type") == "QR")
-         & pl.col("merchant_category").is_not_null()).alias("_qr_person"),
-        (to_merchant & pay_qr & ~ring_amount & (cents % 100 == 0)
-         & (pl.col("amount") >= WHOLE_MIN)).alias("_whole"),
+        (
+            pl.col("to_person")
+            & (pl.col("txn_type") == "QR")
+            & pl.col("merchant_category").is_not_null()
+        ).alias("_qr_person"),
+        (
+            to_merchant
+            & pay_qr
+            & ~ring_amount
+            & (cents % 100 == 0)
+            & (pl.col("amount") >= WHOLE_MIN)
+        ).alias("_whole"),
     )
 
     ring = _chain(base.filter("_ring"), "receiver", DAY).with_columns(
-        pl.when(pl.col("size") <= 3).then(SHAPE_SMALL)
-        .when(pl.col("size") <= 8).then(SHAPE_MID)
-        .otherwise(SHAPE_BIG).alias("shape")
+        pl.when(pl.col("size") <= 3)
+        .then(SHAPE_SMALL)
+        .when(pl.col("size") <= 8)
+        .then(SHAPE_MID)
+        .otherwise(SHAPE_BIG)
+        .alias("shape")
     )
     qr_person = base.filter("_qr_person").with_columns(
         pl.col("row").cast(pl.Int64).alias("event"),
@@ -84,17 +104,25 @@ def build(led: pl.DataFrame) -> pl.DataFrame:
         pl.lit(1).alias("pair_n"),
         pl.lit(1).alias("rank"),
     )
-    whole = _chain(base.filter("_whole"), "receiver", DAY).filter(
-        (pl.col("size") >= WHOLE_MIN_ROWS)
-        & (pl.col("size") >= WHOLE_ROWS_PER_SENDER * pl.col("senders"))
-    ).with_columns(pl.lit(SHAPE_WHOLE).alias("shape"))
+    whole = (
+        _chain(base.filter("_whole"), "receiver", DAY)
+        .filter(
+            (pl.col("size") >= WHOLE_MIN_ROWS)
+            & (pl.col("size") >= WHOLE_ROWS_PER_SENDER * pl.col("senders"))
+        )
+        .with_columns(pl.lit(SHAPE_WHOLE).alias("shape"))
+    )
 
     parts = [p.select("row", *_COLS) for p in (ring, qr_person, whole)]
-    parts = [p.with_columns(
-        pl.col("event").cast(pl.Int64), pl.col("shape").cast(pl.Int8),
-        pl.col("size").cast(pl.Int32),
-        *(pl.col(c).cast(pl.Float32) for c in ("span_s", "senders", "pair_n", "rank")),
-    ) for p in parts]
+    parts = [
+        p.with_columns(
+            pl.col("event").cast(pl.Int64),
+            pl.col("shape").cast(pl.Int8),
+            pl.col("size").cast(pl.Int32),
+            *(pl.col(c).cast(pl.Float32) for c in ("span_s", "senders", "pair_n", "rank")),
+        )
+        for p in parts
+    ]
     events = pl.concat(parts, how="vertical")
     out = led.select("row").join(events, on="row", how="left", maintain_order="left")
     out = out.with_columns(pl.col("shape").fill_null(0))

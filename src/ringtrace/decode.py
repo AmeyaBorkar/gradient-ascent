@@ -20,8 +20,13 @@ from __future__ import annotations
 import numpy as np
 
 
-def fixed_point(proba: np.ndarray, fraud_scale: float = 0.875, max_iter: int = 50,
-                damping: float = 0.5, hidden_factor: float = 1.0) -> np.ndarray:
+def fixed_point(
+    proba: np.ndarray,
+    fraud_scale: float = 0.875,
+    max_iter: int = 50,
+    damping: float = 0.5,
+    hidden_factor: float = 1.0,
+) -> np.ndarray:
     """``hidden_factor`` multiplies each fraud class's expected true count: the model is trained
     to give the ordinary-looking fraud rows a legit score, yet they still count as fraud in the
     labels, so the true class sizes are larger than the probabilities say (1.0 = trust them)."""

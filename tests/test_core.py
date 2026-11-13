@@ -63,12 +63,14 @@ def _toy_ledger(n_train: int, n_test: int) -> pl.DataFrame:
     y = np.zeros(n, dtype=np.int64)
     y[:300] = 3
     y[n_train:] = -1
-    return pl.DataFrame({
-        "is_test": np.r_[np.zeros(n_train, bool), np.ones(n_test, bool)],
-        "y": y,
-        "app_version": np.where(rng.random(n) < 0.3, 3.5, 4.5),
-        "ip_risk_score": rng.random(n) * 0.5,
-    })
+    return pl.DataFrame(
+        {
+            "is_test": np.r_[np.zeros(n_train, bool), np.ones(n_test, bool)],
+            "y": y,
+            "app_version": np.where(rng.random(n) < 0.3, 3.5, 4.5),
+            "ip_risk_score": rng.random(n) * 0.5,
+        }
+    )
 
 
 def test_silver_relabels_confident_unreported_rows():

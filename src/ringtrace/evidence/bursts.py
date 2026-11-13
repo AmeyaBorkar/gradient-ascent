@@ -31,8 +31,9 @@ MERCHANT_MIN_ROWS = 4
 MERCHANT_MONTH_OTHERS = 60
 
 
-def sessions(key: np.ndarray, split: np.ndarray, ts: np.ndarray,
-             row: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def sessions(
+    key: np.ndarray, split: np.ndarray, ts: np.ndarray, row: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Session id (sorted position of its first row), size and position inside it, per row."""
     n = len(key)
     order = np.lexsort((row, ts, key, split))
@@ -72,13 +73,31 @@ def merchant_bursts(led: pl.DataFrame) -> np.ndarray:
     receiver = led["receiver"].to_numpy().astype(np.int64)
     key = np.where(merchant, receiver, -1 - np.arange(len(receiver)))  # persons: singletons
     sid, size, _ = sessions(key, split, ts, row)
-    frame = pl.DataFrame({"r": receiver, "s": split, "m": led["month"].to_numpy(),
-                          "sid": sid, "size": size, "ts": ts, "row": row})
+    frame = pl.DataFrame(
+        {
+            "r": receiver,
+            "s": split,
+            "m": led["month"].to_numpy(),
+            "sid": sid,
+            "size": size,
+            "ts": ts,
+            "row": row,
+        }
+    )
     month_rows = frame.group_by("r", "s", "m").agg(pl.len().alias("month_n"))
-    first = (frame.sort("ts", "row").group_by("sid").agg(pl.col("r", "s", "m").first())
-             .join(month_rows, on=["r", "s", "m"], how="left"))
-    month_n = (frame.select("sid").join(first.select("sid", "month_n"), on="sid", how="left",
-                                        maintain_order="left")["month_n"].to_numpy())
+    first = (
+        frame.sort("ts", "row")
+        .group_by("sid")
+        .agg(pl.col("r", "s", "m").first())
+        .join(month_rows, on=["r", "s", "m"], how="left")
+    )
+    month_n = (
+        frame.select("sid")
+        .join(first.select("sid", "month_n"), on="sid", how="left", maintain_order="left")[
+            "month_n"
+        ]
+        .to_numpy()
+    )
     return merchant & (size >= MERCHANT_MIN_ROWS) & (month_n - size <= MERCHANT_MONTH_OTHERS)
 
 
@@ -93,24 +112,46 @@ def build(led: pl.DataFrame) -> pl.DataFrame:
     sid, size, pos = sessions(device, split, ts, row)
 
     at = np.flatnonzero(size >= MIN_ROWS)
-    rows = pl.DataFrame({
-        "i": at, "sid": sid[at], "pos": pos[at], "row": row[at], "ts": ts[at], "sender": sender[at],
-        "receiver": receiver[at], "login": led["login_to_txn_sec"].to_numpy()[at],
-    })
-    events = rows.group_by("sid").agg(
-        pl.col("row").min().alias("event"),
-        pl.len().alias("size"),
-        (pl.col("ts").max() - pl.col("ts").min()).alias("span"),
-        pl.col("sender").n_unique().alias("accounts"),
-        pl.col("receiver").filter(pl.col("receiver") >= MERCHANT_OFFSET).n_unique()
-        .alias("merchants"),
-        (pl.col("login") <= SCRIPTED_LOGIN_S).mean().alias("scripted"),
-    ).with_columns(
-        pl.when((pl.col("accounts") > FEW_ACCOUNTS)
-                & (pl.col("accounts") >= FARM_ACCOUNT_SHARE * pl.col("size"))).then(1)
-        .when((pl.col("accounts") <= FEW_ACCOUNTS) & (pl.col("scripted") > 0.5)).then(2)
-        .when(pl.col("accounts") <= FEW_ACCOUNTS).then(3)
-        .otherwise(4).cast(pl.Int8).alias("shape"))
+    rows = pl.DataFrame(
+        {
+            "i": at,
+            "sid": sid[at],
+            "pos": pos[at],
+            "row": row[at],
+            "ts": ts[at],
+            "sender": sender[at],
+            "receiver": receiver[at],
+            "login": led["login_to_txn_sec"].to_numpy()[at],
+        }
+    )
+    events = (
+        rows.group_by("sid")
+        .agg(
+            pl.col("row").min().alias("event"),
+            pl.len().alias("size"),
+            (pl.col("ts").max() - pl.col("ts").min()).alias("span"),
+            pl.col("sender").n_unique().alias("accounts"),
+            pl.col("receiver")
+            .filter(pl.col("receiver") >= MERCHANT_OFFSET)
+            .n_unique()
+            .alias("merchants"),
+            (pl.col("login") <= SCRIPTED_LOGIN_S).mean().alias("scripted"),
+        )
+        .with_columns(
+            pl.when(
+                (pl.col("accounts") > FEW_ACCOUNTS)
+                & (pl.col("accounts") >= FARM_ACCOUNT_SHARE * pl.col("size"))
+            )
+            .then(1)
+            .when((pl.col("accounts") <= FEW_ACCOUNTS) & (pl.col("scripted") > 0.5))
+            .then(2)
+            .when(pl.col("accounts") <= FEW_ACCOUNTS)
+            .then(3)
+            .otherwise(4)
+            .cast(pl.Int8)
+            .alias("shape")
+        )
+    )
     rows = rows.join(events, on="sid", how="left", maintain_order="left")
     at = rows["i"].to_numpy()
     in_burst = np.zeros(n, dtype=bool)
@@ -120,21 +161,47 @@ def build(led: pl.DataFrame) -> pl.DataFrame:
     sent = rows.select("sender", "event").unique()
     per_acct = sent.group_by("sender").agg(pl.len().alias("k"))
     base = pl.DataFrame({"sender": sender, "receiver": receiver})
-    snd_k = (base.join(per_acct, on="sender", how="left", maintain_order="left")["k"]
-             .fill_null(0).to_numpy().astype(np.int64))
-    rcv_k = (base.join(per_acct.rename({"sender": "receiver"}), on="receiver", how="left",
-                       maintain_order="left")["k"].fill_null(0).to_numpy().astype(np.int64))
+    snd_k = (
+        base.join(per_acct, on="sender", how="left", maintain_order="left")["k"]
+        .fill_null(0)
+        .to_numpy()
+        .astype(np.int64)
+    )
+    rcv_k = (
+        base.join(
+            per_acct.rename({"sender": "receiver"}),
+            on="receiver",
+            how="left",
+            maintain_order="left",
+        )["k"]
+        .fill_null(0)
+        .to_numpy()
+        .astype(np.int64)
+    )
     own = np.full(n, -1, dtype=np.int64)
     own[at] = rows["event"].to_numpy()
-    rcv_own = (pl.DataFrame({"receiver": receiver, "event": own})
-               .join(sent.rename({"sender": "receiver"}).with_columns(pl.lit(1).alias("hit")),
-                     on=["receiver", "event"], how="left", maintain_order="left")["hit"]
-               .fill_null(0).to_numpy())
+    rcv_own = (
+        pl.DataFrame({"receiver": receiver, "event": own})
+        .join(
+            sent.rename({"sender": "receiver"}).with_columns(pl.lit(1).alias("hit")),
+            on=["receiver", "event"],
+            how="left",
+            maintain_order="left",
+        )["hit"]
+        .fill_null(0)
+        .to_numpy()
+    )
 
     shape = np.zeros(n, dtype=np.int8)
     shape[at] = rows["shape"].to_numpy()
-    on_burst = {"event": pl.Int64, "size": pl.Int16, "span": pl.Float32, "pos": pl.Int16,
-                "accounts": pl.Int16, "merchants": pl.Int16}
+    on_burst = {
+        "event": pl.Int64,
+        "size": pl.Int16,
+        "span": pl.Float32,
+        "pos": pl.Int16,
+        "accounts": pl.Int16,
+        "merchants": pl.Int16,
+    }
     cols = [pl.Series(f"{PREFIX}_shape", shape, dtype=pl.Int8)]
     for name, dtype in on_burst.items():
         out = "span_s" if name == "span" else name

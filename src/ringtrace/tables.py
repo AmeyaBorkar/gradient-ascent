@@ -93,13 +93,16 @@ def raw(name: str) -> pl.DataFrame:
     return _cached(name, src, lambda p: pl.read_csv(p))
 
 
-def stack(train: pl.DataFrame, test: pl.DataFrame, accounts: pl.DataFrame,
-          merchants: pl.DataFrame) -> pl.DataFrame:
+def stack(
+    train: pl.DataFrame, test: pl.DataFrame, accounts: pl.DataFrame, merchants: pl.DataFrame
+) -> pl.DataFrame:
     """Build the ledger: train then test, integer keys, account and merchant attributes joined."""
     test = test.with_columns(pl.lit(None, dtype=pl.Utf8).alias("label"))
     both = pl.concat(
-        [train.with_columns(pl.lit(False).alias("is_test")),
-         test.select(train.columns).with_columns(pl.lit(True).alias("is_test"))],
+        [
+            train.with_columns(pl.lit(False).alias("is_test")),
+            test.select(train.columns).with_columns(pl.lit(True).alias("is_test")),
+        ],
         how="vertical",
     ).with_row_index("row")
 
@@ -112,35 +115,49 @@ def stack(train: pl.DataFrame, test: pl.DataFrame, accounts: pl.DataFrame,
         (pl.col("timestamp").dt.epoch("s")).alias("ts"),
         month.alias("month"),
         # Train rows dated October are the tails of September events: they belong to September.
-        pl.when(pl.col("is_test")).then(pl.lit(10, dtype=pl.Int8))
+        pl.when(pl.col("is_test"))
+        .then(pl.lit(10, dtype=pl.Int8))
         .otherwise(pl.min_horizontal(month, pl.lit(LAST_TRAIN_MONTH, dtype=pl.Int8)))
         .alias("period"),
         label_code.alias("y"),
         _id_number("sender_id").alias("sender"),
         pl.when(pl.col("receiver_type") == "MERCHANT")
         .then(_id_number("receiver_id") + MERCHANT_OFFSET)
-        .otherwise(_id_number("receiver_id")).alias("receiver"),
+        .otherwise(_id_number("receiver_id"))
+        .alias("receiver"),
         _id_number("device_id").alias("device"),
         (pl.col("receiver_type") == "P2P").alias("to_person"),
     )
 
     acc = accounts.select(
         _id_number("account_id").alias("acct"),
-        pl.col("home_city"), pl.col("bank_code"), pl.col("kyc_level"),
-        pl.col("opened_on").str.to_date("%Y-%m-%d").alias("opened_on"), pl.col("os"),
+        pl.col("home_city"),
+        pl.col("bank_code"),
+        pl.col("kyc_level"),
+        pl.col("opened_on").str.to_date("%Y-%m-%d").alias("opened_on"),
+        pl.col("os"),
     )
     ledger = ledger.join(
         acc.rename({c: f"s_{c}" for c in acc.columns if c != "acct"}),
-        left_on="sender", right_on="acct", how="left",
+        left_on="sender",
+        right_on="acct",
+        how="left",
     )
     ledger = ledger.join(
-        acc.select("acct", pl.col("opened_on").alias("r_opened_on"),
-                   pl.col("home_city").alias("r_home_city"), pl.col("kyc_level").alias("r_kyc")),
-        left_on="receiver", right_on="acct", how="left",
+        acc.select(
+            "acct",
+            pl.col("opened_on").alias("r_opened_on"),
+            pl.col("home_city").alias("r_home_city"),
+            pl.col("kyc_level").alias("r_kyc"),
+        ),
+        left_on="receiver",
+        right_on="acct",
+        how="left",
     )
     mer = merchants.select(
         (_id_number("merchant_id") + MERCHANT_OFFSET).alias("mkey"),
-        pl.col("category").alias("m_category"), pl.col("city").alias("m_city"),
+        pl.col("category").alias("m_category"),
+        pl.col("city").alias("m_city"),
         pl.col("onboarded_on").str.to_date("%Y-%m-%d").alias("m_onboarded_on"),
     )
     ledger = ledger.join(mer, left_on="receiver", right_on="mkey", how="left")

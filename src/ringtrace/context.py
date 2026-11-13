@@ -21,8 +21,16 @@ DAY = 86400
 # previous/next gaps beyond these windows say more about the month than about the row
 GAP_CAP = {"snd": DAY, "dev": DAY, "rcv": 3 * DAY, "pair": 7 * DAY}
 
-CATEGORICALS = ("txn_type", "merchant_category", "app", "s_kyc_level", "s_os", "s_bank_code",
-                "m_category", "r_kyc")
+CATEGORICALS = (
+    "txn_type",
+    "merchant_category",
+    "app",
+    "s_kyc_level",
+    "s_os",
+    "s_bank_code",
+    "m_category",
+    "r_kyc",
+)
 
 
 def _codes(col: pl.Series) -> np.ndarray:
@@ -97,8 +105,11 @@ def row_view(led: pl.DataFrame) -> dict[str, np.ndarray]:
 def density(led: pl.DataFrame) -> np.ndarray:
     """Rows per day of the row's period relative to the train months' mean."""
     period = led["period"].to_numpy()
-    per = pl.DataFrame({"p": period, "d": led["timestamp"].dt.date()}).group_by("p").agg(
-        (pl.len() / pl.col("d").n_unique()).alias("rate"))
+    per = (
+        pl.DataFrame({"p": period, "d": led["timestamp"].dt.date()})
+        .group_by("p")
+        .agg((pl.len() / pl.col("d").n_unique()).alias("rate"))
+    )
     rate = dict(zip(per["p"].to_list(), per["rate"].to_list(), strict=True))
     base = np.mean([rate[p] for p in rate if p <= 9])
     lut = np.zeros(int(max(rate)) + 1)
@@ -157,7 +168,7 @@ def reverse_payments(sender, receiver, ts, amt, window: int = 7 * DAY) -> dict[s
     rev = receiver.astype(np.int64) * (2 * MERCHANT_OFFSET) + sender
     keys, inv = np.unique(np.concatenate([fwd, rev]), return_inverse=True)
     del keys
-    kf, kr = inv[: len(fwd)], inv[len(fwd):]
+    kf, kr = inv[: len(fwd)], inv[len(fwd) :]
     t = ts.astype(np.int64) - int(ts.min())
     comp = kf.astype(np.int64) * (1 << 33) + t
     order = np.argsort(comp, kind="stable")
@@ -186,23 +197,42 @@ def flow_view(led: pl.DataFrame) -> dict[str, np.ndarray]:
     """Money moving on: what the receiver sent next, and what the sender received just before."""
     f: dict[str, np.ndarray] = {}
     base = led.select("row", "sender", "receiver", "ts", "amount", "to_person").with_columns(
-        pl.col("ts").cast(pl.Int64))
-    outgoing = base.select(pl.col("sender").alias("acct"), pl.col("ts").alias("t_out"),
-                           pl.col("amount").alias("x_out")).sort("t_out")
-    incoming = base.filter(pl.col("to_person")).select(
-        pl.col("receiver").alias("acct"), pl.col("ts").alias("t_in"),
-        pl.col("amount").alias("x_in")).sort("t_in")
+        pl.col("ts").cast(pl.Int64)
+    )
+    outgoing = base.select(
+        pl.col("sender").alias("acct"), pl.col("ts").alias("t_out"), pl.col("amount").alias("x_out")
+    ).sort("t_out")
+    incoming = (
+        base.filter(pl.col("to_person"))
+        .select(
+            pl.col("receiver").alias("acct"),
+            pl.col("ts").alias("t_in"),
+            pl.col("amount").alias("x_in"),
+        )
+        .sort("t_in")
+    )
     left = base.sort("ts")
-    nxt = left.join_asof(outgoing, left_on="ts", right_on="t_out", by_left="receiver",
-                         by_right="acct", strategy="forward", allow_exact_matches=False
-                         ).sort("row")
+    nxt = left.join_asof(
+        outgoing,
+        left_on="ts",
+        right_on="t_out",
+        by_left="receiver",
+        by_right="acct",
+        strategy="forward",
+        allow_exact_matches=False,
+    ).sort("row")
     person = nxt["to_person"].to_numpy()
     f["flow_next_out_dt"] = np.where(person, (nxt["t_out"] - nxt["ts"]).to_numpy(), np.nan)
-    f["flow_next_out_ratio"] = np.where(person, (nxt["x_out"] / nxt["amount"]).to_numpy(),
-                                        np.nan)
-    prv = left.join_asof(incoming, left_on="ts", right_on="t_in", by_left="sender",
-                         by_right="acct", strategy="backward", allow_exact_matches=False
-                         ).sort("row")
+    f["flow_next_out_ratio"] = np.where(person, (nxt["x_out"] / nxt["amount"]).to_numpy(), np.nan)
+    prv = left.join_asof(
+        incoming,
+        left_on="ts",
+        right_on="t_in",
+        by_left="sender",
+        by_right="acct",
+        strategy="backward",
+        allow_exact_matches=False,
+    ).sort("row")
     f["flow_prev_in_dt"] = (prv["ts"] - prv["t_in"]).to_numpy()
     f["flow_prev_in_ratio"] = (prv["amount"] / prv["x_in"]).to_numpy()
     as_rcv = np.where(base["to_person"].to_numpy(), base["receiver"].to_numpy(), -1)

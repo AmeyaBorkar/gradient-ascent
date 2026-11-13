@@ -42,9 +42,17 @@ BAL_TOL = 2e-4
 U, UO, W, N1, N1X, N2, A1S, A1L, A2 = range(1, 10)
 REQUEST, BAIT, ANSWER = 1, 2, 3
 
-INT_COLS = {"event": pl.Int64, "shape": pl.Int8, "size": pl.Int32, "role": pl.Int8,
-            "n_bait": pl.Int8, "short": pl.Int8, "rev_tiny_n72": pl.Int32,
-            "s_ring_n": pl.Int32, "r_ring_n": pl.Int32}
+INT_COLS = {
+    "event": pl.Int64,
+    "shape": pl.Int8,
+    "size": pl.Int32,
+    "role": pl.Int8,
+    "n_bait": pl.Int8,
+    "short": pl.Int8,
+    "rev_tiny_n72": pl.Int32,
+    "s_ring_n": pl.Int32,
+    "r_ring_n": pl.Int32,
+}
 
 
 def _base(led: pl.DataFrame) -> pl.DataFrame:
@@ -73,40 +81,58 @@ def _sessions(b: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
     baits = b.filter(pl.col("bait")).sort("split", "snd", "rcv", "ts", "row")
     gap = pl.col("ts").diff().over("split", "snd", "rcv")
     baits = baits.with_columns(
-        (gap.is_null() | (gap > SESSION_GAP)).cum_sum().cast(pl.Int64).alias("sess"))
+        (gap.is_null() | (gap > SESSION_GAP)).cum_sum().cast(pl.Int64).alias("sess")
+    )
     sess = baits.group_by("sess").agg(
-        pl.col("split").first(), pl.col("snd").first(), pl.col("rcv").first(),
-        pl.col("row").min().alias("event"), pl.len().alias("n_bait"),
+        pl.col("split").first(),
+        pl.col("snd").first(),
+        pl.col("rcv").first(),
+        pl.col("row").min().alias("event"),
+        pl.len().alias("n_bait"),
         pl.col("amt").max().alias("bait_max"),
-        pl.col("ts").min().alias("t_first"), pl.col("ts").max().alias("t_last"),
+        pl.col("ts").min().alias("t_first"),
+        pl.col("ts").max().alias("t_last"),
     )
     back = b.filter(pl.col("person") & ~pl.col("bait")).select(
-        "split", pl.col("snd").alias("rcv"), pl.col("rcv").alias("snd"),
-        pl.col("i").alias("ans_i"), pl.col("row").alias("ans_row"), pl.col("ts").alias("ans_t"),
-        pl.col("amt").alias("ans_amt"))
+        "split",
+        pl.col("snd").alias("rcv"),
+        pl.col("rcv").alias("snd"),
+        pl.col("i").alias("ans_i"),
+        pl.col("row").alias("ans_row"),
+        pl.col("ts").alias("ans_t"),
+        pl.col("amt").alias("ans_amt"),
+    )
     delay = pl.col("ans_t") - pl.col("t_last")
     first_back = (
         sess.join(back, on=["split", "snd", "rcv"])
         .filter((delay > 0) & (delay <= ANSWER_WINDOW))
-        .sort("sess", "ans_t", "ans_row").unique("sess", keep="first", maintain_order=True)
+        .sort("sess", "ans_t", "ans_row")
+        .unique("sess", keep="first", maintain_order=True)
         # one answer serves one session: the latest session before it keeps it
         .sort("ans_i", "t_last", "event", descending=[False, True, True])
         .unique("ans_i", keep="first", maintain_order=True)
         .select("sess", "ans_i", "ans_t", "ans_amt")
     )
     sess = sess.join(first_back, on="sess", how="left").with_columns(
-        (pl.col("ans_t") - pl.col("t_last")).alias("delay"))
+        (pl.col("ans_t") - pl.col("t_last")).alias("delay")
+    )
     answered = pl.col("ans_i").is_not_null()
     one = pl.col("n_bait") == 1
     sess = sess.with_columns(
-        pl.when(one & ~answered & (pl.col("bait_max") == 10)).then(N1X)
-        .when(one & ~answered).then(N1)
-        .when(~answered).then(N2)
-        .when(one & (pl.col("delay") <= SHORT_ANSWER)).then(A1S)
-        .when(one).then(A1L)
-        .otherwise(A2).cast(pl.Int8).alias("shape"),
-        pl.when(answered).then((pl.col("delay") <= SHORT_ANSWER).cast(pl.Float64))
-        .alias("short"),
+        pl.when(one & ~answered & (pl.col("bait_max") == 10))
+        .then(N1X)
+        .when(one & ~answered)
+        .then(N1)
+        .when(~answered)
+        .then(N2)
+        .when(one & (pl.col("delay") <= SHORT_ANSWER))
+        .then(A1S)
+        .when(one)
+        .then(A1L)
+        .otherwise(A2)
+        .cast(pl.Int8)
+        .alias("shape"),
+        pl.when(answered).then((pl.col("delay") <= SHORT_ANSWER).cast(pl.Float64)).alias("short"),
         pl.coalesce("ans_t", "t_last").sub(pl.col("t_first")).alias("span"),
         (pl.col("n_bait") + answered.cast(pl.Int64)).alias("size"),
     )
@@ -116,9 +142,24 @@ def _sessions(b: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
 def build(led: pl.DataFrame) -> pl.DataFrame:
     b = _base(led)
     n = b.height
-    names = ["event", "shape", "size", "span_s", "role", "n_bait", "bait_max", "delay_s",
-             "answer_amount", "short", "limit", "offset", "rev_tiny_n72", "rev_tiny_dt",
-             "s_ring_n", "r_ring_n"]
+    names = [
+        "event",
+        "shape",
+        "size",
+        "span_s",
+        "role",
+        "n_bait",
+        "bait_max",
+        "delay_s",
+        "answer_amount",
+        "short",
+        "limit",
+        "offset",
+        "rev_tiny_n72",
+        "rev_tiny_dt",
+        "s_ring_n",
+        "r_ring_n",
+    ]
     out = {k: np.full(n, np.nan) for k in names}
 
     p2p, typ, cents = pl.col("person"), pl.col("txn_type"), pl.col("cents")
@@ -126,16 +167,27 @@ def build(led: pl.DataFrame) -> pl.DataFrame:
 
     # --- bait sessions and answers --------------------------------------------------------------
     bait_rows, sess = _sessions(b)
-    members = pl.concat([
-        bait_rows.with_columns(pl.lit(BAIT, dtype=pl.Int8).alias("role")),
-        sess.filter(pl.col("ans_i").is_not_null()).select(
-            pl.col("ans_i").alias("i"), "sess", pl.lit(ANSWER, dtype=pl.Int8).alias("role")),
-    ]).join(sess.drop("snd", "rcv", "split"), on="sess", how="left")
+    members = pl.concat(
+        [
+            bait_rows.with_columns(pl.lit(BAIT, dtype=pl.Int8).alias("role")),
+            sess.filter(pl.col("ans_i").is_not_null()).select(
+                pl.col("ans_i").alias("i"), "sess", pl.lit(ANSWER, dtype=pl.Int8).alias("role")
+            ),
+        ]
+    ).join(sess.drop("snd", "rcv", "split"), on="sess", how="left")
     mi = members["i"].to_numpy()
-    for col, src in (("event", "event"), ("shape", "shape"), ("size", "size"),
-                     ("span_s", "span"), ("role", "role"), ("n_bait", "n_bait"),
-                     ("bait_max", "bait_max"), ("delay_s", "delay"),
-                     ("answer_amount", "ans_amt"), ("short", "short")):
+    for col, src in (
+        ("event", "event"),
+        ("shape", "shape"),
+        ("size", "size"),
+        ("span_s", "span"),
+        ("role", "role"),
+        ("n_bait", "n_bait"),
+        ("bait_max", "bait_max"),
+        ("delay_s", "delay"),
+        ("answer_amount", "ans_amt"),
+        ("short", "short"),
+    ):
         out[col][mi] = members[src].cast(pl.Float64).fill_null(np.nan).to_numpy()
     is_answer = np.zeros(n, dtype=bool)
     is_answer[mi[members["role"].to_numpy() == ANSWER]] = True
@@ -146,18 +198,33 @@ def build(led: pl.DataFrame) -> pl.DataFrame:
     b = b.with_columns(pl.Series("answer", is_answer))
     new_p2p = p2p & pl.col("new") & ~pl.col("answer")
     kind = (
-        pl.when(new_p2p & (typ == "COLLECT") & cents.is_in(_cents(JUST_UNDER))).then(U)
-        .when(new_p2p & typ.is_in(["PAY", "QR", "AUTOPAY", "REFUND"])
-              & cents.is_in(_cents(UO_AMOUNTS))).then(UO)
-        .when(new_p2p & typ.is_in(["COLLECT", "QR"]) & (pl.col("amt") >= W_MIN)
-              & ~cents.is_in(_cents(JUST_UNDER))
-              & ((whole & ((cents // 100) % 10 != 0)) | off_ratio.fill_null(False))).then(W)
-        .otherwise(0).cast(pl.Int8)
+        pl.when(new_p2p & (typ == "COLLECT") & cents.is_in(_cents(JUST_UNDER)))
+        .then(U)
+        .when(
+            new_p2p
+            & typ.is_in(["PAY", "QR", "AUTOPAY", "REFUND"])
+            & cents.is_in(_cents(UO_AMOUNTS))
+        )
+        .then(UO)
+        .when(
+            new_p2p
+            & typ.is_in(["COLLECT", "QR"])
+            & (pl.col("amt") >= W_MIN)
+            & ~cents.is_in(_cents(JUST_UNDER))
+            & ((whole & ((cents // 100) % 10 != 0)) | off_ratio.fill_null(False))
+        )
+        .then(W)
+        .otherwise(0)
+        .cast(pl.Int8)
     )
-    req = b.with_columns(kind.alias("kind")).filter(pl.col("kind") > 0).with_columns(
-        pl.col("row").min().over("split", "snd").alias("event"),
-        pl.len().over("split", "snd").alias("size"),
-        (pl.col("ts").max() - pl.col("ts").min()).over("split", "snd").alias("span"),
+    req = (
+        b.with_columns(kind.alias("kind"))
+        .filter(pl.col("kind") > 0)
+        .with_columns(
+            pl.col("row").min().over("split", "snd").alias("event"),
+            pl.len().over("split", "snd").alias("size"),
+            (pl.col("ts").max() - pl.col("ts").min()).over("split", "snd").alias("span"),
+        )
     )
     ri = req["i"].to_numpy()
     out["event"][ri] = req["event"].to_numpy()
@@ -181,11 +248,17 @@ def build(led: pl.DataFrame) -> pl.DataFrame:
 
     # --- reverse tiny payments in the 72 h before -----------------------------------------------
     tiny = b.filter(pl.col("bait")).select(
-        "split", pl.col("rcv").alias("snd"), pl.col("snd").alias("rcv"), pl.col("ts").alias("tt"))
+        "split", pl.col("rcv").alias("snd"), pl.col("snd").alias("rcv"), pl.col("ts").alias("tt")
+    )
     dt = pl.col("ts") - pl.col("tt")
-    rev = (b.filter(p2p).select("i", "split", "snd", "rcv", "ts")
-           .join(tiny, on=["split", "snd", "rcv"]).filter((dt > 0) & (dt <= ANSWER_WINDOW))
-           .group_by("i").agg(pl.len().alias("n"), dt.min().alias("dt")))
+    rev = (
+        b.filter(p2p)
+        .select("i", "split", "snd", "rcv", "ts")
+        .join(tiny, on=["split", "snd", "rcv"])
+        .filter((dt > 0) & (dt <= ANSWER_WINDOW))
+        .group_by("i")
+        .agg(pl.len().alias("n"), dt.min().alias("dt"))
+    )
     out["rev_tiny_n72"][person] = 0
     out["rev_tiny_n72"][rev["i"].to_numpy()] = rev["n"].to_numpy()
     out["rev_tiny_dt"][rev["i"].to_numpy()] = rev["dt"].to_numpy()
@@ -198,17 +271,29 @@ def build(led: pl.DataFrame) -> pl.DataFrame:
     ev = b.select("i", "split", "snd", "rcv").with_columns(
         pl.Series("event", out["event"], nan_to_null=True).cast(pl.Int64),
         pl.Series("shape", np.nan_to_num(shape)).cast(pl.Int8),
-        pl.Series("role", np.nan_to_num(role)).cast(pl.Int8))
+        pl.Series("role", np.nan_to_num(role)).cast(pl.Int8),
+    )
     scam = ev.filter((pl.col("shape") > 0) & (pl.col("shape") != N1X)).select(
-        "split", "event",
-        pl.when(pl.col("role") == BAIT).then(pl.col("snd")).otherwise(pl.col("rcv")).alias("acct"))
+        "split",
+        "event",
+        pl.when(pl.col("role") == BAIT).then(pl.col("snd")).otherwise(pl.col("rcv")).alias("acct"),
+    )
     total = scam.group_by("split", "acct").agg(pl.len().alias("n_all"))
     own = scam.group_by("split", "acct", "event").agg(pl.len().alias("n_own"))
     for side, col in (("snd", "s_ring_n"), ("rcv", "r_ring_n")):
-        m = (ev.join(total, left_on=["split", side], right_on=["split", "acct"], how="left",
-                     maintain_order="left")
-             .join(own, left_on=["split", side, "event"], right_on=["split", "acct", "event"],
-                   how="left", maintain_order="left"))
+        m = ev.join(
+            total,
+            left_on=["split", side],
+            right_on=["split", "acct"],
+            how="left",
+            maintain_order="left",
+        ).join(
+            own,
+            left_on=["split", side, "event"],
+            right_on=["split", "acct", "event"],
+            how="left",
+            maintain_order="left",
+        )
         out[col][m["i"].to_numpy()] = (m["n_all"].fill_null(0) - m["n_own"].fill_null(0)).to_numpy()
 
     shape = np.nan_to_num(out.pop("shape")).astype(np.int8)

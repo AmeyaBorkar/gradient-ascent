@@ -77,8 +77,14 @@ TEMPLATES: dict[int, tuple[str, tuple[int, ...]]] = {
 }
 TEMPLATE_NAMES = {1: "mf1", 2: "drain1", 3: "mf2+mf3", 4: "col7", 5: "col1", 6: "rng1"}
 # the two classes a template's events are written as, and the class the plain rule gives them
-TEMPLATE_PAIR = {1: (CHAIN, MULE), 2: (SIM, ATO), 3: (MULE, BOT), 4: (CASHB, PHISH),
-                 5: (PHISH, CASHB), 6: (QR, REFUND)}
+TEMPLATE_PAIR = {
+    1: (CHAIN, MULE),
+    2: (SIM, ATO),
+    3: (MULE, BOT),
+    4: (CASHB, PHISH),
+    5: (PHISH, CASHB),
+    6: (QR, REFUND),
+}
 TEMPLATE_CLASS = {1: CHAIN, 2: SIM, 3: MULE, 4: CASHB, 5: PHISH, 6: QR}
 
 

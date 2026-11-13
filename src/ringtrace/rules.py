@@ -34,16 +34,21 @@ def _counter(led: pl.DataFrame) -> dict[str, np.ndarray]:
     conf = c["ctr_conf"].cast(pl.Float64).fill_null(np.nan).to_numpy()
     rows = c["ctr_dev_rows"].fill_null(0).to_numpy().astype(np.int64)
     seg_class = np.where(np.isfinite(seg), np.nan_to_num(seg, nan=-1.0) + 1, 0).astype(np.int64)
-    return {"block": block, "seg_class": seg_class, "conf": np.nan_to_num(conf, nan=-1.0),
-            "dev_rows": rows}
+    return {
+        "block": block,
+        "seg_class": seg_class,
+        "conf": np.nan_to_num(conf, nan=-1.0),
+        "dev_rows": rows,
+    }
 
 
 def _split_counts(mask: np.ndarray, is_test: np.ndarray) -> str:
     return f"train {int((mask & ~is_test).sum())} / test {int((mask & is_test).sum())}"
 
 
-def counter_rule(pred, proba, led, log=print, min_conf: float = 0.9,
-                 trusted: int = TRUSTED_SEGMENTS) -> np.ndarray:
+def counter_rule(
+    pred, proba, led, log=print, min_conf: float = 0.9, trusted: int = TRUSTED_SEGMENTS
+) -> np.ndarray:
     c = _counter(led)
     out = pred.copy()
     fb = c["block"] == 2
@@ -69,8 +74,10 @@ def plain_templates(pred, proba, led, log=print) -> np.ndarray:
     for t, pair in TEMPLATE_PAIR.items():
         hit = (tmpl == t) & np.isin(pred, pair)
         out[hit] = TEMPLATE_CLASS[t]
-        log(f"  {TEMPLATE_NAMES[t]:<8} pair calls {_split_counts(hit, is_test)}, "
-            f"changed {_split_counts(hit & (out != pred), is_test)}")
+        log(
+            f"  {TEMPLATE_NAMES[t]:<8} pair calls {_split_counts(hit, is_test)}, "
+            f"changed {_split_counts(hit & (out != pred), is_test)}"
+        )
     return out
 
 
@@ -78,10 +85,13 @@ def _event_class(event: np.ndarray, cls: np.ndarray, conf: np.ndarray) -> dict[i
     """Majority anchor class of each event (ties: larger summed confidence)."""
     if len(event) == 0:
         return {}
-    votes = (pl.DataFrame({"ev": event, "c": cls, "w": conf})
-             .group_by("ev", "c").agg(pl.len().alias("n"), pl.col("w").sum())
-             .sort(["ev", "n", "w", "c"], descending=[False, True, True, False])
-             .unique("ev", keep="first", maintain_order=True))
+    votes = (
+        pl.DataFrame({"ev": event, "c": cls, "w": conf})
+        .group_by("ev", "c")
+        .agg(pl.len().alias("n"), pl.col("w").sum())
+        .sort(["ev", "n", "w", "c"], descending=[False, True, True, False])
+        .unique("ev", keep="first", maintain_order=True)
+    )
     return dict(zip(votes["ev"].to_list(), votes["c"].to_list(), strict=True))
 
 
@@ -92,8 +102,9 @@ def anchored_templates(pred, proba, led, log=print, min_conf: float = 0.8) -> np
     out = pred.copy()
     for t, pair in TEMPLATE_PAIR.items():
         inside = tmpl == t
-        anchor = (inside & (c["block"] == 2) & np.isin(c["seg_class"], pair)
-                  & (c["conf"] >= min_conf))
+        anchor = (
+            inside & (c["block"] == 2) & np.isin(c["seg_class"], pair) & (c["conf"] >= min_conf)
+        )
         by_event = _event_class(event[anchor], c["seg_class"][anchor], c["conf"][anchor])
         target = np.full(len(pred), TEMPLATE_CLASS[t], dtype=np.int64)
         if by_event:
@@ -107,9 +118,11 @@ def anchored_templates(pred, proba, led, log=print, min_conf: float = 0.8) -> np
         target[anchor] = c["seg_class"][anchor]
         hit = inside & np.isin(pred, pair)
         out[hit] = target[hit]
-        log(f"  {TEMPLATE_NAMES[t]:<8} anchors {_split_counts(anchor, is_test)}, "
+        log(
+            f"  {TEMPLATE_NAMES[t]:<8} anchors {_split_counts(anchor, is_test)}, "
             f"anchored events {len(by_event)}, "
-            f"changed {_split_counts(hit & (out != pred), is_test)}")
+            f"changed {_split_counts(hit & (out != pred), is_test)}"
+        )
     return out
 
 
@@ -121,8 +134,9 @@ RULES = {
 }
 
 
-def apply(rules: list, pred: np.ndarray, proba: np.ndarray, led: pl.DataFrame,
-          log=print) -> np.ndarray:
+def apply(
+    rules: list, pred: np.ndarray, proba: np.ndarray, led: pl.DataFrame, log=print
+) -> np.ndarray:
     """Run ``rules`` in order on the calls ``pred`` (class codes, one per ledger row)."""
     pred = np.asarray(pred, dtype=np.int64).copy()
     is_test = led["is_test"].to_numpy()

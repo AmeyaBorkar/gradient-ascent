@@ -23,8 +23,16 @@ CLASSIC12 = (1950, 1990, 1999, 4950, 4990, 4999, 9950, 9990, 9999, 24950, 24990,
 BAIT = (1, 2, 5, 10)
 STEPS = {"step025": 0.25, "step035": 0.35}
 STEP_GAP_S = 3 * HOUR
-CERTIFICATES = ("odd", "p2p_category", "qr_p2p_nocat", "bal110", "bal102", "over_balance",
-                "step025", "step035")
+CERTIFICATES = (
+    "odd",
+    "p2p_category",
+    "qr_p2p_nocat",
+    "bal110",
+    "bal102",
+    "over_balance",
+    "step025",
+    "step035",
+)
 # neighbour windows (seconds either side, inclusive)
 SENDER_W = DAY
 RECEIVER_PERSON_W = 3 * DAY
@@ -97,8 +105,9 @@ def step_marks(led: pl.DataFrame) -> dict[str, np.ndarray]:
     return out
 
 
-def _neighbours(key: np.ndarray, ts: np.ndarray, width: np.ndarray | int,
-                flags: list[np.ndarray]) -> list[np.ndarray]:
+def _neighbours(
+    key: np.ndarray, ts: np.ndarray, width: np.ndarray | int, flags: list[np.ndarray]
+) -> list[np.ndarray]:
     """Other rows of the same key within [t - w, t + w]: all rows, then each flag's rows."""
     tl = Timeline(key, ts)
     if np.isscalar(width):
@@ -132,8 +141,11 @@ def build(led: pl.DataFrame) -> pl.DataFrame:
     for name, values in marks.items():
         cols[f"{PREFIX}_{name}"] = pl.Series(np.asarray(values, dtype=np.int8))
     rcv_w = np.where(person, RECEIVER_PERSON_W, RECEIVER_MERCHANT_W)
-    for ent, col, width in (("snd", "sender", SENDER_W), ("rcv", "receiver", rcv_w),
-                            ("dev", "device", DEVICE_W)):
+    for ent, col, width in (
+        ("snd", "sender", SENDER_W),
+        ("rcv", "receiver", rcv_w),
+        ("dev", "device", DEVICE_W),
+    ):
         key = led[col].to_numpy().astype(np.int64) * 2 + split
         n_all, n_odd, n_any = _neighbours(key, ts, width, flags)
         cols[f"{PREFIX}_{ent}_n"] = pl.Series(n_all)

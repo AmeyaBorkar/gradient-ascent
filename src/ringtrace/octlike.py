@@ -56,8 +56,9 @@ def export_counter() -> None:
     print(f"[octlike] counter: {ctr.width} columns, {ctr.height} rows -> {target}")
 
 
-def _features(recipe: dict, led: pl.DataFrame, stacked: np.ndarray,
-              log) -> tuple[np.ndarray, list[str]]:
+def _features(
+    recipe: dict, led: pl.DataFrame, stacked: np.ndarray, log
+) -> tuple[np.ndarray, list[str]]:
     """The recipe's feature matrix on the frame, with the counter taken from the unthinned build."""
     from ringtrace import store
 
@@ -134,8 +135,10 @@ def run(frame: Path, cells: list[tuple[str, list[int]]], out: Path, recipes_dir:
     y = led["y"].to_numpy().astype(np.int64)
     fit = ~is_test & np.isin(period, FIT_PERIODS)
     hold = ~is_test & (period == HOLD_PERIOD)
-    log(f"[octlike] frame s{seed}: ledger {led.height} rows, fit {fit.sum()}, "
-        f"September {hold.sum()}, test {n_test}")
+    log(
+        f"[octlike] frame s{seed}: ledger {led.height} rows, fit {fit.sum()}, "
+        f"September {hold.sum()}, test {n_test}"
+    )
     summary_path = out / f"summary_s{seed}.json"
     summary = json.loads(summary_path.read_text()) if summary_path.exists() else {}
 
@@ -152,8 +155,10 @@ def run(frame: Path, cells: list[tuple[str, list[int]]], out: Path, recipes_dir:
             cleaned, stats = _cleaned_target(led, fit, log)
             target[fit] = cleaned[fit]
             summary[f"{PREFIX[recipe_name]}_cleaning"] = stats
-            log(f"[octlike] cleaned labels on July+August: {stats['changed']} rows changed "
-                f"({time.time() - T0:.0f}s)")
+            log(
+                f"[octlike] cleaned labels on July+August: {stats['changed']} rows changed "
+                f"({time.time() - T0:.0f}s)"
+            )
         base = runner.cascade_spec(recipe)
         for r in seed_sets:
             name = f"{PREFIX[recipe_name]}_s{seed}_r{r}"
@@ -169,10 +174,16 @@ def run(frame: Path, cells: list[tuple[str, list[int]]], out: Path, recipes_dir:
             pred = decode_by_period(prob, period[hold], **recipe.get("decoder", {}))
             score = macro_f1(y[hold], pred)
             arg = macro_f1(y[hold], prob.argmax(1))
-            summary[name] = {"given_fixed_point": score, "given_argmax": arg,
-                             "seeds": list(base.seeds), "rows": int(hold.sum())}
-            log(f"[octlike] {name}: September given macro-F1 fixed point {score:.4f} "
-                f"(argmax {arg:.4f}) ({time.time() - T0:.0f}s)")
+            summary[name] = {
+                "given_fixed_point": score,
+                "given_argmax": arg,
+                "seeds": list(base.seeds),
+                "rows": int(hold.sum()),
+            }
+            log(
+                f"[octlike] {name}: September given macro-F1 fixed point {score:.4f} "
+                f"(argmax {arg:.4f}) ({time.time() - T0:.0f}s)"
+            )
             summary_path.write_text(json.dumps(summary, indent=1))
 
 

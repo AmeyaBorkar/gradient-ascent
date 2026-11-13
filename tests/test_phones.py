@@ -60,8 +60,11 @@ def synthetic(seed: int = 7):
     order = rng.permutation(len(rows))  # row order must not matter
     arr = np.array(rows, dtype=np.int64)[order]
     # a fraud phase ends on its last unused number (spec-counter 1: B1, B2)
-    edges = {"f0": f0, "train": (f0, end, legit_tr[1]), "test": (legit_tr[1] + 1, end2,
-                                                                legit_te[1])}
+    edges = {
+        "f0": f0,
+        "train": (f0, end, legit_tr[1]),
+        "test": (legit_tr[1] + 1, end2, legit_te[1]),
+    }
     return arr, edges
 
 

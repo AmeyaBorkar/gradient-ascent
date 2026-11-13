@@ -137,8 +137,10 @@ def main(argv: list[str] | None = None) -> dict:
 
         events = eventclean.ledger_events()
         whole = eventclean.clean_labels(y, events, event_mode, mask=~is_test)
-        log(f"[{event_mode}] all train months: {int((whole != y)[tr_idx].sum())} rows changed, "
-            f"{int(((whole != y) & (y == 0))[tr_idx].sum())} legit -> fraud")
+        log(
+            f"[{event_mode}] all train months: {int((whole != y)[tr_idx].sum())} rows changed, "
+            f"{int(((whole != y) & (y == 0))[tr_idx].sum())} legit -> fraud"
+        )
 
     oof = np.zeros((len(y), len(CLASSES)), dtype=np.float64)
     test_sum = np.zeros((len(te_idx), len(CLASSES)), dtype=np.float64)

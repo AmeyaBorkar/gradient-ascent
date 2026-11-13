@@ -34,8 +34,9 @@ def decoded(run: str, led) -> np.ndarray:
     proba = np.zeros((led.height, K))
     proba[tr] = np.load(out / "oof.npy")
     pred = np.zeros(led.height, dtype=np.int64)
-    pred[tr] = decode_by_period(proba[tr], period[tr],
-                                **recipe.get("decoder", {"fraud_scale": 0.875}))
+    pred[tr] = decode_by_period(
+        proba[tr], period[tr], **recipe.get("decoder", {"fraud_scale": 0.875})
+    )
     if recipe.get("rules"):
         from ringtrace import rules
 
@@ -52,7 +53,7 @@ def _counts(groups: np.ndarray, truth: np.ndarray, pred: np.ndarray, n_groups: i
 
 
 def _macro(c: np.ndarray) -> np.ndarray:
-    tp, pr, tr = c[:, :K], c[:, K:2 * K], c[:, 2 * K:]
+    tp, pr, tr = c[:, :K], c[:, K : 2 * K], c[:, 2 * K :]
     with np.errstate(invalid="ignore", divide="ignore"):
         f1 = np.where(pr + tr > 0, 2 * tp / (pr + tr), 0.0)
     return f1.mean(axis=1)
@@ -76,10 +77,15 @@ def bootstrap(groups, truth, period, pred_a, pred_b, draws=2000, seed=0) -> dict
         deltas += (db - da) / len(months)
         one = np.ones((1, ng))
         point += float((_macro(np.asarray(one @ cb)) - _macro(np.asarray(one @ ca)))[0]) / len(
-            months)
+            months
+        )
     lo, hi = np.percentile(deltas, [5, 95])
-    return {"delta": point, "p05": float(lo), "p95": float(hi),
-            "verdict": "challenger" if lo > 0 else ("base" if hi < 0 else "tie")}
+    return {
+        "delta": point,
+        "p05": float(lo),
+        "p95": float(hi),
+        "verdict": "challenger" if lo > 0 else ("base" if hi < 0 else "tie"),
+    }
 
 
 def main(argv=None) -> dict:
@@ -107,8 +113,10 @@ def main(argv=None) -> dict:
             continue
         out[name] = bootstrap(groups, y.astype(np.int64), period, pa, pb, args.draws)
         r = out[name]
-        print(f"{args.challenger} vs {args.base} [{name}]: {r['delta']:+.4f} "
-              f"[{r['p05']:+.4f}, {r['p95']:+.4f}] -> {r['verdict']}")
+        print(
+            f"{args.challenger} vs {args.base} [{name}]: {r['delta']:+.4f} "
+            f"[{r['p05']:+.4f}, {r['p95']:+.4f}] -> {r['verdict']}"
+        )
     return out
 
 

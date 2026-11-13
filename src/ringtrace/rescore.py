@@ -49,8 +49,9 @@ def main(argv=None) -> dict:
     pred[tr_idx] = decode_by_period(proba[tr_idx], period[tr_idx], **dec)
     pred[te_idx] = decode_by_period(proba[te_idx], period[te_idx], **dec)
     score_block("fixed_point", pred[tr_idx], targets, period[tr_idx], report)
-    rules = recipe.get("rules", []) if args.rules is None else [
-        r for r in args.rules.split(",") if r]
+    rules = (
+        recipe.get("rules", []) if args.rules is None else [r for r in args.rules.split(",") if r]
+    )
     if rules:
         from ringtrace import rules as rulebook
 
@@ -58,7 +59,8 @@ def main(argv=None) -> dict:
         score_block("rules", pred[tr_idx], targets, period[tr_idx], report)
     for tname, yt in targets.items():
         report.setdefault("per_class", {})[tname] = dict(
-            zip(CLASSES, np.round(per_class_f1(yt, pred[tr_idx]), 4).tolist(), strict=True))
+            zip(CLASSES, np.round(per_class_f1(yt, pred[tr_idx]), 4).tolist(), strict=True)
+        )
     print(json.dumps(report.get("per_class", {}).get("cleaned", {})))
     return report
 

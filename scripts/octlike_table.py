@@ -1,6 +1,6 @@
 """Print the October-like summary as a Markdown table (run on the box, aggregates only).
 
-    python scripts/octlike_table.py [~/outputs/octlike]
+python scripts/octlike_table.py [~/outputs/octlike]
 """
 
 from __future__ import annotations
@@ -23,13 +23,17 @@ for f in sorted(out.glob("summary_s*.json")):
 print("| cell | seeds | September rows | given macro-F1, fixed point | argmax |")
 print("|---|---|---|---|---|")
 for k, v in sorted(rows):
-    print(f"| {k} | {v['seeds']} | {v['rows']} | {v['given_fixed_point']:.4f} | "
-          f"{v['given_argmax']:.4f} |")
+    print(
+        f"| {k} | {v['seeds']} | {v['rows']} | {v['given_fixed_point']:.4f} | "
+        f"{v['given_argmax']:.4f} |"
+    )
 for prefix in ("champion", "cleantrain"):
     vals = [v["given_fixed_point"] for k, v in rows if k.startswith(prefix)]
     if vals:
         mean = sum(vals) / len(vals)
-        print(f"\n{prefix}: {len(vals)} cells, mean {mean:.4f}, "
-              f"min {min(vals):.4f}, max {max(vals):.4f}")
+        print(
+            f"\n{prefix}: {len(vals)} cells, mean {mean:.4f}, "
+            f"min {min(vals):.4f}, max {max(vals):.4f}"
+        )
 for seed, st in sorted(cleaning.items()):
     print(f"\ncleaning s{seed}: {json.dumps(st)}")

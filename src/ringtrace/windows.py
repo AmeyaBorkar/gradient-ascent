@@ -78,8 +78,9 @@ class Timeline:
         return sorted_values[self.rank]
 
 
-def distinct_in_window(key: np.ndarray, other: np.ndarray, ts: np.ndarray,
-                       back: int, ahead: int = 0) -> np.ndarray:
+def distinct_in_window(
+    key: np.ndarray, other: np.ndarray, ts: np.ndarray, back: int, ahead: int = 0
+) -> np.ndarray:
     """Distinct ``other`` values among rows of the same ``key`` in [t - back, t] (or
     [t, t + ahead] when ``back`` is 0). Polars evaluates the rolling windows natively."""
     import polars as pl
@@ -89,12 +90,14 @@ def distinct_in_window(key: np.ndarray, other: np.ndarray, ts: np.ndarray,
     ts = np.asarray(ts, dtype=np.int64)
     sign = 1 if back else -1
     width = back or ahead
-    df = pl.DataFrame({
-        "i": np.arange(len(ts), dtype=np.int64),
-        "k": np.asarray(key, dtype=np.int64),
-        "o": np.asarray(other, dtype=np.int64),
-        "t": sign * ts,
-    }).sort("k", "t")
+    df = pl.DataFrame(
+        {
+            "i": np.arange(len(ts), dtype=np.int64),
+            "k": np.asarray(key, dtype=np.int64),
+            "o": np.asarray(other, dtype=np.int64),
+            "t": sign * ts,
+        }
+    ).sort("k", "t")
     agg = df.rolling(index_column="t", period=f"{width + 1}i", group_by="k").agg(
         pl.col("o").n_unique().alias("d"), pl.col("i").last().alias("i_last")
     )

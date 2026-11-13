@@ -58,15 +58,19 @@ def frame() -> tuple[pl.DataFrame, np.ndarray, np.ndarray]:
     for p in ("drn", "mf", "col", "rng"):
         cols[f"{p}_shape"] = [s if f == p else 0 for f, s, *_ in ROWS]
         cols[f"{p}_event"] = [e if f == p else None for f, _, e, *_ in ROWS]
-    led = pl.DataFrame({
-        "is_test": [r[7] for r in ROWS],
-        **{k: pl.Series(v, dtype=pl.Int8 if k.endswith("shape") else pl.Int64)
-           for k, v in cols.items()},
-        "ctr_block": pl.Series([r[3] for r in ROWS], dtype=pl.Int8),
-        "ctr_seg": [r[4] for r in ROWS],
-        "ctr_conf": [r[5] for r in ROWS],
-        "ctr_dev_rows": pl.Series([1] * n, dtype=pl.Int32),
-    })
+    led = pl.DataFrame(
+        {
+            "is_test": [r[7] for r in ROWS],
+            **{
+                k: pl.Series(v, dtype=pl.Int8 if k.endswith("shape") else pl.Int64)
+                for k, v in cols.items()
+            },
+            "ctr_block": pl.Series([r[3] for r in ROWS], dtype=pl.Int8),
+            "ctr_seg": [r[4] for r in ROWS],
+            "ctr_conf": [r[5] for r in ROWS],
+            "ctr_dev_rows": pl.Series([1] * n, dtype=pl.Int32),
+        }
+    )
     pred = np.array([r[6] for r in ROWS], dtype=np.int64)
     proba = np.full((n, 12), 0.01)
     proba[:, 0] = 0.5
@@ -108,8 +112,9 @@ def test_plain_templates():
 def test_counter_and_legit_block():
     led, pred, proba = frame()
     lines: list[str] = []
-    out = rules.apply([{"name": "counter", "min_conf": 0.9}, "legit_block"], pred, proba, led,
-                      log=lines.append)
+    out = rules.apply(
+        [{"name": "counter", "min_conf": 0.9}, "legit_block"], pred, proba, led, log=lines.append
+    )
     assert out[20] == CHAIN  # called legit in the fraud block -> model's best fraud class
     assert out[21] == MULE  # confident trusted segment sets the type
     assert out[22] == PHISH  # cashback segment is not trusted: model's type kept
@@ -124,8 +129,10 @@ def test_counter_and_legit_block():
 
 def test_nan_never_triggers():
     led, pred, proba = frame()
-    led = led.with_columns(pl.lit(None, dtype=pl.Float64).alias("ctr_seg"),
-                           pl.lit(None, dtype=pl.Float64).alias("ctr_conf"))
+    led = led.with_columns(
+        pl.lit(None, dtype=pl.Float64).alias("ctr_seg"),
+        pl.lit(None, dtype=pl.Float64).alias("ctr_conf"),
+    )
     out = rules.apply(["anchored_templates"], pred, proba, led, log=lambda m: None)
     plain = rules.apply(["plain_templates"], pred, proba, led, log=lambda m: None)
     assert out.tolist() == plain.tolist()

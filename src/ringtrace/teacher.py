@@ -19,8 +19,14 @@ from ringtrace import silver, store, threads
 from ringtrace.classes import N_CLASSES
 
 EVENT_FAMILIES = ("bursts", "drains", "flows", "requests", "merchant", "repeats")
-EVENT_COLUMNS = {"bursts": "bot_event", "drains": "drn_event", "flows": "mf_event",
-                 "requests": "col_event", "merchant": "rng_event", "repeats": "rep_event"}
+EVENT_COLUMNS = {
+    "bursts": "bot_event",
+    "drains": "drn_event",
+    "flows": "mf_event",
+    "requests": "col_event",
+    "merchant": "rng_event",
+    "repeats": "rep_event",
+}
 
 
 def available(name: str) -> bool:
@@ -39,14 +45,31 @@ def union_events(n: int) -> np.ndarray:
     return out
 
 
-def teacher_oof(X: np.ndarray, y: np.ndarray, period: np.ndarray, seed: int = 7,
-                rounds: int = 250, legit_keep: float = 0.25) -> np.ndarray:
+def teacher_oof(
+    X: np.ndarray,
+    y: np.ndarray,
+    period: np.ndarray,
+    seed: int = 7,
+    rounds: int = 250,
+    legit_keep: float = 0.25,
+) -> np.ndarray:
     rng = np.random.default_rng(seed)
     out = np.zeros((len(y), N_CLASSES), dtype=np.float32)
-    params = {"tree_method": "hist", "device": "cuda", "objective": "multi:softprob",
-              "num_class": N_CLASSES, "eta": 0.1, "max_depth": 7, "subsample": 0.8,
-              "colsample_bytree": 0.6, "min_child_weight": 3, "lambda": 2.0, "seed": seed,
-              "nthread": threads.budget(), "verbosity": 0}
+    params = {
+        "tree_method": "hist",
+        "device": "cuda",
+        "objective": "multi:softprob",
+        "num_class": N_CLASSES,
+        "eta": 0.1,
+        "max_depth": 7,
+        "subsample": 0.8,
+        "colsample_bytree": 0.6,
+        "min_child_weight": 3,
+        "lambda": 2.0,
+        "seed": seed,
+        "nthread": threads.budget(),
+        "verbosity": 0,
+    }
     for m in np.unique(period):
         fit = period != m
         keep = fit & ((y > 0) | (rng.random(len(y)) < legit_keep))
