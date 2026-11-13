@@ -6,8 +6,9 @@
 set -uo pipefail
 tries="$1"; shift
 need="${RINGTRACE_GPU_FREE_MB:-6000}"
+gpu="${CUDA_VISIBLE_DEVICES:-0}"; gpu="${gpu%%,*}"  # the device the job sees
 for i in $(seq 1 "$tries"); do
-  while free=$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | head -1) \
+  while free=$(nvidia-smi -i "$gpu" --query-gpu=memory.free --format=csv,noheader,nounits | head -1) \
         && [ "$free" -lt "$need" ]; do
     echo "try $i: waiting, ${free} MiB free on the GPU"; sleep 60
   done
