@@ -128,3 +128,39 @@ which rows sit at the margin.
   - wrong merchant-pair type switches in August.
 - **Consequence:** this agrees with the earlier decomposition (adds right, type switches a coin
   flip). TabM's useful signal is P(fraud), not P(type | fraud).
+
+## Which kind of rows TabM adds, and whether it sees ordinary-looking fraud
+
+Leave-one-month-out arrays, Jul-Sep pooled, decoded as above. The adds counted here are the
+champion legit -> TabM fraud calls: 73 rows against the champion alone. Against the five-way
+blend, the earlier decomposition counted 37 adds.
+
+| kind of added row | rows |
+|---|---|
+| (b) generator row (gen-only label fraud) | 47 |
+| (a) ordinary-looking fraud (cleaned fraud, gen-only legit) | 5 |
+| legit on the cleaned labels | 21 |
+
+Precision of the adds: 0.52 on given labels, 0.59 on cleaned.
+
+| class | adds | generator | ordinary | cleaned legit | precision (cleaned) |
+|---|---|---|---|---|---|
+| phishing_collect | 40 | 24 | 2 | 14 | 0.57 |
+| refund_abuse | 11 | 5 | 0 | 6 | 0.36 |
+| sim_swap | 7 | 6 | 1 | 0 | 0.43 |
+| velocity_bot | 5 | 5 | 0 | 0 | 1.00 |
+| fake_cashback | 3 | 2 | 1 | 0 | 0.67 |
+| mule_account, account_takeover, qr_swap, merchant_collusion | 7 | 5 | 1 | 1 | 0.86 |
+
+**Ordinary-looking rows** (gen-only legit; 1,539,715 rows, 2.35 % fraud on cleaned labels):
+- **AUC of P(fraud) against the cleaned labels,** Jul / Aug / Sep:
+  - TabM 0.531 / 0.531 / 0.531;
+  - champion 0.510 / 0.507 / 0.505.
+- **TabM's edge is in the bulk only:** the fraud rate in its top 10 % is 3.1 % against 2.9 % for
+  the champion.
+- **Precision above 0.3:** the high-precision prefix (cumulative precision >= 0.3) is the same
+  size for both models, 3,663 rows for TabM against 3,636 (Jul-Sep). It holds rows both models
+  already score near 1.
+- **No reachable pocket in (a).** TabM's extra signal on ordinary rows is real but far too weak
+  for any precision cut that pays in macro-F1. So no October count above 0.3 precision beyond
+  what the champion already calls is estimated.
