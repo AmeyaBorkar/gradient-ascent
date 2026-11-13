@@ -63,3 +63,51 @@ def test_entity_inputs_pool_strictly_earlier_rows_of_each_entity():
     assert by_sender[2, -1] == 1 and by_sender[2, 0] == 100.0
     # receiver 5: rows 0, 1, 3; row 3 sees rows 0 and 1
     assert by_receiver[3, -1] == 2 and by_receiver[3, 0] == 150.0
+
+
+def test_every_family_is_wired():
+    assert set(nnexp.FAMILIES) == {"selftrain", "entity", "tabr", "shift", "metric"}
+
+
+def test_domain_weights_upweight_rows_that_look_like_the_target():
+    from ringtrace import nn_shift
+
+    rng = np.random.default_rng(0)
+    X_src = rng.normal(size=(4000, 3))
+    X_tgt = rng.normal(size=(2000, 3))
+    X_tgt[:, 0] += 1.0
+    w, info = nn_shift.domain_weights(
+        X_src, X_tgt, rounds=30, sample=4000, threads=1, log=lambda *_: None
+    )
+    assert w.shape == (4000,) and np.isclose(w.mean(), 1.0)
+    assert info["auc"] > 0.6
+    hi, lo = X_src[:, 0] > 1.0, X_src[:, 0] < -1.0
+    assert w[hi].mean() > 2 * w[lo].mean()
+    w2, _ = nn_shift.domain_weights(
+        X_src, X_tgt, rounds=30, sample=4000, threads=1, log=lambda *_: None
+    )
+    assert np.array_equal(w, w2)
+
+
+def test_domain_weights_are_flat_without_shift():
+    from ringtrace import nn_shift
+
+    rng = np.random.default_rng(1)
+    X_src = rng.normal(size=(4000, 3))
+    X_tgt = rng.normal(size=(4000, 3))
+    w, info = nn_shift.domain_weights(
+        X_src, X_tgt, rounds=20, sample=8000, threads=1, log=lambda *_: None
+    )
+    assert info["auc"] < 0.6
+    assert info["ess_share"] > 0.8
+
+
+def test_weighted_fit_with_unit_weights_runs_on_cpu():
+    from ringtrace import nn_shift, tabm
+
+    rng = np.random.default_rng(2)
+    X = rng.normal(size=(300, 4))
+    y = (X[:, 0] > 0).astype(np.int64) * 3
+    spec = tabm.TabMSpec(seeds=(0,), epochs=1, k=2, width=16, blocks=1, device="cpu")
+    (p,) = nn_shift.fit_predict_weighted(X, y, np.ones(300), [X[:10]], spec, log=lambda *_: None)
+    assert p.shape == (10, 12) and np.allclose(p.sum(axis=1), 1.0)

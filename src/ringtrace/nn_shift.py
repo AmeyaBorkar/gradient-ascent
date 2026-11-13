@@ -255,3 +255,133 @@ def scale_rows(
     for j in cols:
         out[rows, j] *= factor
     return out
+
+
+# ---------------------------------------------------------------------------------------------
+# covariate-shift reweighting toward a target frame (features only)
+
+
+def domain_weights(
+    X_src: np.ndarray,
+    X_tgt: np.ndarray,
+    clip: tuple[float, float] = (0.2, 5.0),
+    sample: int = 300_000,
+    rounds: int = 200,
+    seed: int = 0,
+    threads: int = 8,
+    log=print,
+) -> tuple[np.ndarray, dict]:
+    """Importance weights ``p_tgt(x) / p_src(x)`` for every source row, from a domain classifier.
+
+    A LightGBM classifier tells source rows (0) from target rows (1) on the raw matrix; it reads
+    no labels. Both sets are split in two halves by a seeded permutation; a model fitted on
+    (at most ``sample`` rows of) each half scores the other half's source rows, so no source
+    row is scored by a model that saw it. The odds are scaled by ``n_src / n_tgt``, clipped to
+    ``clip`` and divided by their mean, so the weights average 1. ``info`` has the cross-fitted
+    AUC on the source rows plus the scored target rows, and the effective sample share
+    ``(sum w)^2 / (n sum w^2)``.
+    """
+    import lightgbm as lgb
+    from sklearn.metrics import roc_auc_score
+
+    X_src = _matrix(X_src)
+    X_tgt = _matrix(X_tgt)
+    if X_src.shape[1] != X_tgt.shape[1]:
+        raise ValueError(f"column counts differ: {X_src.shape[1]} and {X_tgt.shape[1]}")
+    n_s, n_t = X_src.shape[0], X_tgt.shape[0]
+    if n_s < 4 or n_t < 4:
+        raise ValueError("need at least 4 source and 4 target rows")
+    rng = np.random.default_rng(seed)
+    half_s = rng.permutation(n_s) % 2
+    half_t = rng.permutation(n_t) % 2
+    p_src = np.empty(n_s, dtype=np.float64)
+    p_tgt = np.empty(n_t, dtype=np.float64)
+    params = {
+        "objective": "binary",
+        "learning_rate": 0.1,
+        "num_leaves": 31,
+        "min_data_in_leaf": 200,
+        "feature_fraction": 0.8,
+        "bagging_fraction": 0.8,
+        "bagging_freq": 1,
+        "num_threads": threads,
+        "seed": seed,
+        "deterministic": True,
+        "force_row_wise": True,
+        "verbose": -1,
+    }
+    for h in (0, 1):
+        s_idx = np.flatnonzero(half_s == h)
+        t_idx = np.flatnonzero(half_t == h)
+        cap = max(sample // 2, 1)
+        if s_idx.size > cap:
+            s_idx = np.sort(rng.choice(s_idx, cap, replace=False))
+        if t_idx.size > cap:
+            t_idx = np.sort(rng.choice(t_idx, cap, replace=False))
+        Xh = np.vstack([X_src[s_idx], X_tgt[t_idx]]).astype(np.float32)
+        dh = np.r_[np.zeros(s_idx.size), np.ones(t_idx.size)]
+        # balance the two domains inside the fit, then correct with n_src / n_tgt below
+        wh = np.r_[np.full(s_idx.size, 0.5 / s_idx.size), np.full(t_idx.size, 0.5 / t_idx.size)]
+        wh *= len(dh)
+        booster = lgb.train(params, lgb.Dataset(Xh, dh, weight=wh), num_boost_round=rounds)
+        del Xh
+        other_s = np.flatnonzero(half_s != h)
+        other_t = np.flatnonzero(half_t != h)
+        for start in range(0, other_s.size, _DEFAULT_CHUNK):
+            idx = other_s[start : start + _DEFAULT_CHUNK]
+            p_src[idx] = booster.predict(X_src[idx].astype(np.float32))
+        p_tgt[other_t] = booster.predict(X_tgt[other_t].astype(np.float32))
+    eps = 1e-6
+    p = np.clip(p_src, eps, 1 - eps)
+    # The fit was balanced, so p / (1 - p) is already the density ratio p_tgt / p_src.
+    w = np.clip(p / (1 - p), clip[0], clip[1])
+    w = w / w.mean()
+    auc = float(roc_auc_score(np.r_[np.zeros(n_s), np.ones(n_t)], np.r_[p_src, p_tgt]))
+    ess = float(w.sum() ** 2 / (n_s * np.square(w).sum()))
+    info = {
+        "auc": auc,
+        "ess_share": ess,
+        "w_min": float(w.min()),
+        "w_max": float(w.max()),
+        "clipped_share": float(((p / (1 - p) <= clip[0]) | (p / (1 - p) >= clip[1])).mean()),
+    }
+    log(
+        f"  shift weights: domain AUC {auc:.4f}, effective share {ess:.3f}, "
+        f"w {info['w_min']:.3f}..{info['w_max']:.3f}, clipped {info['clipped_share']:.4f}"
+    )
+    return w, info
+
+
+def fit_predict_weighted(
+    X_tr: np.ndarray,
+    y_tr: np.ndarray,
+    w_tr: np.ndarray,
+    X_out: list[np.ndarray],
+    spec,
+    log=print,
+) -> list[np.ndarray]:
+    """TabM on one-hot labels with per-row weights; probabilities for every matrix in ``X_out``.
+
+    Preprocessing is ``tabm.fit_prep`` on ``X_tr``; the update is
+    ``nn_selftrain.train_one_soft`` (class weights from the row-weighted counts, a
+    row-weighted cross-entropy). Seeds are averaged.
+    """
+    import torch
+
+    from ringtrace import nn_selftrain, tabm
+
+    prep = tabm.fit_prep(X_tr, spec.quantiles)
+    Z = tabm.transform(prep, X_tr)
+    Zo = [tabm.transform(prep, X) for X in X_out]
+    T = nn_selftrain._one_hot(y_tr)
+    outs = [np.zeros((len(X), T.shape[1]), dtype=np.float64) for X in X_out]
+    for seed in spec.seeds:
+        model = nn_selftrain.train_one_soft(
+            Z, T, np.asarray(w_tr, dtype=np.float64), spec, seed, log
+        )
+        for o, z in zip(outs, Zo, strict=True):
+            o += tabm.predict(model, z, spec)
+        del model
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    return [o / len(spec.seeds) for o in outs]

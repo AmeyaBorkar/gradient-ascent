@@ -236,8 +236,73 @@ def _fit_entity(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
     return prob
 
 
+def _fit_tabr(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
+    """The TabR-style retrieval member; its memory is the fit rows only."""
+    from ringtrace import tabr
+
+    (prob,) = tabr.fit_predict(
+        X[cell.fit],
+        cell.targets["given"][cell.fit],
+        cell.period[cell.fit],
+        [X[cell.hold]],
+        tabr.TabRSpec(seeds=spec.seeds),
+        log=log,
+    )
+    return prob
+
+
+# Shift variant: the fit rows weighted by a domain classifier toward the scored rows' features.
+SHIFT = {"clip": (0.2, 5.0), "sample": 300_000, "rounds": 200}
+
+
+def _fit_shift(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
+    """TabM on the fit rows reweighted toward the scored rows (features only, never labels)."""
+    from ringtrace import nn_shift, threads
+
+    w, info = nn_shift.domain_weights(
+        X[cell.fit],
+        X[cell.hold],
+        clip=SHIFT["clip"],
+        sample=SHIFT["sample"],
+        rounds=SHIFT["rounds"],
+        seed=0,
+        threads=threads.budget(),
+        log=log,
+    )
+    (_dir() / f"shift-info_{c}.json").write_text(json.dumps(info, indent=1))
+    (prob,) = nn_shift.fit_predict_weighted(
+        X[cell.fit], cell.targets["given"][cell.fit], w, [X[cell.hold]], spec, log=log
+    )
+    return prob
+
+
+# Metric variant: cross-entropy plus a REINFORCE estimate of batch macro-F1.
+METRIC = {"metric_loss": "reinforce", "lam": 0.5}
+
+
+def _fit_metric(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
+    from ringtrace import nn_metric
+
+    (prob,) = nn_metric.fit_predict_metric(
+        X[cell.fit],
+        cell.targets["given"][cell.fit],
+        cell.period[cell.fit],
+        [X[cell.hold]],
+        spec,
+        log=log,
+        **METRIC,
+    )
+    return prob
+
+
 # Variants that are their own fit function, not a TabMSpec switch: name -> fit(c, cell, X, spec).
-FAMILIES = {"selftrain": _fit_selftrain, "entity": _fit_entity}
+FAMILIES = {
+    "selftrain": _fit_selftrain,
+    "entity": _fit_entity,
+    "tabr": _fit_tabr,
+    "shift": _fit_shift,
+    "metric": _fit_metric,
+}
 
 
 def tag_of(variant: str, seeds: tuple[int, ...], job: str = "") -> str:
