@@ -5,7 +5,8 @@
    "name": "champion",
    "run": "blend-champion-m1",
    "variant": "hedge",
-   "cells": "champion"
+   "cells": "champion",
+   "variant_run": "champion"
   },
   {
    "name": "lgbm",

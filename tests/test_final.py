@@ -33,7 +33,6 @@ def bench(tmp_path):
         np.save(d / "test.npy", _probs(rng, y_te, sharp))
     d = tmp_path / "good-refit"
     d.mkdir()
-    np.save(d / "oof.npy", _probs(rng, y, 4.0))
     np.save(d / "test.npy", _probs(rng, y_te, 4.0))
     targets = {"given": y, "cleaned": y.copy()}
     groups = np.arange(n_tr)
@@ -117,6 +116,11 @@ def test_variant_changes_october_only(bench):
     a, b = bench.calls(fold)["pred"], bench.calls(refit)["pred"]
     assert np.array_equal(a[bench.tr], b[bench.tr])
     assert (a[bench.te] != b[bench.te]).any()
+    other = _recipe(
+        members=[{"name": "w", "run": "weak", "variant": "refit", "variant_run": "good"}]
+    )
+    c = bench.calls(other)["pred"]
+    assert np.array_equal(c[bench.te], b[bench.te])
 
 
 def test_gate_verdict():

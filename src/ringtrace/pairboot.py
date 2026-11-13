@@ -62,20 +62,22 @@ def macro(c: np.ndarray) -> np.ndarray:
 
 
 class PairedBoot:
-    """Resampled counts of one base, ready to compare any number of challengers."""
+    """Resampled counts of one base, ready to compare any number of challengers. ``truth`` is one
+    target or a dict of targets; the weights are drawn once and shared by every target."""
 
     def __init__(
         self,
         units: np.ndarray,
-        truth: np.ndarray,
+        truth,
         base: np.ndarray,
         strata: np.ndarray | None = None,
         draws: int = 2000,
         seed: int = 0,
         chunk: int = 4096,
     ):
+        self.single = not isinstance(truth, dict)
+        self.truths = {"_": np.asarray(truth)} if self.single else dict(truth)
         self.draws, self.seed = draws, seed
-        self.truth = np.asarray(truth)
         self.base = np.asarray(base)
         _, self.g = np.unique(units, return_inverse=True)
         strata = np.zeros(len(units), dtype=np.int64) if strata is None else np.asarray(strata)
@@ -84,18 +86,22 @@ class PairedBoot:
             rows = np.flatnonzero(strata == s)
             ids = np.unique(self.g[rows])  # global unit ids in this stratum
             local = np.searchsorted(ids, self.g[rows])
-            ca = _counts(local, self.truth[rows], self.base[rows], len(ids))
-            tot = np.zeros((draws, 3 * K))
+            ca = {
+                t: _counts(local, y[rows], self.base[rows], len(ids))
+                for t, y in self.truths.items()
+            }
+            tot = {t: np.zeros((draws, 3 * K)) for t in self.truths}
             for i in range(0, len(ids), chunk):
-                w = poisson_weights(seed, ids[i : i + chunk], draws)
-                tot += np.asarray(ca[i : i + chunk].T.dot(w.T).T)
-            point = np.asarray(ca.sum(axis=0)).ravel()
+                w = poisson_weights(seed, ids[i : i + chunk], draws).T
+                for t in self.truths:
+                    tot[t] += np.asarray(ca[t][i : i + chunk].T.dot(w).T)
+            point = {t: np.asarray(c.sum(axis=0)).ravel() for t, c in ca.items()}
             self.strata.append({"rows": rows, "ids": ids, "local": local, "tot": tot, "pt": point})
 
     def compare(self, chal: np.ndarray, q=(2.5, 97.5)) -> dict:
         chal = np.asarray(chal)
-        deltas = np.zeros(self.draws)
-        point = 0.0
+        deltas = {t: np.zeros(self.draws) for t in self.truths}
+        point = dict.fromkeys(self.truths, 0.0)
         for st in self.strata:
             rows = st["rows"]
             diff = self.base[rows] != chal[rows]
@@ -106,15 +112,16 @@ class PairedBoot:
             r = rows[sel]
             loc = np.searchsorted(touched, st["local"][sel])
             n = len(touched)
-            dc = _counts(loc, self.truth[r], chal[r], n) - _counts(
-                loc, self.truth[r], self.base[r], n
-            )
-            w = poisson_weights(self.seed, st["ids"][touched], self.draws)
-            tot_b = st["tot"] + np.asarray(dc.T.dot(w.T).T)
-            deltas += macro(tot_b) - macro(st["tot"])
-            pb = st["pt"] + np.asarray(dc.sum(axis=0)).ravel()
-            point += float(macro(pb[None])[0] - macro(st["pt"][None])[0])
+            w = poisson_weights(self.seed, st["ids"][touched], self.draws).T
+            for t, y in self.truths.items():
+                dc = _counts(loc, y[r], chal[r], n) - _counts(loc, y[r], self.base[r], n)
+                tot_b = st["tot"][t] + np.asarray(dc.T.dot(w).T)
+                deltas[t] += macro(tot_b) - macro(st["tot"][t])
+                pb = st["pt"][t] + np.asarray(dc.sum(axis=0)).ravel()
+                point[t] += float(macro(pb[None])[0] - macro(st["pt"][t][None])[0])
         k = len(self.strata)
-        deltas /= k
-        lo, hi = np.percentile(deltas, list(q))
-        return {"delta": point / k, "lo": float(lo), "hi": float(hi)}
+        out = {}
+        for t in self.truths:
+            lo, hi = np.percentile(deltas[t] / k, list(q))
+            out[t] = {"delta": point[t] / k, "lo": float(lo), "hi": float(hi)}
+        return out["_"] if self.single else out

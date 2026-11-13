@@ -56,3 +56,15 @@ def test_identical_is_zero():
     t = rng.integers(0, N_CLASSES, 100)
     boot = pb.PairedBoot(np.arange(100), t, t, draws=50)
     assert boot.compare(t.copy()) == {"delta": 0.0, "lo": 0.0, "hi": 0.0}
+
+
+def test_dict_of_targets_matches_single_targets():
+    rng = np.random.default_rng(2)
+    n = 500
+    units = rng.integers(0, 200, n)
+    t1, t2 = rng.integers(0, N_CLASSES, n), rng.integers(0, N_CLASSES, n)
+    a = rng.integers(0, N_CLASSES, n)
+    b = np.where(rng.random(n) < 0.1, t1, a)
+    multi = pb.PairedBoot(units, {"x": t1, "y": t2}, a, draws=100).compare(b)
+    assert multi["x"] == pb.PairedBoot(units, t1, a, draws=100).compare(b)
+    assert multi["y"] == pb.PairedBoot(units, t2, a, draws=100).compare(b)

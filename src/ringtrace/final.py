@@ -17,7 +17,8 @@ A recipe::
 
 ``variant`` picks the October probabilities of a member: ``fold`` (the mean of the three month
 folds, ``runs/<run>/test.npy``), ``refit`` (``runs/<run>-refit/test.npy``, all train months) or
-``hedge`` (``runs/<run>-hedge/test.npy``). The train rows always come from ``runs/<run>/oof.npy``,
+``hedge`` (``runs/<run>-hedge/test.npy``); ``variant_run`` replaces ``<run>`` in those names.
+The train rows always come from ``runs/<run>/oof.npy``,
 so the variant cannot be measured leave-one-month-out; its evidence comes from the October-like
 refit test. ``cells`` names the member's October-like cells (``<cells>_s<seed>_r<r>.npz``).
 
@@ -173,6 +174,19 @@ def capped(name: str, before: np.ndarray, after: np.ndarray, is_test: np.ndarray
     return n
 
 
+def load_test(run_dir: Path, n_test: int) -> np.ndarray:
+    """October probabilities of a refit or hedge run (these runs hold no out-of-fold rows)."""
+    path = run_dir / "test.npy"
+    if not path.exists():
+        raise RecipeError(f"{path} is missing")
+    a = np.load(path).astype(np.float64)
+    if a.shape != (n_test, N_CLASSES) or not np.isfinite(a).all() or (a < 0).any():
+        raise RecipeError(f"{path}: bad shape {a.shape} or values")
+    if np.abs(a.sum(axis=1) - 1).max() > 1e-3:
+        raise RecipeError(f"{path}: rows do not sum to 1")
+    return a
+
+
 def pair_counts(a: np.ndarray, b: np.ndarray) -> dict[str, int]:
     diff = a != b
     keys, n = np.unique(a[diff] * N_CLASSES + b[diff], return_counts=True)
@@ -255,15 +269,14 @@ class Bench:
 
     def member(self, m: dict) -> np.ndarray:
         """Full-ledger probabilities: out-of-fold train rows, the variant's October rows."""
-        key = (m["run"], m["variant"])
+        key = (m["run"], m["variant"], m.get("variant_run"))
         if key not in self._arrays:
             from ringtrace.blend import load_member
 
             oof, test = load_member(self.runs_dir / m["run"], len(self.tr), len(self.te))
             if m["variant"] != "fold":
-                _, test = load_member(
-                    self.runs_dir / (m["run"] + VARIANTS[m["variant"]]), len(self.tr), len(self.te)
-                )
+                stem = m.get("variant_run", m["run"])
+                test = load_test(self.runs_dir / (stem + VARIANTS[m["variant"]]), len(self.te))
             full = np.zeros((self.led.height, N_CLASSES))
             full[self.tr], full[self.te] = oof, test
             self._arrays[key] = full
@@ -385,11 +398,12 @@ class Bench:
         sa = month_scores(a[self.tr], self.targets, ptr)
         sb = month_scores(b[self.tr], self.targets, ptr)
         out: dict = {}
-        for t, y in self.targets.items():
-            key = (recipe_key(base), t, draws)
-            if key not in self._boots:
-                self._boots[key] = PairedBoot(self.groups, y, a[self.tr], ptr, draws=draws)
-            bs = self._boots[key].compare(b[self.tr])
+        key = (recipe_key(base), draws)
+        if key not in self._boots:
+            self._boots[key] = PairedBoot(self.groups, self.targets, a[self.tr], ptr, draws=draws)
+        boot = self._boots[key].compare(b[self.tr])
+        for t in self.targets:
+            bs = boot[t]
             out[t] = {
                 "base": sa[t]["months"],
                 "challenger": sb[t]["months"],
@@ -466,21 +480,14 @@ class Bench:
 
                 for r in sets:
                     ya = calls(base, r)
-                    boots = {
-                        t: (
-                            truth[frame.hold],
-                            PairedBoot(
-                                units, truth[frame.hold], ya, draws=draws, seed=seed * 100 + r
-                            ),
-                        )
-                        for t, truth in frame.targets.items()
-                    }
+                    hold_truth = {t: truth[frame.hold] for t, truth in frame.targets.items()}
+                    boot = PairedBoot(units, hold_truth, ya, draws=draws, seed=seed * 100 + r)
                     for i in todo:
                         yb = calls(chals[i], r)
                         cell = {"rows_changed": int((ya != yb).sum())}
-                        for t, (yt, boot) in boots.items():
-                            bs = boot.compare(yb)
-                            cell[t] = {"base": macro_f1(yt, ya), "chal": macro_f1(yt, yb), **bs}
+                        bs = boot.compare(yb)
+                        for t, yt in hold_truth.items():
+                            cell[t] = {"base": macro_f1(yt, ya), "chal": macro_f1(yt, yb), **bs[t]}
                         cells[i][(seed, r)] = cell
         finally:
             from ringtrace import store
@@ -529,13 +536,29 @@ def fmt_line(name: str, lomo: dict, octlike: dict | None, verdict: dict) -> str:
 
 
 def table(
-    bench: Bench, base: dict, chals: list[dict], draws=2000, oct_draws=1000, log=print
+    bench: Bench,
+    base: dict,
+    chals: list[dict],
+    draws=2000,
+    oct_draws=1000,
+    log=print,
+    save=None,
 ) -> dict:
+    """Every challenger against the base. A challenger whose arrays fail to load is reported as an
+    error and skipped; ``save(rep)`` is called after each challenger."""
     t0 = time.time()
-    rep = {"base": base["name"], "base_scores": bench.lomo(base), "challengers": {}}
-    octs = bench.octlike(base, chals, draws=oct_draws)
+    rep: dict = {"base": base["name"], "base_scores": bench.lomo(base), "challengers": {}}
+    good = []
+    for c in chals:
+        try:
+            bench.calls(c)
+            good.append(c)
+        except (OSError, ValueError) as e:
+            rep["challengers"][c["name"]] = {"error": str(e)}
+            log(f"[final] {c['name']}: ERROR {e}")
+    octs = bench.octlike(base, good, draws=oct_draws)
     log(f"[final] October-like scored in {time.time() - t0:.0f}s")
-    for c, o in zip(chals, octs, strict=True):
+    for c, o in zip(good, octs, strict=True):
         lo = bench.compare(base, c, draws)
         v = gate_verdict(lo, o)
         rep["challengers"][c["name"]] = {
@@ -546,6 +569,8 @@ def table(
             "base_rate_changes": bench.calls(c)["base_rate_changes"],
         }
         log("[final] " + fmt_line(c["name"], lo, o, v) + f"  ({time.time() - t0:.0f}s)")
+        if save is not None:
+            save(rep)
     rep["wall_s"] = time.time() - t0
     return rep
 
@@ -625,10 +650,14 @@ def main(argv=None) -> dict:
             for r in recipes
         }
         return reps
-    rep = table(bench, recipes[0], recipes[1:], args.draws, args.oct_draws)
     path = Path(args.report) if args.report else paths.out_dir() / "final" / "table.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(rep, indent=1, default=_json_default))
+
+    def save(rep):
+        path.write_text(json.dumps(rep, indent=1, default=_json_default))
+
+    rep = table(bench, recipes[0], recipes[1:], args.draws, args.oct_draws, save=save)
+    save(rep)
     return rep
 
 
