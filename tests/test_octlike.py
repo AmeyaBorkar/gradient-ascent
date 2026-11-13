@@ -145,3 +145,38 @@ def test_bootstrap_self_is_zero_and_better_is_positive():
     res = octlike.bootstrap(units, truth, pred, better, draws=200)
     assert res["delta"] > 0 and res["lo"] > 0
     assert res == octlike.bootstrap(units, truth, pred, better, draws=200)
+
+
+def test_train_target_modes_only_touch_fit_rows():
+    rng = np.random.default_rng(0)
+    n = 60
+    y = np.zeros(n, dtype=np.int64)
+    ev = np.full(n, -1, dtype=np.int64)
+    ev[:10] = 0
+    y[:7] = 3  # an event mostly labelled 3, three legit rows inside it
+    ev[30:40] = 1
+    y[30:37] = 3  # the same pattern outside the fit rows
+    fit_rows = np.zeros(n, dtype=bool)
+    fit_rows[:20] = True
+    events = [ev, np.full(n, -1, dtype=np.int64)]
+    assert np.array_equal(octlike.train_target({}, y, fit_rows), y)
+    for mode in ("event_clean", "event_l2"):
+        out = octlike.train_target({"train_on": mode}, y, fit_rows, events=lambda: events)
+        assert np.array_equal(out[~fit_rows], y[~fit_rows])
+        assert (out[7:10] == 3).all()
+    cl = rng.integers(0, 12, n)
+    out = octlike.train_target({"train_on": "cleaned"}, y, fit_rows, cleaned=lambda: cl)
+    assert np.array_equal(out[fit_rows], cl[fit_rows])
+    assert np.array_equal(out[~fit_rows], y[~fit_rows])
+    with pytest.raises(ValueError):
+        octlike.train_target({"train_on": "nonsense"}, y, fit_rows)
+
+
+def test_catboost_gpu_ram_cap_from_environment(monkeypatch):
+    from ringtrace.cascade import CatBoostSpec
+
+    monkeypatch.delenv("RINGTRACE_CATBOOST_GPU_RAM", raising=False)
+    assert "gpu_ram_part" not in CatBoostSpec().params(0, "Logloss")
+    monkeypatch.setenv("RINGTRACE_CATBOOST_GPU_RAM", "0.4")
+    assert CatBoostSpec().params(0, "Logloss")["gpu_ram_part"] == 0.4
+    assert "gpu_ram_part" not in CatBoostSpec(task_type="CPU").params(0, "Logloss")

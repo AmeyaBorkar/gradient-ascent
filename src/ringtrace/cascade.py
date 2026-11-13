@@ -18,6 +18,7 @@ still comes from ``booster``, so every option trains on the same rows.
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass, field
 
@@ -125,6 +126,11 @@ class CatBoostSpec:
             p["devices"] = self.devices
             if self.gpu_ram_part is not None:
                 p["gpu_ram_part"] = self.gpu_ram_part
+            else:
+                # share of GPU memory CatBoost may reserve (set when it shares the GPU)
+                cap = os.environ.get("RINGTRACE_CATBOOST_GPU_RAM")
+                if cap:
+                    p["gpu_ram_part"] = float(cap)
         return p
 
 
