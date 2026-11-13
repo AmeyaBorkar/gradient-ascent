@@ -5,6 +5,9 @@
 
 * ``counter``: every fraud-block row is fraud; in the first seven segments (mule .. qr) a confident
   segment (``ctr_conf >= min_conf``) sets the type, elsewhere the model keeps its fraud type.
+  Options: ``source="cpr"`` takes the segments from ``phones_prior`` (the test split taught by the
+  train split), ``unanchored`` keeps to rows with no anchor of their own, ``below`` to rows whose
+  plain counter confidence is below it.
 * ``legit_block``: a one-row phone in a legit block is legit.
 * ``plain_templates``: inside each of the six look-alike templates, every call of the template's
   pair takes the template's class.
@@ -53,17 +56,43 @@ def _split_counts(mask: np.ndarray, is_test: np.ndarray) -> str:
     return f"train {int((mask & ~is_test).sum())} / test {int((mask & is_test).sum())}"
 
 
+def _taught_counter(led: pl.DataFrame) -> dict[str, np.ndarray]:
+    c = anchors.family_columns(led, ["cpr_seg", "cpr_conf"])
+    seg = c["cpr_seg"].cast(pl.Float64).fill_null(np.nan).to_numpy()
+    conf = c["cpr_conf"].cast(pl.Float64).fill_null(np.nan).to_numpy()
+    seg_class = np.where(np.isfinite(seg), np.nan_to_num(seg, nan=-1.0) + 1, 0).astype(np.int64)
+    return {"seg_class": seg_class, "conf": np.nan_to_num(conf, nan=-1.0)}
+
+
 def counter_rule(
-    pred, proba, led, log=print, min_conf: float = 0.9, trusted: int = TRUSTED_SEGMENTS
+    pred,
+    proba,
+    led,
+    log=print,
+    min_conf: float = 0.9,
+    trusted: int = TRUSTED_SEGMENTS,
+    source: str = "ctr",
+    unanchored: bool = False,
+    below: float | None = None,
 ) -> np.ndarray:
+    """``source="cpr"`` reads the segments of the test split taught by the train split
+    (``phones_prior``); ``unanchored`` limits the rule to rows with no anchor of their own;
+    ``below`` limits it to rows whose plain counter confidence is below that value."""
     c = _counter(led)
+    if source not in ("ctr", "cpr"):
+        raise ValueError(f"unknown counter source {source!r}")
+    seg = _taught_counter(led) if source == "cpr" else c
     out = pred.copy()
     fb = c["block"] == 2
+    if unanchored:
+        fb &= anchors.row_anchor(led) == 0
+    if below is not None:
+        fb &= c["conf"] < below
     called_legit = fb & (out == 0)
     if called_legit.any():
         out[called_legit] = np.asarray(proba)[called_legit, 1:].argmax(axis=1) + 1
-    sure = fb & (c["seg_class"] >= 1) & (c["seg_class"] <= trusted) & (c["conf"] >= min_conf)
-    out[sure] = c["seg_class"][sure]
+    sure = fb & (seg["seg_class"] >= 1) & (seg["seg_class"] <= trusted) & (seg["conf"] >= min_conf)
+    out[sure] = seg["seg_class"][sure]
     return out
 
 

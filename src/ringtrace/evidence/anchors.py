@@ -55,7 +55,7 @@ SHAPE_CLASS: dict[str, dict[int, int]] = {
 }
 
 # store name of every prefix a caller may ask ``family_columns`` for
-STORE_NAME = {**FAMILY_OF, "mrk": "marks", "ctr": "phones"}
+STORE_NAME = {**FAMILY_OF, "mrk": "marks", "ctr": "phones", "cpr": "phones_prior"}
 
 # one-class marks, used only on rows that no family shape anchors
 MARK_CLASS = (

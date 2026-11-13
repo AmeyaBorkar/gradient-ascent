@@ -26,6 +26,7 @@ FAMILIES = {
     "merchant": "ringtrace.evidence.merchant",
     "repeats": "ringtrace.evidence.repeats",
     "phones": "ringtrace.evidence.phones",
+    "phones_prior": "ringtrace.evidence.phones_prior",
 }
 
 _LEDGER: pl.DataFrame | None = None

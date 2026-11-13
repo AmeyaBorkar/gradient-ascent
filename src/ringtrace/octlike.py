@@ -55,7 +55,7 @@ HOLD_PERIOD = 9
 HOUR = 3600
 EVENT_COLUMNS = ("bot_event", "drn_event", "mf_event", "col_event", "rng_event", "rep_event")
 EVENT_FAMILIES = ("bursts", "drains", "flows", "requests", "merchant", "repeats")
-HELD_FAMILY = "phones"
+HELD_FAMILIES = ("phones", "phones_prior")
 DRAWS = 1000
 DEFAULT_DECODER = {"fraud_scale": 0.875}
 DEFAULT_RULES = ["anchored_templates"]
@@ -279,7 +279,7 @@ class Frame:
             arr = silver.load(base, which)
             if arr is not None:
                 self.targets[tname] = arr.astype(np.int64)[self.stacked]
-        held = store.family(HELD_FAMILY)[self.stacked]
+        held = {name: store.family(name)[self.stacked] for name in HELD_FAMILIES}
         blank = np.isin(self.stacked, f["blank"])
         led = base[self.stacked].with_columns(
             pl.Series("stacked_row", self.stacked),
@@ -289,7 +289,7 @@ class Frame:
             .otherwise(pl.col("qr_vpa_mismatch"))
             .alias("qr_vpa_mismatch"),
         )
-        store.use_frame(led, key=f"octlike-s{seed}-{digest}", fixed={HELD_FAMILY: held})
+        store.use_frame(led, key=f"octlike-s{seed}-{digest}", fixed=held)
         self.led = led
         self.period = led["period"].to_numpy()
         is_test = led["is_test"].to_numpy()

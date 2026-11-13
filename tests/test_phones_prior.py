@@ -146,3 +146,22 @@ def test_teach_changes_only_later_splits():
     assert np.allclose(post.sum(axis=1), 1.0)
     truth = arr[:, 3]
     assert (on["seg"][fb] == truth[fb]).mean() >= 0.9
+
+
+def test_phones_prior_family():
+    import polars as pl
+
+    from ringtrace.evidence import phones_prior
+
+    arr, _ = synthetic(seed=5)
+    led = pl.DataFrame({"device": arr[:, 0], "is_test": arr[:, 1].astype(bool)})
+    plain = phones.build(led, anchor=arr[:, 2])
+    taught = phones_prior.build(led, anchor=arr[:, 2])
+    assert taught.columns == ["cpr_seg", "cpr_conf"]
+    tr = arr[:, 1] == 0
+    for c in ("seg", "conf"):
+        a, b = plain[f"ctr_{c}"].to_numpy()[tr], taught[f"cpr_{c}"].to_numpy()[tr]
+        assert np.array_equal(a, b, equal_nan=True)
+    fb = (plain["ctr_block"].to_numpy() == 2) & ~tr
+    assert np.isfinite(taught["cpr_seg"].to_numpy()[fb]).all()
+    assert np.isnan(taught["cpr_seg"].to_numpy()[plain["ctr_block"].to_numpy() != 2]).all()

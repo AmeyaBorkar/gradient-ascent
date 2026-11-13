@@ -172,3 +172,39 @@ def test_anchored_templates_class_override():
         rules.apply(
             [{"name": "anchored_templates", "classes": {"1": PHISH}}], pred, proba, led, log=print
         )
+
+
+def _taught_frame():
+    led, pred, proba = frame()
+    n = led.height
+    zeros = {f"{p}_shape": pl.Series([0] * n, dtype=pl.Int8) for p in ("bot", "rep")}
+    zeros.update({c: pl.Series([0] * n, dtype=pl.Int8) for c, _ in anchors.MARK_CLASS})
+    seg, conf = led["ctr_seg"].to_list(), led["ctr_conf"].to_list()
+    seg[20], conf[20] = 1.0, 0.95  # the taught counter is sure of the bot segment
+    conf[21] = 0.6  # and unsure of the mule segment
+    led = led.with_columns(
+        **zeros, cpr_seg=pl.Series(seg, dtype=pl.Float64), cpr_conf=pl.Series(conf)
+    )
+    return led, pred, proba
+
+
+def test_counter_taught_unanchored():
+    led, pred, proba = _taught_frame()
+    rule = {"name": "counter", "trusted": 11, "min_conf": 0.9, "source": "cpr", "unanchored": True}
+    out = rules.apply([rule], pred, proba, led, log=lambda m: None)
+    assert out[20] == BOT  # legit call, sure taught segment
+    assert out[21] == QR  # taught segment unsure: the model's fraud type stays
+    assert out[22] == CASHB  # all eleven segments trusted
+    # rows with an anchor of their own are never touched
+    assert out[[3, 6, 10, 15, 19]].tolist() == pred[[3, 6, 10, 15, 19]].tolist()
+
+
+def test_counter_below():
+    led, pred, proba = _taught_frame()
+    rule = {"name": "counter", "trusted": 11, "min_conf": 0.9, "source": "cpr"}
+    out = rules.apply([{**rule, "unanchored": True, "below": 0.9}], pred, proba, led, log=print)
+    assert out[20] == BOT  # the plain counter was unsure (0.5)
+    assert out[22] == PHISH  # the plain counter was already sure (0.99): untouched
+    assert (out != pred).sum() == 1
+    with pytest.raises(ValueError):
+        rules.apply([{**rule, "source": "nope"}], pred, proba, led, log=lambda m: None)
