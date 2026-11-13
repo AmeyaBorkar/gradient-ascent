@@ -537,3 +537,41 @@ started).
 
 - 2026-11-14 00:40 IST: first `recipes/final.json` = the five-way blend + `blank_merchant_qr`
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+## Lens: fraud-mass combiners, seeds, add anatomy (`python -m ringtrace.lens`)
+
+Base = `blend-tabmF-bq` rebuilt from arrays (October calls identical to the file on every row):
+given 0.5137 / 0.5094 / 0.5150, cleaned 0.5654 / 0.5644 / 0.5718, gen-only
+0.9031 / 0.9000 / 0.9019, A-clean proxy 0.5462 / 0.5451 / 0.5525. Change per month Jul / Aug / Sep
+[95 % event-bootstrap interval of the mean, 2,000 draws]; October-like per thinning seed s13 / s14
+/ s15 (mean 95 % lower bound, 1,000 draws), nine cells. Rows = train / October calls changed.
+Finding: `docs/findings/lens.md`.
+
+| run | commit | where | wall |
+|---|---|---|---|
+| lens combine (with October-like) | ba61ab8 | laptop CPU, 6 threads | 8.1 min |
+| lens combine --no-octlike (pocket b as generator rows) | fee3fa8 | laptop CPU, 6 threads | 5.8 min |
+| lens-seeds, lens-adds, lens-types | 63b98e1 | box CPU, 8 threads each | 13.4 / 12.3 / 13.0 min |
+| lens-adds2 (class gate) | fee3fa8 | box CPU, 8 threads | about 12 min |
+| lens seedcells | fee3fa8 | laptop CPU, 6 threads | about 6 min |
+
+| challenger | rows | given | cleaned | gen-only | A-clean | October-like given (lb) | October-like cleaned (lb) | verdict |
+|---|---|---|---|---|---|---|---|---|
+| logit average | 44 / 5 | -0.00034 / -0.00028 / -0.00029 [-0.00050, -0.00013] | -0.00032 / -0.00028 / -0.00035 [-0.00051, -0.00015] | -0.00039 / -0.00005 / -0.00001 | -0.00031 / -0.00028 / -0.00035 | -0.00015 / -0.00028 / -0.00036 (-0.00074) | -0.00012 / -0.00025 / -0.00029 (-0.00067) | rejected |
+| geometric mean | 56 / 7 | -0.00060 / -0.00029 / -0.00035 [-0.00064, -0.00022] | -0.00056 / -0.00029 / -0.00048 [-0.00067, -0.00024] | -0.00071 / -0.00002 / -0.00017 | -0.00054 / -0.00029 / -0.00047 | -0.00023 / -0.00023 / -0.00045 (-0.00080) | -0.00030 / -0.00040 / -0.00038 (-0.00089) | rejected |
+| noisy-OR | 115 / 14 | +0.00031 / -0.00012 / -0.00008 [-0.00017, +0.00025] | +0.00028 / +0.00013 / +0.00010 [-0.00007, +0.00041] | -0.00021 / -0.00049 / -0.00041 | +0.00029 / +0.00015 / +0.00011 | -0.00057 / -0.00018 / -0.00044 (-0.00090) | +0.00014 / +0.00040 / -0.00041 (-0.00060) | rejected |
+| max | 74 / 8 | +0.00022 / -0.00006 / -0.00006 [-0.00015, +0.00022] | +0.00021 / -0.00002 / -0.00005 [-0.00015, +0.00024] | -0.00017 / -0.00051 / -0.00045 | +0.00021 / +0.00000 / -0.00003 | -0.00047 / -0.00018 / -0.00031 (-0.00073) | +0.00011 / +0.00029 / -0.00035 (-0.00053) | rejected |
+| nested stacker, C = 0.01 | 133 / 35 | +0.00027 / -0.00012 / +0.00007 [-0.00013, +0.00029] | +0.00023 / +0.00009 / +0.00018 [-0.00007, +0.00039] | -0.00044 / -0.00055 / -0.00051 | +0.00025 / +0.00011 / +0.00020 | -0.00236 / -0.00116 / -0.00146 (-0.00241) | -0.00186 / -0.00033 / -0.00121 (-0.00206) | rejected |
+| nested stacker, C = 1 | 124 / 33 | +0.00028 / -0.00011 / +0.00003 [-0.00015, +0.00028] | +0.00024 / +0.00010 / +0.00010 [-0.00008, +0.00038] | -0.00037 / -0.00051 / -0.00050 | +0.00025 / +0.00012 / +0.00012 | -0.00240 / -0.00119 / -0.00149 (-0.00245) | -0.00189 / -0.00039 / -0.00134 (-0.00211) | rejected |
+| TabM 6 seeds (0-5) | 6 / 3 | -0.00002 / +0.00004 / +0.00000 [-0.00004, +0.00005] | +0.00002 / +0.00004 / +0.00000 [-0.00002, +0.00007] | +0.00001 / +0.00011 / +0.00000 | +0.00002 / +0.00004 / +0.00000 | n/a | n/a | tie |
+| TabM 9 seeds (0-8) | 5 / 3 | -0.00002 / +0.00007 / +0.00004 [-0.00001, +0.00008] | +0.00002 / +0.00006 / +0.00004 [+0.00000, +0.00009] | +0.00001 / +0.00012 / +0.00005 | +0.00002 / +0.00006 / +0.00004 | +0.00001 / -0.00005 / +0.00000 (-0.00007) | +0.00001 / -0.00005 / -0.00000 (-0.00006) | tie (fails given Jul, October-like) |
+| family gate (TabM mass only in families whose adds were >= 50 % right, nested) | 34 / 6 | -0.00068 / -0.00018 / -0.00023 [-0.00061, -0.00018] | -0.00064 / -0.00016 / -0.00030 [-0.00059, -0.00018] | -0.00086 / -0.00011 / +0.00004 | -0.00062 / -0.00016 / -0.00029 | not run | not run | rejected |
+| class gate (adds of classes < 50 % right in both fit months back to legit, nested) | 0 / 0 | 0 | 0 | 0 | 0 | - | - | no class qualifies |
+| TabM type share, nested classes | 10 / 1 | -0.00013 / -0.00065 / +0.00001 [-0.00060, -0.00000] | -0.00013 / -0.00062 / +0.00001 [-0.00058, -0.00000] | -0.00004 / -0.00098 / +0.00004 | -0.00012 / -0.00060 / +0.00001 | not run | not run | rejected |
+| TabM type share, layering_chain only | 2 / 0 | +0.00000 / +0.00003 / +0.00001 [+0.00000, +0.00004] | +0.00000 / +0.00003 / +0.00001 | +0.00000 / +0.00008 / +0.00004 | +0.00000 / +0.00003 / +0.00001 | not run | not run | tie (0 October rows) |
+
+The October-like cells for the 9-seed TabM are the mean of the three seed-set cells for each
+thinning seed (5 rows changed over nine cells). The 9-seed rows count is against the 3-seed base;
+6- and 9-seed October rows are 1 legit -> phishing_collect and 2 phishing_collect -> legit. The
+seed-set 9-11 run had not landed; 12 seeds were not measured. Per-class type-share lines for every
+class and the add tables are in the finding.
