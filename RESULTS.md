@@ -219,3 +219,21 @@ Analysis of the saved blend run (`blend`), no refits. Box CPU, 16 threads. Findi
 | fresh-octlike-bq: champion + `blank_merchant_qr` vs champion, 9 cells | ffbdfb7 | +0.0000 in every seed on given, cleaned and gen-only; lower bound +0.0000; 0 rows changed; **FAIL** (not positive) | about 10 min |
 | fresh-octlike-bq, first two launches | ffbdfb7 | failed: missing frames in the shared cache, then cells from an older frame build (251,860 vs 252,462 September rows); scored on current-frame champion cells | <2 min |
 | fresh-blend-blankqr (`python -m ringtrace.blend recipes/blend-blankqr.json`), upload candidate | 92735ae | given 0.5130 / 0.5091 / 0.5148 (0.5123); cleaned 0.5647 / 0.5641 / 0.5714 (0.5667); gen-only 0.9022 / 0.9000 / 0.9019 (0.9013); valid; sha256 `e7c594672f0921e6def080f0c06347144cd848282b10c9fe6e384416eed043d0`; against the blend's file: 20 October rows legit -> fraud (13 qr_swap, 7 refund_abuse) | about 5 min |
+
+## Signature rescue
+
+Generator signatures that the blend (`recipes/blend-blankqr.json`) calls legit in October. Laptop CPU,
+8 threads, the members' saved arrays, no refits. Finding: `docs/findings/signature-rescue.md`.
+
+| run | commit | result | wall |
+|---|---|---|---|
+| rescue-survey (`python analysis/rescue.py survey`) | 7f3ad0c | about 60 signatures. Qualifying (>= 50 train rows, >= 97 % cleaned fraud, October legit share above out-of-fold): non-QR row with a QR check (7,478 train rows, 99.92 %, legit share 0.03 % -> 0.18 %, 2 October rows) and drain events (3,463, 99.86 %, 0.14 % -> 0.17 %, 1 row). Every other signature has 0 October rows called legit | about 2 min |
+| rescue-rule-nonqr: blend + `signature_rescue` on `mark:nonqr_check`, leave-one-month-out | 7f3ad0c | given +0.00002 / +0.00000 / +0.00000 (95 % [-0.00001, +0.00004]); cleaned +0.00002 / +0.00000 / +0.00000 ([-0.00001, +0.00003]); gen-only +0.00001 / +0.00000 / +0.00000 ([-0.00003, +0.00004]); 2 train rows and 2 October rows changed (phishing_collect 2) | about 5 min |
+| rescue-rule-drain: `drn:any` | 7f3ad0c | given +0.00003 / -0.00002 / -0.00002; cleaned +0.00002 / -0.00002 / -0.00002; gen-only -0.00002 / -0.00005 / -0.00006; 5 train rows and 1 October row (sim_swap); **rejected** | about 5 min |
+| rescue-rule-both: non-QR check or drain | 7f3ad0c | given +0.00005 / -0.00002 / -0.00002; cleaned +0.00004 / -0.00002 / -0.00002; gen-only -0.00001 / -0.00005 / -0.00006; 7 train / 3 October rows; **rejected** | about 5 min |
+| rescue-octlike-nonqr, champion cells s13-15 x r0-2 | 7f3ad0c | 0 rows changed in every cell; +0.0000 on every seed and target, lower bound +0.0000; a tie (**FAIL**: not positive) | 8.0 min |
+| rescue-octlike-both | 7f3ad0c | 1-2 rows changed per cell; given -0.00007 / -0.00004 / +0.00000 per seed, lower bound -0.00014; **FAIL** | about 8 min |
+| rescue-octlike, summary step | 7f3ad0c | failed after every cell was scored: summary entries were mixed into the cell loop. The per-cell numbers above come from these runs; fixed in the next commit | - |
+| rescue-rule, first launch | 7f3ad0c | failed: out of memory in the 2,000-draw bootstrap matrix on the laptop; draws are now chunked | <1 min |
+| rescue-nonqr (`python -m ringtrace.blend recipes/rescue-nonqr.json`), upload candidate | 7f3ad0c | given 0.5130 / 0.5091 / 0.5148 (0.5123); cleaned 0.5647 / 0.5641 / 0.5714 (0.5667); gen-only 0.9022 / 0.9000 / 0.9019 (0.9013); valid; sha256 `0f0a60e8e86838cb3602f0a8453d14ee767c989cfbf00e5c2dbaa1cc35449206`; against `blend-blankqr`: legit -> phishing_collect 2; `analysis/rescue.py apply` on that file gives the same sha256 | 1.8 min |
+| rescue-nonqr-on-tabmF (`python analysis/rescue.py apply --sig mark:nonqr_check` on the TabM blend upload file), upload candidate | 7f3ad0c | valid; sha256 `715138bd2d1d6bc48338f34873363c310a2493556f1769ec0cc9a94d2f05fc3a`; against its base: legit -> phishing_collect 1 | about 1 min |
