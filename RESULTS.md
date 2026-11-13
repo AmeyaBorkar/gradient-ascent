@@ -627,3 +627,51 @@ Against `final.json`; no in-context cells, so October-like is n/a and none could
 Also judged from its own branch: the TabM configuration sweep (`feat/tabm2`) ties the base within
 ±0.00005 in the fraud-only role, so nothing to add. TabPFN-3 and LimiX were not run on their branch.
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+## Wide look: headroom, pair typing, generator checks, segment size (commit c3c51ab)
+
+`RINGTRACE_THREADS=6 python analysis/farlook.py all`, 21 s, laptop CPU, run `blend` decoded as the
+submission (fixed point 0.875 per month, anchored template rule). The decode reproduces the
+blend's months: given 0.5130 / 0.5091 / 0.5147, cleaned 0.5647 / 0.5641 / 0.5714. No refit, no
+candidate file. Finding: `docs/findings/farlook.md`.
+
+Pools of the six look-alike templates, cleaned labels, Jul / Aug / Sep (`pairs`):
+
+| pool (class -> partner) | rows | partner share | best share to move to the partner | whole pool to the partner | perfect typing |
+|---|---|---|---|---|---|
+| drain1 (sim_swap -> account_takeover) | 555 / 504 / 474 | 0.268 / 0.274 / 0.243 | 0 / 0 / 0 | -0.0231 / -0.0206 / -0.0255 | +0.0118 / +0.0121 / +0.0105 |
+| col7 (fake_cashback -> phishing_collect) | 154 / 153 / 198 | 0.539 / 0.595 / 0.551 | 0 / 0 / 0 | -0.0034 / -0.0021 / -0.0036 | +0.0053 / +0.0061 / +0.0075 |
+| col1 (phishing_collect -> fake_cashback) | 716 / 673 / 614 | 0.085 / 0.079 / 0.086 | 0 / 0 / 0 | -0.0332 / -0.0328 / -0.0317 | +0.0067 / +0.0063 / +0.0059 |
+| mf1 (layering_chain -> mule_account) | 842 / 914 / 842 | 0.147 / 0.152 / 0.129 | 0 / 0 / 0 | -0.0288 / -0.0313 / -0.0331 | +0.0048 / +0.0055 / +0.0044 |
+| mf2+mf3 (mule_account -> velocity_bot) | 1,201 / 1,151 / 1,260 | 0.044 / 0.078 / 0.104 | 0 / 0 / 0 | -0.0477 / -0.0434 / -0.0448 | +0.0018 / +0.0035 / +0.0050 |
+| rng1 (qr_swap -> refund_abuse) | 325 / 333 / 310 | 0.046 / 0.027 / 0.052 | 0 / 0 / 0 | -0.0175 / -0.0185 / -0.0172 | +0.0014 / +0.0007 / +0.0012 |
+| sum | | | | | +0.0319 / +0.0343 / +0.0344 |
+
+Telling the partner apart inside a pool, train rows pooled: blend type-ratio AUC 0.610 (drain1),
+0.493 (col7), 0.561 (col1), 0.627 (mf1), 0.516 (mf2+mf3), 0.637 (rng1); boosted trees on row and
+event features, 5 folds by event, 0.600 / 0.503 / 0.487 / 0.559 / 0.345 / 0.574. The partner's
+share in the best tenth is at most 0.38 in drain1 (break-even about 0.48) and 0.10 in col1 (about
+0.33). **Verdict: no split and no label-free typing gains; the template classes stay.**
+
+Other checks, all negative:
+
+| check (`command`) | result |
+|---|---|
+| shared accounts keep a pair's class (`loyalty`) | sim / takeover receivers 0.498 against 0.499 ± 0.015 shuffled (941 event pairs); cashback / phishing receivers 0.699 against 0.692 ± 0.015; chain / mule 0.62 against 0.57 ± 0.02; bot-pool senders in 1 of 19 bot-written and 10 of 185 mule-written mule-style bursts |
+| transaction ids (`generator`) | 1,824,642 ids, 0 duplicates, 17,084 distinct gaps, gap cv 1.000: a uniform draw, no counter |
+| phone number against time inside a counter segment (`generator`) | rank correlation -0.17 to +0.09 over the 11 train segments |
+| dead columns in October by counter block (`generator`) | IP risk above 0.5: fraud block 0.7 %, bot pool 1.5 %, legit block 0.6 %, home 0.5 % (train 26.5 / 40.5 / 1.8 / 2.4 %); app version identical |
+| cells among legit calls (`cells`) | another account's home phone 2.28 % cleaned fraud on 74,567 rows, own phone away from home 2.44 %, phone first used today 2.21 %, against a base of 2.31 %; no impossible-fact cell has rows left to call |
+
+Counter segments at October's size (`thin`): train's fraud block thinned to one sixth of its
+phones, 30 seeds, segments refitted without labels.
+
+| unanchored fraud rows | full-block fit | thinned fit |
+|---|---|---|
+| agreement with the cleaned label (171 ± 9 rows a draw) | 0.942 ± 0.015 | 0.897 ± 0.028 |
+| last four segments (30 ± 5 rows) | 0.896 ± 0.056 | 0.800 ± 0.094 |
+| rows lost / won back by thinning | | 8.6 ± 5.1 / 0.9 ± 1.1 |
+
+October, counted only: 564 fraud-block rows, 213 unanchored, 35 of them with segment confidence
+below 0.9. **Verdict: a measured October-only loss of about 9 rows; the experiment that could
+recover it is specified in the finding and not run.**

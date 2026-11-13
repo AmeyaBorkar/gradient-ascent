@@ -33,6 +33,22 @@ counter-anchored template rule.
 - [x] Knowledge base in `docs/knowledge/` (data, modeling, experiments, leaderboard) and
       `docs/onboarding.md`.
 
+## Wide look for a larger lever (14 Nov)
+- [x] `python analysis/farlook.py all` (21 s): headroom, pair typing, generator checks and the
+      counter's segments at October's size; finding `docs/findings/farlook.md`.
+- No lever worth +0.0025 was found, and no candidate file was built.
+  - The cleaned headroom is the typing of events inside the six look-alike templates: +0.032 to
+    +0.034 a month with perfect typing. Nothing label-free reaches it (AUC 0.49 to 0.64 inside a
+    pool; shared accounts do not keep a pair's class), and the template classes are already the
+    best split of every pool.
+  - Every other error adds up to 0.0043. Finding ordinary-looking fraud cannot pay without its
+    type: the largest class share among those rows is 19 %, below every class's break-even.
+- **Current best idea:** the counter's segments are fitted on one sixth of train's phones in
+  October. Thinning train's block to that size loses 8.6 ± 5.1 unanchored rows of 171 (agreement
+  0.897 against 0.942). Recovering it is worth about +0.0005, at most +0.002. The experiment (a
+  cut-position prior and per-segment occupancy in `phones.decode_phase`, two gates) is specified
+  in the finding and has not been run.
+
 ## Next steps (under way)
 - [ ] The October-like gate of each member and of the equal five-way blend against the champion
       (cells s13-15 x r0-2).
