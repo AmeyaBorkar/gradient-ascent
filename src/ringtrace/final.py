@@ -229,6 +229,7 @@ class Bench:
         self._arrays: dict = {}
         self._calls: dict = {}
         self._weights: dict = {}
+        self._boots: dict = {}
 
     @classmethod
     def from_store(cls, runs_dir: Path, cells_dir: Path | None = None, log=print) -> Bench:
@@ -374,12 +375,36 @@ class Bench:
         return month_scores(pred[self.tr], self.targets, self.period[self.tr])
 
     def compare(self, base: dict, chal: dict, draws: int = 2000) -> dict:
-        from ringtrace.squeeze import lomo_compare
+        """Per-month change on every target and the paired event bootstrap (95 %) of the mean
+        change; the base's resampled counts are shared by every challenger."""
+        from ringtrace.blend import month_scores
+        from ringtrace.pairboot import PairedBoot
 
         a, b = self.calls(base)["pred"], self.calls(chal)["pred"]
-        r = lomo_compare(self, a, b, draws)
-        r["october_pairs"] = pair_counts(a[self.te], b[self.te])
-        return r
+        ptr = self.period[self.tr]
+        sa = month_scores(a[self.tr], self.targets, ptr)
+        sb = month_scores(b[self.tr], self.targets, ptr)
+        out: dict = {}
+        for t, y in self.targets.items():
+            key = (recipe_key(base), t, draws)
+            if key not in self._boots:
+                self._boots[key] = PairedBoot(self.groups, y, a[self.tr], ptr, draws=draws)
+            bs = self._boots[key].compare(b[self.tr])
+            out[t] = {
+                "base": sa[t]["months"],
+                "challenger": sb[t]["months"],
+                "change": [
+                    y1 - y0 for y0, y1 in zip(sa[t]["months"], sb[t]["months"], strict=True)
+                ],
+                **bs,
+            }
+        out["rows_changed"] = {
+            "train": int((a[self.tr] != b[self.tr]).sum()),
+            "october": int((a[self.te] != b[self.te]).sum()),
+        }
+        out["never_loses"] = all(min(out[t]["change"]) >= 0 for t in self.targets)
+        out["october_pairs"] = pair_counts(a[self.te], b[self.te])
+        return out
 
     # October-like -------------------------------------------------------------------------
 
@@ -400,6 +425,7 @@ class Bench:
         + August); the September fold's weights; base-rate rules apply as in the recipe."""
         from ringtrace import octlike as ol
         from ringtrace import rules as rulebook
+        from ringtrace.pairboot import PairedBoot
         from ringtrace.scoring import macro_f1
 
         todo = [i for i, c in enumerate(chals) if self.has_cells(c, seeds, sets)]
@@ -440,12 +466,20 @@ class Bench:
 
                 for r in sets:
                     ya = calls(base, r)
+                    boots = {
+                        t: (
+                            truth[frame.hold],
+                            PairedBoot(
+                                units, truth[frame.hold], ya, draws=draws, seed=seed * 100 + r
+                            ),
+                        )
+                        for t, truth in frame.targets.items()
+                    }
                     for i in todo:
                         yb = calls(chals[i], r)
                         cell = {"rows_changed": int((ya != yb).sum())}
-                        for t, truth in frame.targets.items():
-                            yt = truth[frame.hold]
-                            bs = ol.bootstrap(units, yt, ya, yb, draws, seed=seed * 100 + r)
+                        for t, (yt, boot) in boots.items():
+                            bs = boot.compare(yb)
                             cell[t] = {"base": macro_f1(yt, ya), "chal": macro_f1(yt, yb), **bs}
                         cells[i][(seed, r)] = cell
         finally:
@@ -500,6 +534,7 @@ def table(
     t0 = time.time()
     rep = {"base": base["name"], "base_scores": bench.lomo(base), "challengers": {}}
     octs = bench.octlike(base, chals, draws=oct_draws)
+    log(f"[final] October-like scored in {time.time() - t0:.0f}s")
     for c, o in zip(chals, octs, strict=True):
         lo = bench.compare(base, c, draws)
         v = gate_verdict(lo, o)
@@ -510,7 +545,7 @@ def table(
             "verdict": v,
             "base_rate_changes": bench.calls(c)["base_rate_changes"],
         }
-        log("[final] " + fmt_line(c["name"], lo, o, v))
+        log("[final] " + fmt_line(c["name"], lo, o, v) + f"  ({time.time() - t0:.0f}s)")
     rep["wall_s"] = time.time() - t0
     return rep
 
