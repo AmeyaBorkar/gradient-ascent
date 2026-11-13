@@ -30,10 +30,15 @@ TabM fitted on the same machine (`<job>-base-sd0`).
 
 | technique | where | status |
 |---|---|---|
-| soft self-training on the scored rows' features (teacher: plain TabM, w 0.3) | laptop GPU | fitting |
-| entity embeddings (sender, receiver, device) + strictly-past pooled history | box GPU | fitting |
-| TabR-style retrieval | laptop GPU, after self-training and the laptop base | queued |
-| shift reweighting (domain classifier toward the scored rows) | box GPU, after entity and the box base | queued |
+| soft self-training on the scored rows' features (teacher: plain TabM, w 0.3) | laptop GPU | fitted; scoring against the laptop base |
+| entity embeddings (sender, receiver, device) + strictly-past pooled history | box GPU | fitted; loses in every cell (fraud-only -0.0004 to -0.0006 given, cross-machine look) |
+| TabR-style retrieval | laptop GPU | fitting |
+| shift reweighting (domain classifier toward the scored rows) | box GPU | first fit stopped: domain AUC 1.0000 on all features (calendar columns); refit with those columns left out, queued |
 | REINFORCE macro-F1 term (lam 0.5) | laptop GPU, after TabR | queued |
+| TabM on generator-only labels rebuilt from July + August alone | box GPU | fitting |
+| entity ablation: pooled history alone | box GPU, after shift | queued |
+
+The plain TabM refitted on the laptop differs from the earlier screen's base (another GPU) by 70
+September calls, so every comparison uses a base fitted on the same machine.
 
 Current best idea: none yet; the bar is a non-negative fraud-only change in every cell and target.
