@@ -355,3 +355,18 @@ exist locally.
 
 | fresh-blend-col7-phishing (`python -m ringtrace.blend recipes/blend-col7-phishing.json`), upload candidate: col7 template -> phishing_collect | 306885e | given 0.5102 / 0.5084 / 0.5143 (0.5110, vs blend-blankqr -0.0028 / -0.0007 / -0.0005); cleaned 0.5615 / 0.5627 / 0.5697 (0.5646; -0.0032 / -0.0014 / -0.0017); gen-only 0.9004 / 0.9019 / 0.9033 (0.9019; -0.0018 / +0.0019 / +0.0014); valid; sha256 `91d1e767f0e8fe63643251fe7fd72579874a6772c9faa941a6cc1cca1b88fcd8`; 94 October rows fake_cashback -> phishing_collect | about 6 min |
 | fresh-blend-mf23-bot (`python -m ringtrace.blend recipes/blend-mf23-bot.json`), upload candidate: mf2+mf3 template -> velocity_bot | 306885e | given 0.4956 / 0.4924 / 0.4949 (0.4943; -0.0174 / -0.0167 / -0.0199); cleaned 0.5453 / 0.5447 / 0.5483 (0.5461; -0.0194 / -0.0194 / -0.0231); gen-only 0.8678 / 0.8629 / 0.8586 (0.8631; -0.0344 / -0.0371 / -0.0433); valid; sha256 `0cbf7e1b535567b3d6bbc32ef735cf70a7c7f45bc4e4310f69d82100ff635448`; 422 October rows mule_account -> velocity_bot | about 6 min |
+
+## Member: refit, October refit blends
+
+Every member is refitted on all train rows (450 rounds or CatBoost iterations, the screen
+cross-fitted over the three months, seeds 0, 1, 2), and each blend is decoded like `recipes/blend.json`.
+The train scores are the members' unchanged out-of-fold files, so they match the five-way blend and do
+not validate the refit. The change tables compare against the five-way blend (`runs/blend`, sha256
+c3af1418...).
+
+| run | commit | given Jul / Aug / Sep (mean) | cleaned (mean) | gen-only (mean) | wall | notes |
+|---|---|---|---|---|---|---|
+| lgbm-refit / lgbm-hedge | 18b268b | — | — | — | 7.2 min | 450 rounds; 50 / 19 argmax rows and 14 / 7 decoded calls changed vs its fold mean |
+| catboost-refit / catboost-hedge | 18b268b | — | — | — | 1.8 min | 450 iterations, gpu_ram_part 0.45; 24 / 11 argmax rows and 9 / 6 decoded calls changed |
+| refit-blend (five -refit members) | 18b268b | 0.5130 / 0.5091 / 0.5147 (0.5123) | 0.5667 | 0.9013 | <2 min | VALID, sha256 `7557112ae26186658e6c9640f5181ddc2a86483c30fdb562b972f6880ec349a4`; 11 October calls changed vs blend (10 legit -> fraud: qr 4, phishing 2, refund 2, cashback 1, collusion 1; 1 cashback -> refund) |
+| hedge-blend (five -hedge members) | 18b268b | 0.5130 / 0.5091 / 0.5147 (0.5123) | 0.5667 | 0.9013 | <2 min | VALID, sha256 `28d9544465b36b028cb6c91069b4af26dc361d6978d5a4401e41f0d6ec7507ad`; 6 October calls changed vs blend (5 legit -> fraud, one each: cashback, phishing, qr, collusion, refund; 1 cashback -> refund) |
