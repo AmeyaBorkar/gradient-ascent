@@ -1,6 +1,6 @@
 # ringtrace
 
-A clean-room pipeline for the Hack4Hack "UPI Fraud Rings" datathon: label every October
+A pipeline for the Hack4Hack "UPI Fraud Rings" datathon: label every October
 transaction with one of 12 classes (legit + 11 fraud types), scored by macro-F1.
 
 ## One command

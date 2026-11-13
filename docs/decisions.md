@@ -54,8 +54,7 @@ Short records of design choices.
     both runs' saved probabilities (fixed point + rules) instead of trusting stored calls, uses
     the first family event of a row as its unit, and averages the per-month macro-F1 like the
     headline score. One sparse product per month gives all 2,000 resamples.
-13. **October-like mode** (`python -m ringtrace.octlike`), for the blend test with the team's
-    probabilities on their thinned frames (`~/data-oct/s13|s14|s15`: September thinned to
+13. **October-like mode** (`python -m ringtrace.octlike`), on thinned frames (`~/data-oct/s13|s14|s15`: September thinned to
     October's density, fraud events whole, devices in the counter's legit block renumbered, the QR
     check blanked on ~150 QR payments to a person):
     - every family is rebuilt on the frame's own ledger (frame train + original test) with the
