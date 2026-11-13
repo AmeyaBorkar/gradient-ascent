@@ -204,3 +204,26 @@ rule. Details and per-class tables: `docs/findings/more-data.md`.
 | clean-event-refit / clean-event-hedge | 031e194 | — | — | — | 5.0 min | 48 / 24 argmax rows changed |
 | clean-l2-refit / clean-l2-hedge | 031e194 | — | — | — | 7.1 min | 61 / 38 argmax rows changed |
 | refit-october, first launch | ec37c9d | — | — | — | <1 min | failed: shell quoting in the recipe loop; relaunched via `scripts/refit_october.sh` |
+
+## In-context member: TabICL v2 (`icl-tabicl`, rejected)
+
+TabICL v2 (package 2.2.0, decision 16) refits the champion's fraud stage on the champion's
+candidate rows: the 5 % of train rows with fraud probability at least tau = 2.18e-5 (26,977 /
+22,901 / 28,418 candidates in Jul / Aug / Sep, 15,013 in October; they hold 41.0 % of the fraud
+rows). Outside the candidates the member equals the champion. GPU: RTX 4090, held to 12 GB, 24
+threads. Every result is decoded with the fixed point at 0.875, then the anchored template rule.
+Analysis: `docs/findings/icl-tabicl.md`.
+
+| run | commit | given Jul / Aug / Sep (mean) | cleaned Jul / Aug / Sep (mean) | gen-only Jul / Aug / Sep (mean) | wall | notes |
+|---|---|---|---|---|---|---|
+| icl-tabicl-slice (fold 9, 2,000 queries) | f3d1ce3 | — | — | — | 49 s (14 s model) | timing probe |
+| icl-tabicl (member arrays) | f3d1ce3 | — | — | — | 194 s | folds 48 / 35 / 34 s, October 69 s; finite, rows sum to 1 |
+| icl-tabicl-rep9a / rep9b (fold 9 twice) | 1f9e787 | — | — | — | 55 s each | bit-identical to each other and to the full run |
+| icl-tabicl-solo (member alone) | 1f9e787 | 0.5104 / 0.5072 / 0.4996 (0.5058) | 0.5621 / 0.5620 / 0.5571 (0.5604) | 0.9023 / 0.8992 / 0.9148 (0.9054) | 2 min | vs champion: −0.0064 given [−0.0072, −0.0057], −0.0061 cleaned [−0.0069, −0.0054] |
+| icl-tabicl-base5 (five-member blend, rescored) | 1f9e787 | 0.5130 / 0.5091 / 0.5147 (0.5123) | 0.5647 / 0.5641 / 0.5714 (0.5667) | 0.9022 / 0.9000 / 0.9018 (0.9013) | 2 min | reference |
+| icl-tabicl-blend6 (member at 1/6) | 1f9e787 | 0.5133 / 0.5092 / 0.5147 (0.5124) | 0.5649 / 0.5642 / 0.5714 (0.5668) | 0.9026 / 0.9000 / 0.9019 (0.9015) | 2 min | Sep −4.0e-6 given, −3.3e-6 cleaned; bootstrap +0.0001 [+0.0000, +0.0002] both |
+| icl-tabicl-blend3 (member at 1/3) | 1f9e787 | 0.5135 / 0.5092 / 0.5147 (0.5125) | 0.5651 / 0.5642 / 0.5713 (0.5669) | 0.9029 / 0.9001 / 0.9018 (0.9016) | 2 min | Sep −2.2e-6 given, −4.2e-5 cleaned; bootstrap +0.0002 [+0.0001, +0.0003] given, +0.0002 [+0.0000, +0.0003] cleaned |
+| octlike icl-tabicl, 9 cells | 1f9e787 | change vs champion per seed: −0.0229 / −0.0212 / −0.0185, bound −0.0235 | −0.0235 / −0.0217 / −0.0194, bound −0.0242 | −0.0406 / −0.0381 / −0.0278 | 4.6 min (about 30 s per cell) | FAIL |
+| octlike champion x 5/6 + member x 1/6 | 1f9e787 | +0.0000 / +0.0001 / +0.0000, bound −0.0001 | +0.0001 / +0.0001 / +0.0000, bound −0.0000 | +0.0001 / +0.0002 / −0.0000 | (scoring only) | FAIL (tie) |
+| octlike champion x 2/3 + member x 1/3 | 1f9e787 | +0.0000 / +0.0001 / +0.0000, bound −0.0001 | +0.0002 / +0.0002 / +0.0000, bound −0.0001 | +0.0002 / +0.0001 / −0.0001 | (scoring only) | FAIL (tie) |
+| compare, first launch (both blends) | 1f9e787 | — | — | — | >10 min | stopped by a time limit on the laptop; rerun |
