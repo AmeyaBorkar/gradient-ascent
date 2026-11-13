@@ -94,7 +94,7 @@ def with_cuts(prior: phones.Prior, cuts: np.ndarray, spread, gap_weight) -> phon
 def cmd_gate(f: Frame, seeds: int = 30) -> dict:
     y, anchor = f.y, f.anchor
     every = np.ones(len(f.nums_all), dtype=bool)
-    r_full, seg_full, _, ph_full = f.decode(every)
+    r_full, seg_full, conf_full, ph_full = f.decode(every)
     full = np.zeros(len(y), dtype=np.int64)
     full[r_full] = seg_full
     train_prior = phones.learn_prior(ph_full, f.lo, f.edge)
@@ -121,7 +121,7 @@ def cmd_gate(f: Frame, seeds: int = 30) -> dict:
         return out
 
     # the full block: its own fit, then taught by itself and by October's fit
-    base_full = score(r_full, seg_full, np.ones(len(r_full)))
+    base_full = score(r_full, seg_full, conf_full)
     full_rows = {}
     for s, w in settings:
         row = {}
