@@ -185,3 +185,12 @@ def test_column_auc_gap_flags_only_the_drifting_column():
     b[:1000, 2] = np.nan  # missingness moves too
     gap = nn_shift.column_auc_gap(a, b, sample=5000)
     assert gap[0] < 0.03 and gap[1] > 0.4 and gap[2] > 0.05
+
+
+def test_run_model_builds_the_tabr_member_from_its_recipe():
+    from ringtrace import run, tabr
+
+    recipe = run.load_recipe("recipes/wildrun-tabr.json")
+    spec, fit_fn = run.model(recipe)
+    assert isinstance(spec, tabr.TabRSpec) and fit_fn is tabr.fit_predict
+    assert spec.seeds == (0, 1, 2) and spec.epochs == 10

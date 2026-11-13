@@ -44,7 +44,15 @@ def cascade_spec(recipe: dict) -> CascadeSpec:
 
 
 def model(recipe: dict):
-    """(spec, fit_predict) of the recipe's model: the cascade, or ``"model": "tabm"``."""
+    """(spec, fit_predict) of the recipe's model: the cascade, ``"model": "tabm"`` or
+    ``"model": "tabr"`` (settings under the key of the same name)."""
+    if recipe.get("model") == "tabr":
+        from ringtrace import tabr
+
+        t = dict(recipe.get("tabr", {}))
+        if "seeds" in t:
+            t["seeds"] = tuple(t["seeds"])
+        return tabr.TabRSpec(**t), tabr.fit_predict
     if recipe.get("model") == "tabm":
         from ringtrace import tabm
 
