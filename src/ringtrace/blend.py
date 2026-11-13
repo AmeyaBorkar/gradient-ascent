@@ -137,9 +137,6 @@ def write_submission(led, te_idx: np.ndarray, pred: np.ndarray, path: str) -> No
     print(f"VALID {out} sha256 {hashlib.sha256(out.read_bytes()).hexdigest()}")
 
 
-if __name__ == "__main__":
-    main()
-
 
 def fraud_split_from(types: np.ndarray, split: np.ndarray) -> np.ndarray:
     """``types``'s distribution over the fraud classes, rescaled to ``split``'s fraud mass
@@ -163,3 +160,7 @@ def save_fraud_split(types_spec: str, split_spec: str, name: str) -> None:
         )
         check_proba(p, name)
         np.save(out / f"{which}.npy", p.astype(np.float32))
+
+
+if __name__ == "__main__":
+    main()

@@ -116,3 +116,14 @@ def test_fraud_split_keeps_types_and_takes_the_fraud_mass():
     np.testing.assert_allclose(p.sum(1), 1.0)
     np.testing.assert_allclose(p[0, :3], [0.2, 0.6, 0.2])
     np.testing.assert_allclose(p[1, 1:], 0.5 / 11)
+
+
+def test_blend_module_defines_everything_before_its_main_guard():
+    import ast
+    from pathlib import Path
+
+    from ringtrace import blend
+
+    tree = ast.parse(Path(blend.__file__).read_text())
+    last = tree.body[-1]
+    assert isinstance(last, ast.If) and "__main__" in ast.unparse(last.test)
