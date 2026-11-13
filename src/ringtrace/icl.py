@@ -217,7 +217,7 @@ def _mitra_predict(
         mitra_deterministic_context,
     )
 
-    np.random.seed(seed)
+    np.random.seed(seed)  # noqa: NPY002 - the library draws from the global generator
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     torch.use_deterministic_algorithms(True, warn_only=True)
