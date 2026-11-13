@@ -220,3 +220,119 @@ def test_fine_tune_rejects_class_weights():
     sd = wspace.state(tabm.build_model(Z.shape[1], spec))
     with pytest.raises(ValueError):
         wspace.fine_tune(sd, Z, y, spec, 0, log=lambda *_: None)
+
+
+def _noisy_state(n_in=3, seed=0):
+    """A tiny TabM with noise on every tensor, so the adapter scales are not exactly +-1."""
+    spec = tiny_spec()
+    torch.manual_seed(seed)
+    model = tabm.build_model(n_in, spec)
+    with torch.no_grad():
+        for param in model.parameters():
+            param.add_(0.05 * torch.randn_like(param))
+    sd = wspace.state(model)
+    assert not torch.allclose(sd["body.0.r"].abs(), torch.ones_like(sd["body.0.r"]))
+    return sd, spec
+
+
+def _probs(sd, x, spec):
+    model = wspace.load(sd, spec).double()
+    model.eval()
+    with torch.no_grad():
+        return model(x.double()).softmax(-1).mean(1)
+
+
+def _permutation(n, rng):
+    perm = rng.permutation(n)
+    if np.array_equal(perm, np.arange(n)):
+        perm[0], perm[1] = perm[1], perm[0]
+    return torch.tensor(perm, dtype=torch.long)
+
+
+def _permutations(rows, n, rng):
+    perm = np.stack([rng.permutation(n) for _ in range(rows)])
+    if np.all(perm == np.arange(n)):
+        perm[0, 0], perm[0, 1] = perm[0, 1], perm[0, 0]
+    return torch.tensor(perm, dtype=torch.long)
+
+
+def _signs(shape, rng):
+    sign = rng.choice(np.array([-1.0, 1.0]), size=shape)
+    if np.all(sign == 1.0):
+        sign = sign.copy()
+        sign.reshape(-1)[0] = -1.0
+    return torch.tensor(sign)
+
+
+def _kinds(sd, rng):
+    """One non-trivial draw of each elementary symmetry, including both hidden blocks."""
+    features, freq = sd["embed.c"].shape
+    units = sd["embed.b"].shape[1]
+    members = sd["head_b"].shape[0]
+    width = sd["head_w"].shape[1]
+    layers = sum(1 for key in sd if key.endswith(".lin.weight"))
+    out = {
+        "members": lambda state: wspace.permute_members(state, _permutation(members, rng)),
+        "freq": lambda state: wspace.permute_freq(
+            state, _permutations(features, freq, rng), _signs((features, freq), rng)
+        ),
+        "embed": lambda state: wspace.permute_embed(
+            state, _permutations(features, units, rng), _signs((features, units), rng)
+        ),
+    }
+    for layer in range(layers):
+        out[f"hidden{layer}"] = lambda state, layer=layer: wspace.permute_hidden(
+            state,
+            layer,
+            _permutation(width, rng),
+            _signs((width,), rng),
+            _signs((width,), rng),
+        )
+    return out
+
+
+def test_elementary_transforms_preserve_the_function():
+    sd, spec = _noisy_state(seed=0)
+    x = torch.randn(32, sd["embed.c"].shape[0])
+    base = _probs(sd, x, spec)
+    for name, apply in _kinds(sd, np.random.default_rng(1)).items():
+        moved = apply(sd)
+        assert wspace.distance(sd, moved) > 0, name
+        assert torch.allclose(_probs(moved, x, spec), base, atol=1e-5), name
+
+
+def test_weight_matching_recovers_one_symmetry():
+    sd, spec = _noisy_state(seed=2)
+    for name, apply in _kinds(sd, np.random.default_rng(3)).items():
+        aligned, _ = wspace.weight_matching(sd, apply(sd))
+        dist = wspace.distance(sd, aligned)
+        assert dist < 1e-4, f"{name}: {dist}"
+
+
+def test_weight_matching_improves_a_fully_scrambled_copy():
+    sd, spec = _noisy_state(seed=4)
+    x = torch.randn(32, sd["embed.c"].shape[0])
+    scrambled = sd
+    for apply in _kinds(sd, np.random.default_rng(5)).values():
+        scrambled = apply(scrambled)
+    aligned, hist = wspace.weight_matching(sd, scrambled)
+    assert hist[0] == pytest.approx(wspace.distance(sd, scrambled), rel=1e-5)
+    assert all(nxt <= prev for prev, nxt in zip(hist, hist[1:], strict=False))
+    assert hist[-1] < hist[0]
+    assert torch.allclose(_probs(aligned, x, spec), _probs(sd, x, spec), atol=1e-5)
+
+
+def test_merge_seeds_aligns_single_symmetries_and_can_skip_it():
+    sd, spec = _noisy_state(seed=6)
+    x = torch.randn(32, sd["embed.c"].shape[0])
+    kinds = _kinds(sd, np.random.default_rng(7))
+    copies = [kinds["freq"](sd), kinds["members"](sd)]
+    merged, histories = wspace.merge_seeds(copies, align=True)
+    assert len(histories) == 1
+    assert histories[0][-1] < 1e-4  # the second copy recovered onto the first
+    assert torch.allclose(_probs(merged, x, spec), _probs(sd, x, spec), atol=1e-5)
+    plain, skipped = wspace.merge_seeds(copies, align=False)
+    assert skipped == []
+    mean = wspace.mean_state(copies)
+    for key in sd:
+        assert torch.equal(plain[key], mean[key])

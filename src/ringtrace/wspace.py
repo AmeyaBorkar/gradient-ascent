@@ -207,6 +207,207 @@ def arm_weights(ends: dict, alphas=ALPHAS) -> dict:
 
 
 # ---------------------------------------------------------------------------------------------
+# re-basin: the network's symmetries and weight matching
+
+
+def _member_keys(sd: dict) -> list[str]:
+    keys = [k for k in ("head_w", "head_b") if k in sd]
+    layer = 0
+    while f"body.{3 * layer}.r" in sd:
+        keys.extend(f"body.{3 * layer}.{suffix}" for suffix in ("r", "s", "b"))
+        layer += 1
+    return keys
+
+
+def _sgn(v):
+    """Sign of an inner product. Zero carries no gauge preference, so it counts as +1."""
+    sign = v.sign()
+    return v.new_ones(v.shape).where(sign == 0, sign)
+
+
+def _assign(sim):
+    """Column chosen for each row of a similarity matrix (maximum-weight matching)."""
+    from scipy.optimize import linear_sum_assignment
+
+    cost = np.ascontiguousarray(sim.detach().numpy())
+    row, col = linear_sum_assignment(cost, maximize=True)
+    perm = np.empty(cost.shape[0], dtype=np.int64)
+    perm[row] = col
+    return tabm._torch().from_numpy(perm)
+
+
+def permute_members(sd: dict, pi) -> dict:
+    """Reorder ensemble members. The shared weights have no member axis."""
+    out = {k: v.clone() for k, v in sd.items()}
+    for key in _member_keys(sd):
+        out[key] = sd[key][pi]
+    return out
+
+
+def permute_freq(sd: dict, perm, sign) -> dict:
+    """Reorder periodic frequencies. ``sign`` flips frequency and the odd (sine) row together."""
+    out = {k: v.clone() for k, v in sd.items()}
+    c, w = sd["embed.c"], sd["embed.w"]
+    q = c.shape[1]
+    sign = sign.to(dtype=c.dtype, device=c.device)
+    perm = perm.to(device=c.device)
+    out["embed.c"] = sign * c.gather(1, perm)
+    index = perm.unsqueeze(-1).expand(-1, -1, w.shape[-1])
+    moved = w.clone()
+    moved[:, :q] = sign.unsqueeze(-1) * w[:, :q].gather(1, index)
+    moved[:, q:] = w[:, q:].gather(1, index)
+    out["embed.w"] = moved
+    return out
+
+
+def permute_embed(sd: dict, perm, sign) -> dict:
+    """Reorder each feature's embedding units. ``sign`` is the first block's input gauge."""
+    out = {k: v.clone() for k, v in sd.items()}
+    w, bias = sd["embed.w"], sd["embed.b"]
+    sign = sign.to(dtype=w.dtype, device=w.device)
+    perm = perm.to(device=w.device)
+    out["embed.w"] = w.gather(2, perm.unsqueeze(1).expand(-1, w.shape[1], -1))
+    out["embed.b"] = bias.gather(1, perm)
+    features, units = perm.shape
+    for key in ("body.0.lin.weight", "body.0.r"):
+        tensor = sd[key]
+        grouped = tensor.reshape(tensor.shape[0], features, units)
+        index = perm.unsqueeze(0).expand(grouped.shape[0], -1, -1)
+        out[key] = (sign * grouped.gather(2, index)).reshape_as(tensor)
+    return out
+
+
+def permute_hidden(sd: dict, layer: int, perm, sign_in, sign_out) -> dict:
+    """Reorder one block's outputs. ``sign_out`` gauges the next block's inputs, except on the
+    last block, where the head has no input scale and the sign is ignored."""
+    out = {k: v.clone() for k, v in sd.items()}
+    key = f"body.{3 * layer}"
+    weight = sd[f"{key}.lin.weight"]
+    sign_in = sign_in.to(dtype=weight.dtype, device=weight.device)
+    perm = perm.to(device=weight.device)
+    out[f"{key}.lin.weight"] = sign_in[:, None] * weight[perm]
+    out[f"{key}.s"] = sign_in * sd[f"{key}.s"][:, perm]
+    out[f"{key}.b"] = sd[f"{key}.b"][:, perm]
+    nxt = f"body.{3 * (layer + 1)}"
+    if f"{nxt}.lin.weight" in sd:
+        sign_out = sign_out.to(dtype=weight.dtype, device=weight.device)
+        out[f"{nxt}.lin.weight"] = sign_out * sd[f"{nxt}.lin.weight"][:, perm]
+        out[f"{nxt}.r"] = sign_out * sd[f"{nxt}.r"][:, perm]
+    else:
+        out["head_w"] = sd["head_w"][:, perm]
+    return out
+
+
+def _picked(sim, perm):
+    return sim.gather(1, perm.unsqueeze(1)).squeeze(1)
+
+
+def _match_frequencies(a, b):
+    torch = tabm._torch()
+    c_a, c_b = a["embed.c"], b["embed.c"]
+    w_a, w_b = a["embed.w"], b["embed.w"]
+    q = c_a.shape[1]
+    paired = c_a[:, :, None] * c_b[:, None, :]
+    paired = paired + torch.einsum("fqd,fpd->fqp", w_a[:, :q], w_b[:, :q])
+    cosine = torch.einsum("fqd,fpd->fqp", w_a[:, q:], w_b[:, q:])
+    sim = paired.abs() + cosine
+    perm = torch.stack([_assign(sim[i]) for i in range(sim.shape[0])])
+    return permute_freq(b, perm, _sgn(paired.gather(2, perm.unsqueeze(-1)).squeeze(-1)))
+
+
+def _match_embedding(a, b):
+    torch = tabm._torch()
+    w_a, w_b = a["embed.w"], b["embed.w"]
+    bias_a, bias_b = a["embed.b"], b["embed.b"]
+    value = torch.einsum("fqd,fqe->fde", w_a, w_b) + bias_a[:, :, None] * bias_b[:, None, :]
+    features, units = bias_a.shape
+    cross = None
+    for key in ("body.0.lin.weight", "body.0.r"):
+        left = a[key].reshape(a[key].shape[0], features, units)
+        right = b[key].reshape(b[key].shape[0], features, units)
+        gram = torch.einsum("nfd,nfe->fde", left, right)
+        cross = gram if cross is None else cross + gram
+    perm = torch.stack([_assign((value + cross.abs())[i]) for i in range(features)])
+    return permute_embed(b, perm, _sgn(cross.gather(2, perm.unsqueeze(-1)).squeeze(-1)))
+
+
+def _match_hidden(a, b, layer):
+    torch = tabm._torch()
+    key = f"body.{3 * layer}"
+    incoming = a[f"{key}.lin.weight"] @ b[f"{key}.lin.weight"].T
+    incoming = incoming + a[f"{key}.s"].T @ b[f"{key}.s"]
+    bias = a[f"{key}.b"].T @ b[f"{key}.b"]
+    nxt = f"body.{3 * (layer + 1)}"
+    if f"{nxt}.lin.weight" in a:
+        outgoing = a[f"{nxt}.lin.weight"].T @ b[f"{nxt}.lin.weight"]
+        outgoing = outgoing + a[f"{nxt}.r"].T @ b[f"{nxt}.r"]
+        sim = incoming.abs() + bias + outgoing.abs()
+    else:
+        # No sign gauge on the head: its inner product is used as it stands.
+        outgoing = torch.einsum("kxc,kyc->xy", a["head_w"], b["head_w"])
+        sim = incoming.abs() + bias + outgoing
+    perm = _assign(sim)
+    sign_in = _sgn(_picked(incoming, perm))
+    # sign_out is ignored on the last block; the head branch never reads it.
+    sign_out = _sgn(_picked(outgoing, perm)) if f"{nxt}.lin.weight" in a else sign_in
+    return permute_hidden(b, layer, perm, sign_in, sign_out)
+
+
+def _match_members(a, b):
+    sim = None
+    for key in _member_keys(a):
+        left, right = a[key], b[key]
+        if left.ndim > 2:
+            left = left.reshape(left.shape[0], -1)
+            right = right.reshape(right.shape[0], -1)
+        gram = left @ right.T
+        sim = gram if sim is None else sim + gram
+    return permute_members(b, _assign(sim))
+
+
+def _as_float64(sd: dict) -> dict:
+    torch = tabm._torch()
+    return {k: v.detach().to(dtype=torch.float64, device="cpu").clone() for k, v in sd.items()}
+
+
+def weight_matching(a: dict, b: dict, sweeps: int = 20) -> tuple[dict, list[float]]:
+    """Align ``b`` to ``a`` by coordinate descent over the symmetries above.
+
+    The history starts with the distance before any sweep and gains one entry after every sweep.
+    """
+    ref, cur = _as_float64(a), _as_float64(b)
+    n_layers = 0
+    while f"body.{3 * n_layers}.lin.weight" in cur:
+        n_layers += 1
+    history = [distance(ref, cur)]
+    for _ in range(sweeps):
+        before = history[-1]
+        cur = _match_frequencies(ref, cur)
+        cur = _match_embedding(ref, cur)
+        for layer in range(n_layers):
+            cur = _match_hidden(ref, cur, layer)
+        cur = _match_members(ref, cur)
+        history.append(distance(ref, cur))
+        if before == 0.0 or (before - history[-1]) / before < 1e-9:
+            break
+    aligned = {k: cur[k].to(dtype=b[k].dtype, device=b[k].device) for k in b}
+    return aligned, history
+
+
+def merge_seeds(states: list[dict], align: bool = True) -> tuple[dict, list]:
+    """Average states. With ``align``, every later state is weight-matched to the first."""
+    if not align:
+        return mean_state(states), []
+    aligned = [states[0]]
+    histories = []
+    for other in states[1:]:
+        matched, hist = weight_matching(states[0], other)
+        aligned.append(matched)
+        histories.append(hist)
+    return mean_state(aligned), histories
+
+
+# ---------------------------------------------------------------------------------------------
 # contexts
 
 
