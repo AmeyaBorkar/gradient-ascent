@@ -41,3 +41,15 @@ def test_event_and_ring_mix():
     assert np.isclose(r["size2_3"], 2e5 / 7)
     assert r["size9p"] == 0.0
     assert np.isclose(r["mean_size"], 2.0)
+
+
+def test_scale_rows_modes():
+    idx = np.array([10, 11, 12, 13])
+    kept = np.array([True, True, True, False])
+    y = np.zeros(20, dtype=int)
+    y[11] = 3
+    structured = np.zeros(20, dtype=bool)
+    structured[12] = True
+    assert list(octshape.scale_rows(idx, kept, y, structured, "all")) == [10, 12]
+    assert list(octshape.scale_rows(idx, kept, y, structured, "outside")) == [10]
+    assert len(octshape.scale_rows(idx, kept, y, structured, "off")) == 0

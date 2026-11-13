@@ -9,8 +9,10 @@ changed, the way ``ringtrace.octlike`` changes September:
 
 * month m's rows are grouped into protected units (generator events and label units together,
   ``octlike.september_units``) and each unit is kept whole with probability ``octlike.KEEP``;
-* the amount of every kept legit-labelled row of month m is scaled by ``AMOUNT_SCALE``
-  (rounded to the paisa);
+* the amount of every kept legit-labelled row of month m that sits outside every label-free
+  generator structure (an event id of any evidence module, or a row mark) is scaled by
+  ``AMOUNT_SCALE`` (rounded to the paisa); ``scale="off"`` skips it (control arm), and
+  ``scale="all"`` scales every legit-labelled row (the first build, which split rings);
 * ``qr_vpa_mismatch`` is blanked on ``octlike.QR_BLANK`` of the kept QR payments to a person;
 * every feature family is rebuilt on the frame (its own cache key), except the device counter,
   held at its values on the unthinned build.
@@ -46,6 +48,7 @@ TRAIN_MONTHS = (7, 8, 9)
 RECIPE = "recipes/champion.json"
 WATCH = ("qr_swap", "merchant_collusion", "refund_abuse")
 RING_SHAPES = (1, 2, 3)
+SCALE_MODES = ("outside", "off", "all")
 
 
 # ---------------------------------------------------------------------------------------------
@@ -69,6 +72,19 @@ def scale_amounts(amount: np.ndarray, rows: np.ndarray, factor: float = AMOUNT_S
     out = np.asarray(amount, dtype=np.float64).copy()
     out[rows] = np.round(out[rows] * factor, 2)
     return out
+
+
+def scale_rows(idx: np.ndarray, kept: np.ndarray, y: np.ndarray, structured: np.ndarray, mode: str):
+    """Rows (of ``idx``) whose amount is scaled: kept and legit-labelled; with ``outside`` also
+    outside every generator structure; none with ``off``."""
+    if mode not in SCALE_MODES:
+        raise ValueError(f"unknown scale mode {mode!r}")
+    sel = kept & (y[idx] == 0)
+    if mode == "outside":
+        sel &= ~structured[idx]
+    elif mode == "off":
+        sel &= False
+    return idx[sel]
 
 
 def event_mix(event: np.ndarray, mask: np.ndarray) -> dict:
@@ -105,7 +121,11 @@ def _dir() -> Path:
     return d
 
 
-def build_copy(month: int, seed: int, log=print) -> dict:
+def _path(month: int, seed: int, scale: str) -> Path:
+    return _dir() / f"m{month}_s{seed}_{scale}.npz"
+
+
+def build_copy(month: int, seed: int, scale: str = "outside", log=print) -> dict:
     """Choose the kept, blanked and scaled rows of a copy of ``month`` and save them."""
     from ringtrace import store
 
@@ -125,8 +145,11 @@ def build_copy(month: int, seed: int, log=print) -> dict:
     qr = (led["txn_type"] == "QR").to_numpy() & led["to_person"].to_numpy()
     blank = blank_rows(idx[kept & qr[idx]], seed, month)
     y = led["y"].to_numpy()
-    scaled = idx[kept & (y[idx] == 0)]
-    np.savez(_dir() / f"m{month}_s{seed}.npz", rows=rows, blank=blank, scaled=scaled)
+    structured = store.family("marks")["mrk_any"].to_numpy() > 0
+    for ev in events:
+        structured |= ev >= 0
+    scaled = scale_rows(idx, kept, y, structured, scale)
+    np.savez(_path(month, seed, scale), rows=rows, blank=blank, scaled=scaled)
     stats = {
         "month_rows": int(len(idx)),
         "kept": int(kept.sum()),
@@ -134,19 +157,20 @@ def build_copy(month: int, seed: int, log=print) -> dict:
         "blanked": int(len(blank)),
         "scaled": int(len(scaled)),
     }
-    log(f"[octshape] copy m{month} s{seed}: {json.dumps(stats)}")
+    stats["legit_kept"] = int((kept & (y[idx] == 0)).sum())
+    log(f"[octshape] copy m{month} s{seed} {scale}: {json.dumps(stats)}")
     return stats
 
 
 class Copy:
     """A copy frame installed as the store's ledger (device counter held)."""
 
-    def __init__(self, month: int, seed: int):
+    def __init__(self, month: int, seed: int, scale: str = "outside"):
         from ringtrace import store
 
-        path = _dir() / f"m{month}_s{seed}.npz"
+        path = _path(month, seed, scale)
         if not path.exists():
-            build_copy(month, seed)
+            build_copy(month, seed, scale)
         store.use_frame(None)
         base = store.ledger()
         f = np.load(path)
@@ -223,7 +247,7 @@ def _mix_of(led: pl.DataFrame, mask: np.ndarray) -> dict:
     return res
 
 
-def mix(seeds=COPY_SEEDS, log=print) -> dict:
+def mix(seeds=COPY_SEEDS, scales=("outside", "off"), log=print) -> dict:
     from ringtrace import store
 
     store.use_frame(None)
@@ -234,8 +258,9 @@ def mix(seeds=COPY_SEEDS, log=print) -> dict:
     out["october"] = _mix_of(led, is_test)
     for m in TRAIN_MONTHS:
         for s in seeds:
-            c = Copy(m, s)
-            out[f"copy_m{m}_s{s}"] = _mix_of(c.led, c.mine)
+            for sc in scales:
+                c = Copy(m, s, sc)
+                out[f"copy_m{m}_s{s}_{sc}"] = _mix_of(c.led, c.mine)
     for s in octlike.SEEDS:
         if (paths.cache_dir() / "octlike" / f"s{s}.npz").exists():
             f = octlike.Frame(s)
@@ -244,7 +269,7 @@ def mix(seeds=COPY_SEEDS, log=print) -> dict:
     for k, v in out.items():
         r = v["rings"]
         log(
-            f"[mix] {k:<16} rows {v['rows']:>7}  rings/100k s1 {r['size1']:.2f} s2-3 "
+            f"[mix] {k:<22} rows {v['rows']:>7}  rings/100k s1 {r['size1']:.2f} s2-3 "
             f"{r['size2_3']:.2f} s4-8 {r['size4_8']:.2f} s9+ {r['size9p']:.2f} "
             f"mean {r['mean_size']:.2f}  "
             + " ".join(
