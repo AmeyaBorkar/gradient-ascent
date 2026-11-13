@@ -177,16 +177,44 @@ def role_scores(config: str, log=print) -> dict:
     return out
 
 
+def table(base: str = "base") -> list[str]:
+    """Markdown rows: each finished config's scores minus the base config's, per part."""
+    runs = paths.out_dir() / "runs"
+    ref = json.loads((runs / (PREFIX + base) / "summary.json").read_text())
+    lines = []
+    for name in CONFIGS:
+        path = runs / (PREFIX + name) / "summary.json"
+        if not path.exists():
+            continue
+        got = json.loads(path.read_text())
+        cells = []
+        for t in ("given", "cleaned"):
+            sep = got.get("lomo", {}).get(t)
+            oct_ = [got[s][t] - ref[s][t] for s in ("13", "14", "15") if s in got]
+            cells.append("-" if sep is None else f"{sep - ref['lomo'][t]:+.4f}")
+            cells.append(
+                " / ".join(f"{d:+.4f}" for d in oct_) + (f" ({np.mean(oct_):+.4f})" if oct_ else "")
+                if oct_
+                else "-"
+            )
+        lines.append(f"| {name} | " + " | ".join(cells) + " |")
+    return lines
+
+
 def main(argv=None) -> dict:
     from ringtrace import threads
 
     threads.pin()
     ap = argparse.ArgumentParser(prog="python -m ringtrace.tabmsweep")
-    ap.add_argument("config", choices=sorted(CONFIGS))
+    ap.add_argument("config", choices=sorted(CONFIGS) + ["table"])
     ap.add_argument("--parts", default="lomo,13,14,15")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--role", action="store_true", help="only the blend-role scores of September")
     args = ap.parse_args(argv)
+    if args.config == "table":
+        for line in table():
+            print(line)
+        return {}
     recipe = recipe_for(args.config)
     out = paths.out_dir() / "runs" / recipe["name"]
     out.mkdir(parents=True, exist_ok=True)
