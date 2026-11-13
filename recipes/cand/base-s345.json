@@ -1,0 +1,40 @@
+{
+ "name": "base-s345",
+ "members": [
+  {
+   "name": "champion",
+   "run": "champion-s345",
+   "variant": "fold"
+  },
+  {
+   "name": "lgbm",
+   "run": "final-lgbm-s345",
+   "variant": "fold"
+  },
+  {
+   "name": "catboost",
+   "run": "final-catboost-s345",
+   "variant": "fold"
+  },
+  {
+   "name": "clean-event",
+   "run": "final-clean-event-s345",
+   "variant": "fold"
+  },
+  {
+   "name": "clean-l2",
+   "run": "final-clean-l2-s345",
+   "variant": "fold"
+  }
+ ],
+ "weights": {
+  "mode": "equal"
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ],
+ "base_rate_rules": []
+}
