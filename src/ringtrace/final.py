@@ -205,8 +205,10 @@ def gate_verdict(lomo: dict, octlike: dict | None, targets=("given", "cleaned"))
     if octlike is None:
         oct_ok = None
     else:
-        oct_ok = all(v > 0 for t in targets for v in octlike["per_seed"][t].values()) and all(
-            octlike["lower_bound"][t] > 0 for t in targets
+        oct_ok = (
+            octlike.get("complete", True)
+            and all(v > 0 for t in targets for v in octlike["per_seed"][t].values())
+            and all(octlike["lower_bound"][t] > 0 for t in targets)
         )
     return {
         "months_non_negative": months_ok,
@@ -422,28 +424,34 @@ class Bench:
 
     # October-like -------------------------------------------------------------------------
 
-    def has_cells(self, recipe: dict, seeds, sets) -> bool:
-        if self.cells_dir is None:
-            return False
-        return all(
-            "cells" in m and (self.cells_dir / f"{m['cells']}_s{s}_r{r}.npz").exists()
-            for m in recipe["members"]
+    def cells_of(self, recipe: dict, seeds, sets) -> set:
+        """The (seed, set) cells that exist for every member of the recipe."""
+        if self.cells_dir is None or any("cells" not in m for m in recipe["members"]):
+            return set()
+        return {
+            (s, r)
             for s in seeds
             for r in sets
-        )
+            if all(
+                (self.cells_dir / f"{m['cells']}_s{s}_r{r}.npz").exists() for m in recipe["members"]
+            )
+        }
 
     def octlike(
         self, base: dict, chals: list[dict], seeds=(13, 14, 15), sets=(0, 1, 2), draws=1000
     ) -> list[dict | None]:
-        """Each challenger against the base in the nine cells (thinned September, fitted on July
-        + August); the September fold's weights; base-rate rules apply as in the recipe."""
+        """Each challenger against the base in the cells both have (all nine when complete;
+        thinned September, fitted on July + August); the September fold's weights; base-rate rules
+        apply as in the recipe."""
         from ringtrace import octlike as ol
         from ringtrace import rules as rulebook
         from ringtrace.pairboot import PairedBoot
         from ringtrace.scoring import macro_f1
 
-        todo = [i for i, c in enumerate(chals) if self.has_cells(c, seeds, sets)]
-        if not self.has_cells(base, seeds, sets) or not todo:
+        have_base = self.cells_of(base, seeds, sets)
+        have = {i: self.cells_of(c, seeds, sets) & have_base for i, c in enumerate(chals)}
+        todo = [i for i in have if have[i]]
+        if not todo:
             return [None] * len(chals)
         wsep = {recipe_key(r): self.weights(r)[9] for r in [base, *chals]}
         cells: dict = {i: {} for i in todo}
@@ -479,10 +487,14 @@ class Bench:
                     return pred
 
                 for r in sets:
+                    if not any((seed, r) in have[i] for i in todo):
+                        continue
                     ya = calls(base, r)
                     hold_truth = {t: truth[frame.hold] for t, truth in frame.targets.items()}
                     boot = PairedBoot(units, hold_truth, ya, draws=draws, seed=seed * 100 + r)
                     for i in todo:
+                        if (seed, r) not in have[i]:
+                            continue
                         yb = calls(chals[i], r)
                         cell = {"rows_changed": int((ya != yb).sum())}
                         bs = boot.compare(yb)
@@ -498,8 +510,14 @@ class Bench:
             c = cells[i]
             tg = [t for t in next(iter(c.values())) if t != "rows_changed"]
             out[i] = {
+                "n_cells": len(c),
+                "complete": len(c) == len(seeds) * len(sets),
                 "per_seed": {
-                    t: {s: float(np.mean([c[(s, r)][t]["delta"] for r in sets])) for s in seeds}
+                    t: {
+                        s: float(np.mean([v[t]["delta"] for (s2, _), v in c.items() if s2 == s]))
+                        for s in seeds
+                        if any(s2 == s for s2, _ in c)
+                    }
                     for t in tg
                 },
                 "lower_bound": {t: float(np.mean([v[t]["lo"] for v in c.values()])) for t in tg},
@@ -528,6 +546,7 @@ def fmt_line(name: str, lomo: dict, octlike: dict | None, verdict: dict) -> str:
         for t in ("given", "cleaned"):
             ps = " / ".join(f"{v:+.5f}" for v in octlike["per_seed"][t].values())
             parts.append(f"octlike {t} {ps} (lb {octlike['lower_bound'][t]:+.5f})")
+        parts.append(f"cells {octlike.get('n_cells', '?')}")
     else:
         parts.append("octlike n/a")
     parts.append(f"rows {lomo['rows_changed']}")

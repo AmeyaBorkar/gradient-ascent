@@ -134,6 +134,9 @@ def test_gate_verdict():
         "lower_bound": {"given": 0.01, "cleaned": 0.01},
     }
     assert final.gate_verdict(lomo, octl)["passes"]
+    octl["complete"] = False
+    assert not final.gate_verdict(lomo, octl)["passes"]
+    octl["complete"] = True
     octl["per_seed"]["given"][14] = 0.0
     assert not final.gate_verdict(lomo, octl)["passes"]
     assert not final.gate_verdict(lomo, None)["passes"]
