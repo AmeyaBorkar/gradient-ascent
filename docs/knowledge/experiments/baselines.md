@@ -31,8 +31,8 @@ the paired event bootstrap, `python -m ringtrace.rescore` to rescore saved proba
   the no-counter model is +0.0333 [+0.0310, +0.0358] given and +0.0343 [+0.0319, +0.0369] cleaned;
   the seven families (with hygiene) vs context-only +0.0118 [+0.0094, +0.0142] given, +0.0130
   [+0.0104, +0.0155] cleaned.
-- Ablations of drains, merchant, requests, marks, bursts, repeats and context were dropped at the
-  end of the earlier research (queued, never run) in this repository: family-by-family removal is
+- Ablations of drains, merchant, requests, marks, bursts, repeats and context were queued and never run
+  in this repository: family-by-family removal is
   **not measured here** except the counter and money flow. See [rules.md](rules.md) for earlier
   measurements.
 - Reproducibility: rebuilt from a clean checkout with an empty cache and fresh cleaned labels, the

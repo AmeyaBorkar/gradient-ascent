@@ -1,9 +1,9 @@
-# Ensembles: seeds, other learners, rank blends, a second implementation, stacking
+# Ensembles: seeds, other learners, rank blends, a second fit of the method, stacking
 
 **Summary.** Nothing in the ensemble family beats the single XGBoost champion by more than +0.0010
 macro-F1. Seeds, LightGBM, CatBoost, two-family and three-family blends, fold-mean versus refit,
 per-stage depth and round settings, per-class model choice, per-class blend weights, type-stage
-stacking, a TabPFN stacker, a GNN stacker and an independent second implementation all tie
+stacking, a TabPFN stacker, a GNN stacker and a second independent fit of the champion's method all tie
 (within -0.0010 to +0.0010 of the champion), against a +0.007 adoption gate. The reason is
 information, not capacity: the evidence features near-determine the decoded calls (a 5-round model
 decodes to the same score as a 900-round one), and two seeds disagree on about 0.01% of rows. See
@@ -36,7 +36,7 @@ Back to the [index](index.md).
 | neighbour stage | -0.0003 [-0.0007, -0.0000] | n/a | loses |
 | TabPFN stacker | +0.0003 | +0.0011 | tie |
 | GNN columns / GNN blend | -0.0003 / n/a | -0.0030 / -0.0000 | loses / tie |
-| independent second implementation, blended 3:1 | +0.0001 to +0.0004 | -0.00002 to +0.0003 cleaned per thinning, 95% lower bound -0.00036 | tie, does not transfer |
+| second independent fit of the champion's method, blended 3:1 | +0.0001 to +0.0004 | -0.00002 to +0.0003 cleaned per thinning, 95% lower bound -0.00036 | tie, does not transfer |
 | equal-weight five-member blend | +0.0001 to +0.0003 | +0.00016 to +0.00085 on given, positive in every cell; 95% lower bound -0.00004 (cleaned) | tie (best honest combination; see below) |
 
 ## Baselines every ensemble is compared with
@@ -45,7 +45,7 @@ Back to the [index](index.md).
   rule) **[repo]**: LOMO given 0.5122 (Jul 0.5130 / Aug 0.5090 / Sep 0.5146), cleaned 0.5665;
   rebuilt from a clean checkout it reproduces the same predictions byte for byte
   (`python -m ringtrace.build recipes/champion.json`).
-- **[earlier]** the original implementation scored 0.5126 given / 0.5662 cleaned / 0.9005
+- **[earlier]** an earlier fit of the same method scored 0.5126 given / 0.5662 cleaned / 0.9005
   generator-only; its public leaderboard score was 0.5470.
 - **October-like September [repo]**: the champion's mean over nine cells (three thinning seeds x
   three seed sets) is 0.5093 given, with seed sets within +-0.0003 of each other
@@ -148,19 +148,20 @@ Nested, i.e. selected on two months and scored on the third; pool of six models.
   bundle without TabPFN is positive everywhere measured (+0.0003 cleaned October-like [-0.0002,
   +0.0007], +0.0005 LOMO) but not past the gate. The pieces do not add up.
 
-## An independent second implementation and the equal-weight blend
+## Blending two fits of the same method, and the equal-weight blend
 
-- **The independent rebuild [repo]** reproduces the champion: LOMO 0.5122 given / 0.5665 cleaned
-  against 0.5126 / 0.5662, same predictions after rebuild from a clean checkout. **[earlier]** its
-  October file scored 0.5457 public against 0.5470 for the original; the difference is noise: the
+- **This repository's champion [repo]** scores LOMO 0.5122 given / 0.5665 cleaned, against
+  0.5126 / 0.5662 measured earlier for the same method, with the same predictions after a rebuild
+  from a clean checkout. **[earlier]** its October file scored 0.5457 public against 0.5470 for the
+  earlier fit; the difference is noise: the
   two files differ on 59 September rows, a public-size slice (78,175 rows) shows a difference with
   sd 0.0007, and one extra right row on that slice moves macro-F1 by 0.0002 (mule) to 0.0013 (loan).
   The same file's public and private scores differ with sd 0.0117.
-- **[earlier]** The two implementations disagree on 150 LOMO rows; the champion is right on 67, the
-  rebuild on 68. The largest cell is champion qr_swap calls the rebuild calls legit (56 rows; the
-  rebuild is right on 34).
-- **[earlier]** Blends with the rebuild, change against the champion (cleaned, October-like, per
-  thinning seed): 3:1 blend +2.8 / +1.0 / -0.2 (x1e-4); with the cleaned-label rebuild +1.2 / +0.7 /
+- **[earlier]** The two fits disagree on 150 LOMO rows; the earlier fit is right on 67, the
+  later one on 68. The largest cell is qr_swap calls of the earlier fit that the later one calls
+  legit (56 rows; the later fit is right on 34).
+- **[earlier]** Blends of the two fits, change against the champion (cleaned, October-like, per
+  thinning seed): 3:1 blend +2.8 / +1.0 / -0.2 (x1e-4); with the cleaned-label second fit +1.2 / +0.7 /
   +0.9; 1:1 +0.9 / -3.0 / -0.8; nine champion seeds against three -0.7 / -1.7 / +1.1. LOMO gains are
   +0.0002 to +0.0003 and do not transfer. 95% lower bounds are -3.6e-4 to -7.3e-4.
 - **[earlier] The equal-weight five-member blend** (champion XGBoost, LightGBM, CatBoost, XGBoost
@@ -174,16 +175,15 @@ Nested, i.e. selected on two months and scored on the third; pool of six models.
   calls against the champion, and the three-family rank blend differs from it by 4. Every honest
   route converges on the same handful of October rows: about 7 account_takeover -> sim_swap and
   about 4 qr_swap -> legit.
-- Adding the cleaned-label rebuild too (six members) is worse (95% lower bound -3.0e-4 to -3.8e-4).
-- **Lesson:** this five-member blend is the target of the current repository's rebuild plan
+- Adding the cleaned-label second fit too (six members) is worse (95% lower bound -3.0e-4 to -3.8e-4).
+- **Lesson:** this five-member blend is the target of this repository's plan
   (`PROGRESS.md`); the expected gain over the single champion is +0.0002 to +0.0005, and it is
-  adopted for stability and sign-consistency, not for score. Members 2-5 are **not yet run in this
-  repo** (only the champion and its cleaned-label variant are).
-- Code review of the original found no bug changing the October file; two bit-identical speed
+  adopted for stability and sign-consistency, not for score. Members 2-5 are now run in this repo
+  (`RESULTS.md`).
+- A code review of the earlier fit found no bug changing the October file; two bit-identical speed
   fixes (about 110 s a run); one small LOMO-only leak (the type-row and legit-drop masks of a fold's
   training months came from score models that saw the held-out month).
-- The independent harness matters for another reason: the original and the rebuild reproduce each
-  other on every cell, so both can be trusted as the gate's instrument.
+- The two fits reproduce each other on every cell, so the gate can be trusted as an instrument.
 
 ## Why they all tie: the information limit
 

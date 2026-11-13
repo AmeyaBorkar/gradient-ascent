@@ -307,7 +307,7 @@ measurements in this repo.
   recall unchanged, so thresholds tuned on noisy labels under-predict fraud on clean labels; the
   fixed-point decoder has the optimal threshold F/2 per class. Class-conditional noise estimates
   (positive-unlabelled) assume reporting is independent of features, which is probably false here.
-- **Ranked ideas from the notes** and their fate: rules as test-time evidence (done, the evidence
+- **Earlier ranked ideas** and their fate: rules as test-time evidence (done, the evidence
   families); event-consensus soft labels (equivalent to the silver and in-event relabelling above,
   tie); privileged teacher into soft labels (the silver teacher, tie); forward correction (tie, section
   6); margin relabelling (not run); a gated student on a neural tabular model (not run). "Not to

@@ -2,7 +2,7 @@
 
 Status convention. "Measured in this repository" means this repo's own runs (its champion scores
 0.5122 given / 0.5665 cleaned leave-one-month-out). Everything below is an "earlier measurement"
-from previous sessions, which a later pass may re-derive here. The regime gate itself was not
+from earlier research, which a later pass may re-derive here. The regime gate itself was not
 re-run in this repo.
 
 Summary. The training labels contain a large block of "ordinary" fraud rows that look exactly like
@@ -146,7 +146,7 @@ ended at 0.5488 public, a +0.0018 gain that is a few rows of noise.
   from upload 3, 18 from upload 2; LOMO +0.0001 versus upload 3.
 - Upload 5, a bundle without the pretrained piece (pools, self-training, 5-seed bag, one type per
   event): 0.5488, identical to upload 4 to four decimals; 15 rows differ, netting to zero.
-- Final standing from the source: uploads 4 and 5 tied for best public at 0.5488; the ordinary-rows-legit
+- Final standing: uploads 4 and 5 tied for best public at 0.5488; the ordinary-rows-legit
   file was never uploaded, and a ten-upload day was never used in full.
 - Lesson. Because the entry is the best public upload scored on private, every file uploaded is a
   potential final; a file 0.01 worse still wins public 10-19% of the time. Footprint (rows changed)

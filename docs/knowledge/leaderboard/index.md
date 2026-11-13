@@ -15,7 +15,7 @@ No public score was produced from this repository: it makes no uploads itself.
 | [uploads.md](uploads.md) | Every upload in order: model, public score, forecast and read-out rule, lesson |
 | [regime.md](regime.md) | How the all-legit upload read the test labels, the regime table, the decision playbook |
 | [cv-vs-public.md](cv-vs-public.md) | CV against public gaps; public-slice noise; why near-identical files differ by chance |
-| [decisions.md](decisions.md) | Canonical folds, device counter, upload rule and its evolution, merge policy, design choices |
+| [decisions.md](decisions.md) | Canonical folds, device counter, upload rule and its evolution, design choices |
 | [reproducibility.md](reproducibility.md) | What the organisers re-run, what a submission must satisfy, evidence of byte-identical rebuilds |
 
 ## The headline facts

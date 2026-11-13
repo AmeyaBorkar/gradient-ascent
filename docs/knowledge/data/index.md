@@ -49,7 +49,7 @@ wrote each row and is the strongest non-row signal.
   pack's analysis scripts are not in this repository, so re-deriving means rewriting a short query.
 - **Belief** and **guess** mark things inferred, not shown.
 
-## Known disagreements inside the source (handle with care)
+## Known disagreements in the earlier measurements (handle with care)
 
 - Noise rates: 12.0% (first map) against 12.2% (interval 11.5 to 12.9) in the later model; this base uses
   the range.

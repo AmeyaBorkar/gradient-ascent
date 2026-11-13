@@ -26,7 +26,7 @@ classes. "LOMO" = leave-one-month-out (train two months, score the third, mean o
 | [decoders.md](decoders.md) | decoder variants and prior-shift methods |
 | [lookalikes.md](lookalikes.md) | sibling separation: features, LLM, GNN, TabICL / TabPFN, specialists |
 | [ordinary-rows.md](ordinary-rows.md) | every angle on separating ordinary fraud rows from legit |
-| [ensembles.md](ensembles.md) | seeds, learners, blends, stacking, second implementation, five-member blend, information-limit theory |
+| [ensembles.md](ensembles.md) | seeds, learners, blends, stacking, a second fit of the method, five-member blend, information-limit theory |
 | [labels.md](labels.md) | noise model, cleaned labels, cleaned-label training, noise-robust methods |
 | [more-data.md](more-data.md) | learning curve, refit, self-training, transduction, October-shaped training, drift audits |
 | [regime-hybrid.md](regime-hybrid.md) | the two label regimes, the hybrid, uploads, leaderboard noise |
@@ -107,7 +107,7 @@ Effect = change in macro-F1 against the reference named in the file. **helps** >
 | three-family rank blend | tie (best single blend) | +0.0010 [+0.0001, +0.0018] October-like [earlier] | [ensembles.md](ensembles.md) |
 | per-class choice, per-class weights, type-stage stacking | fail nested gate | +0.0002 / -0.0001 / -0.0003 [earlier] | [ensembles.md](ensembles.md) |
 | TabPFN stacker | tie | +0.0011 October-like [earlier] | [ensembles.md](ensembles.md) |
-| independent second implementation (reproduces champion; blend 3:1) | tie | +0.0001 to +0.0004 LOMO, does not transfer [earlier] | [ensembles.md](ensembles.md) |
+| second independent fit of the champion's method (reproduces it; blend 3:1) | tie | +0.0001 to +0.0004 LOMO, does not transfer [earlier] | [ensembles.md](ensembles.md) |
 | equal-weight five-member blend | tie (most robust) | +0.0002 to +0.0005, 95% lower bound -0.0004 [earlier]; not yet run here | [ensembles.md](ensembles.md) |
 
 ### Labels

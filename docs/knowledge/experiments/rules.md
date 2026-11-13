@@ -9,8 +9,8 @@ measured, whether it helped, and what it taught. Companion files: [index](index.
 ## Status labels
 
 - **measured in this repo**: this repository's own runs show it (its results ledger).
-- **earlier measurement**: an earlier research pass measured it, with a different code base and
-  usually a different scoring frame; a later pass may re-derive it here. Treat the numbers as
+- **earlier measurement**: measured before this repository's runs, usually in a different scoring frame; it may be
+  re-derived here. Treat the numbers as
   strong leads, not as this repo's facts.
 
 Scoring frames used below. LOMO = leave-one-month-out over July, August, September (macro-F1 over

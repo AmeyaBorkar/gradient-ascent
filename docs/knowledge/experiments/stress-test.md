@@ -10,7 +10,7 @@ expected private-set risk from generator drift is about **-0.003**, inside the n
 check (September vs October AUC 0.729) is explained by density, amount scale and one split-length
 artefact that the model hardly uses.
 
-Status: all numbers are **[earlier]** (an earlier implementation; this repository's own
+Status: all numbers are **[earlier]** (measured before this repository's runs; this repository's own
 runs are in `RESULTS.md`). The October-like frame construction and its pitfalls are in
 [more-data.md](more-data.md). Back to the [index](index.md).
 

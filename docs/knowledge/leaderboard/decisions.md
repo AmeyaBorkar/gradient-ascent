@@ -1,11 +1,9 @@
 # Decisions that matter to modelling and validation
 
 Summary: whole-month folds; the device counter is used (as features everywhere, as a rule only in
-the first seven segments, fitted per split); uploads need consistent evidence, not a big effect; the
-merge policy is a simple gate. Status: **earlier measurement** for the evidence quoted; the
+the first seven segments, fitted per split); uploads need consistent evidence, not a big effect. Status: **earlier measurement** for the evidence quoted; the
 repository's own design choices at the end are **measured in this repo** where a number is given
-(see [RESULTS.md](../../../RESULTS.md)). Team-process decisions (roles, who uploads, library
-inventory) are left out.
+(see [RESULTS.md](../../../RESULTS.md)).
 
 ## 1. Canonical folds are whole months
 
@@ -111,19 +109,7 @@ fit blend weights out of fold; run the leakage checklist on every new family (ta
 transforms fitted inside the fold; no future information; no group straddling a fold boundary; a
 suspiciously large gain is a bug until proven otherwise).
 
-## 4. Merge policy (condensed)
-
-- A non-draft change may be merged whose gate holds; oldest first,
-  rebase-merge only, no direct commits to the main line, no force-push except with lease on one's
-  own branch, no skipping hooks.
-- Gate: a green CI check or, when hosted CI cannot run, a passing local CI script run on the exact
-  head commit with its result posted.
-- A change to the champion or the submission build still needs a second review; drafts and changes
-  marked do-not-merge are skipped; a change that no longer rebases cleanly goes back to its author.
-- Reason: a two-person, 48-hour round where the members sleep in shifts; waiting for a human holds up
-  everyone who builds on the main line.
-
-## 5. Repository design choices that bear on validation (this repo)
+## 4. Repository design choices that bear on validation (this repo)
 
 Measured in this repo where a number appears; full text in [decisions.md](../../decisions.md).
 - The cleaned-label teacher is a different, simpler model than the scored one, and the cleaned labels

@@ -1,6 +1,6 @@
 # Every upload, in order
 
-Summary: five uploads are recorded, plus one independent rebuild of the champion whose position in
+Summary: five uploads are recorded, plus one upload of this repository's champion whose position in
 the sequence is not recorded. The sequence: a probe that read the regime, a champion, then three
 near-ties. Public scores are all **earlier measurements** (this repo makes no uploads; its own CV
 numbers are in [RESULTS.md](../../../RESULTS.md)). The daily limit began at 10 uploads and was later
@@ -15,7 +15,7 @@ raised to 20; it resets at midnight IST. Uploads that fail validation do not cou
 | 3 | XGBoost + LightGBM + CatBoost rank blend | **0.5487** | none recorded | 17 vs upload 2 |
 | 4 | Upload 3 plus two small changes | **0.5488** | none recorded | 9 vs upload 3; 18 vs upload 2 |
 | 5 | "Combined bundle" without the pretrained tabular model | **0.5488** | none recorded | 15 vs upload 4 |
-| - | Independent rebuild of the champion | 0.5457 | n/a | 49 vs upload 2 (October) |
+| - | This repository's champion | 0.5457 | n/a | 49 vs upload 2 (October) |
 
 ## Upload 1: the all-legit file
 
@@ -93,12 +93,11 @@ raised to 20; it resets at midnight IST. Uploads that fail validation do not cou
 - **Lesson:** ties on the public board are undecidable. Choose between them on CV and on which file
   is easiest to reproduce (see [reproducibility.md](reproducibility.md)).
 
-## Independent rebuild of the champion
+## This repository's champion and its upload
 
-- **What:** a second implementation written from the written record alone, with no shared code
-  (this repository). Its LOMO is 0.5122 given / 0.5665 cleaned against the original's 0.5126 /
-  0.5662 (the LOMO is measured in this repo).
-- **Result:** its October file scored **0.5457** public against 0.5470, a gap of -0.0013
+- **What:** the champion as built in this repository. Its LOMO is 0.5122 given / 0.5665 cleaned
+  (measured in this repo); an earlier measurement of the same method gave 0.5126 / 0.5662.
+- **Result:** its October file scored **0.5457** public against 0.5470 for the earlier upload, a gap of -0.0013
   (earlier measurement).
 - **Lesson:** the gap is noise. The two files differ on 59 September rows (49 October rows); on all
   of September the rebuild is -0.0003. On a public-sized slice the difference has sd 0.0007 (5-95%
@@ -113,7 +112,7 @@ raised to 20; it resets at midnight IST. Uploads that fail validation do not cou
 | Rules-only detector (3,634 fraud calls; 3,854 with device zones) | cannot become best public (about 0.04 below the model) and adds no decision |
 | Champion with the drifting counter feature dropped, six XGBoost seeds, LightGBM at 1/3 | cleaned LOMO 0.5664; pooled lower bound -0.0000, failed the upload rule |
 | Upload 4's type-score change applied to the champion | failed the families-mode October-like check: lower bound -0.0002, one thinning seed -0.0001 |
-| Five-model equal blend of both implementations | positive on every month and thinning seed (+0.0002 to +0.0004 LOMO), 13 October rows differ from the champion; still misses the 95% lower bound |
+| Five-model equal blend | positive on every month and thinning seed (+0.0002 to +0.0004 LOMO), 13 October rows differ from the champion; still misses the 95% lower bound |
 | Cleaned-label-trained blends | tie in October-like months |
 
 ## What the sequence taught

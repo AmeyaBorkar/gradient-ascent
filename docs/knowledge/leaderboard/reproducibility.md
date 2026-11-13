@@ -25,7 +25,7 @@ whichever file scores best publicly is the one that must reproduce. Rules and ev
 
 1. One command rebuilds the file from the committed code (this repo:
    `python -m ringtrace.build recipes/champion.json`), with data supplied by the organisers.
-2. Pinned environment: exact library versions (the original rebuilds used Python 3.13 and
+2. Pinned environment: exact library versions (the rebuilds used Python 3.13 and
    xgboost 3.4.1; the blends also lightgbm 4.7.0 and catboost 1.2.10; polars 2.1.0, numpy 2.5.4).
 3. The best public file's whole recipe is in the code: if it is a blend, every member, seed count,
    rank-average recipe, decoder and post-decode rule must be committed. A file that depends on a
@@ -65,10 +65,8 @@ not bit-reproducible (atomics), another reason to keep such models out of the fi
 - Each upload: file validated, sha256 recorded, a record with the hypothesis, commit, run ids, CV,
   forecast and read-out rule, then the public score; a tag on the commit that rebuilds it. The file
   itself is never committed.
-- Two independent implementations exist: the original pipeline and this repository, written from
-  the written record with no shared code. Both reproduce the champion's CV within 0.0004 and its
-  public score within 0.0013 (noise; see [cv-vs-public.md](cv-vs-public.md)). The rebuild is a check
-  that the written method suffices to reproduce the result.
+- The champion reproduces its earlier CV within 0.0004 and its public score within 0.0013 (noise;
+  see [cv-vs-public.md](cv-vs-public.md)).
 
 ## Open points to settle next
 
