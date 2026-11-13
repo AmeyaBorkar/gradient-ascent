@@ -116,3 +116,81 @@ def test_fraud_split_keeps_types_and_takes_the_fraud_mass():
     np.testing.assert_allclose(p.sum(1), 1.0)
     np.testing.assert_allclose(p[0, :3], [0.2, 0.6, 0.2])
     np.testing.assert_allclose(p[1, 1:], 0.5 / 11)
+
+
+def test_soft_targets_smooth_across_the_fraud_boundary_and_mix_the_teacher():
+    y = np.array([0, 3])
+    prior = np.full(N_CLASSES, 1.0)
+    q = tabm.soft_targets(y, _spec(smooth_fraud=0.1), prior)
+    np.testing.assert_allclose(q.sum(1), 1.0, atol=1e-6)
+    assert q[0, 0] == pytest.approx(0.9) and q[0, 1:].sum() == pytest.approx(0.1)
+    assert q[1, 3] == pytest.approx(0.9) and q[1, 0] == pytest.approx(0.1)
+    assert q[1, [1, 2, 4]].sum() == 0
+    teacher = np.full((2, N_CLASSES), 1 / N_CLASSES)
+    q2 = tabm.soft_targets(y, _spec(distill_alpha=0.5), prior, teacher)
+    assert q2[0, 0] == pytest.approx(0.5 + 0.5 / N_CLASSES)
+    with pytest.raises(ValueError):
+        tabm.soft_targets(y, _spec(distill_alpha=0.5), prior)
+
+
+@pytest.mark.parametrize(
+    "kw",
+    [
+        {"loss": "focal"},
+        {"loss": "logit_adjust"},
+        {"smooth_fraud": 0.05},
+        {"distill_alpha": 0.3},
+        {"mixup_alpha": 0.2},
+        {"noise_std": 0.05},
+        {"ema_decay": 0.99},
+        {"swa_last": 3},
+        {"pretrain_epochs": 2},
+        {"qr_blank_p": 0.5},
+    ],
+)
+def test_every_technique_learns_and_is_deterministic(kw):
+    X, y = _problem(3000, 1)
+    Xh, yh = _problem(1000, 2)
+    period = np.full(len(y), 7)
+    rng = np.random.default_rng(5)
+    teacher = np.full((len(y), N_CLASSES), 0.02)
+    teacher[np.arange(len(y)), y] += 1 - teacher.sum(1)
+    Xb = X.copy()
+    Xb[:, 4] = np.nan
+    ex = tabm.Extras(
+        teacher=teacher,
+        X_blank=Xb,
+        blank_rows=np.flatnonzero(rng.random(len(y)) < 0.3),
+        X_unlabelled=Xh,
+    )
+    spec = _spec(**kw)
+    (p1,) = tabm.fit_predict(X, y, period, [Xh], spec, log=lambda *_: None, extras=ex)
+    (p2,) = tabm.fit_predict(X, y, period, [Xh], spec, log=lambda *_: None, extras=ex)
+    np.testing.assert_allclose(p1.sum(1), 1.0, atol=1e-5)
+    np.testing.assert_array_equal(p1, p2)
+    assert macro_f1(yh, p1.argmax(1)) > 0.7
+
+
+def test_qr_blanking_needs_its_inputs():
+    X, y = _problem(500, 1)
+    with pytest.raises(ValueError):
+        tabm.fit_predict(
+            X, y, np.full(len(y), 7), [X], _spec(qr_blank_p=0.5, epochs=1), log=lambda *_: None
+        )
+
+
+def test_nnexp_variants_build_and_fraud_only_keeps_tree_types():
+    from ringtrace import nnexp
+
+    recipe = {"model": "tabm", "tabm": {"seeds": [0, 1, 2], "epochs": 10}}
+    for name in nnexp.VARIANTS:
+        nnexp.variant_spec(name, recipe)
+    s = nnexp.variant_spec("ema+smooth", recipe)
+    assert s.ema_decay > 0 and s.smooth_fraud > 0 and s.epochs == 10
+    trees = np.zeros((1, N_CLASSES))
+    trees[0, [0, 1, 2]] = [0.8, 0.15, 0.05]
+    nn = np.zeros((1, N_CLASSES))
+    nn[0, [0, 5]] = [0.4, 0.6]
+    p = nnexp.fraud_only(nn, trees)
+    assert p[0, 0] == pytest.approx(0.6)
+    assert p[0, 1] / p[0, 2] == pytest.approx(3.0) and p[0, 5] == 0
