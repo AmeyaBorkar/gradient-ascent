@@ -5,6 +5,9 @@
     python analysis/closelook.py volume   # per-class volume scaling, nested over the months
     python analysis/closelook.py pairs    # look-alike templates by counter hold and size
     python analysis/closelook.py october  # October calls and mass per class against train
+    python analysis/closelook.py scan     # fraud-pure predicates: October call share vs train
+    python analysis/closelook.py gate <recipes>   # the full bar against the best file
+    python analysis/closelook.py build <recipes>  # October files into candidates/
 
 The best file is the recipe ``recipes/final-half.json`` (five tree members for the type split, the
 fraud mass from TabM 1/2 and each tree 1/10, the fixed point at 0.875, the anchored template rule,
@@ -543,6 +546,89 @@ def cmd_october() -> dict:
     return rep
 
 
+def cmd_scan() -> dict:
+    """Fraud-pure label-free predicates (one or two of: categorical columns and null states,
+    family shapes, marks, counter block, template) with train cleaned fraud rate >= 0.8 on 30 or
+    more train rows and 5 or more October rows: the share called fraud in train and in October.
+    A blank-QR-like pocket would show a lower October share. October is only counted."""
+    import itertools
+
+    import polars as pl
+
+    from ringtrace import store
+    from ringtrace.evidence import anchors
+    from ringtrace.squeeze import RULE_COLUMNS
+
+    d = _ctx()
+    led = store.ledger()
+    fam = anchors.family_columns(led, RULE_COLUMNS)
+    te = d["is_test"]
+    tr = ~te
+    fraud = np.zeros(len(te), dtype=bool)
+    fraud[tr] = d["cleaned"] > 0
+    called = d["calls"] > 0
+    feat = {c: led[c].fill_null("NULL").to_numpy().astype(str) for c in SCAN_TEXT}
+    feat["mcat_null"] = led["merchant_category"].is_null().to_numpy().astype(str)
+    feat["qrvpa"] = led["qr_vpa_mismatch"].cast(pl.Utf8).fill_null("NULL").to_numpy().astype(str)
+    for c in ("new_payee", "pin_retries", "to_person"):
+        feat[c] = led[c].to_numpy().astype(str)
+    amt = led["amount"].to_numpy()
+    feat["amt_int"] = (np.abs(amt - np.round(amt)) < 1e-9).astype(str)
+    for p in ("bot", "drn", "mf", "col", "rng", "rep"):
+        feat[p + "_shape"] = fam[p + "_shape"].fill_null(0).to_numpy().astype(str)
+    for m in ("mrk_p2p_category", "mrk_qr_p2p_nocat", "mrk_bal102", "mrk_step025", "mrk_step035"):
+        feat[m] = (fam[m].fill_null(0).to_numpy() > 0).astype(str)
+    feat["ctr_block"] = fam["ctr_block"].fill_null(0).to_numpy().astype(str)
+    feat["tmpl"] = d["tmpl"].astype(str)
+    codes = {k: np.unique(v, return_inverse=True) for k, v in feat.items()}
+    out = []
+    names = list(feat)
+    for keys in [*([k] for k in names), *itertools.combinations(names, 2)]:
+        code = np.zeros(len(te), dtype=np.int64)
+        labels = [codes[k][0] for k in keys]
+        for k in keys:
+            u, inv = codes[k]
+            code = code * len(u) + inv
+        n = int(code.max()) + 1
+        n_tr = np.bincount(code[tr], minlength=n)
+        n_te = np.bincount(code[te], minlength=n)
+        f_tr = np.bincount(code[tr], weights=fraud[tr], minlength=n)
+        c_tr = np.bincount(code[tr], weights=called[tr], minlength=n)
+        c_te = np.bincount(code[te], weights=called[te], minlength=n)
+        for i in np.flatnonzero((n_tr >= 30) & (n_te >= 5)):
+            if f_tr[i] / n_tr[i] < 0.8:
+                continue
+            parts, j = [], int(i)
+            for lab in reversed(labels):
+                parts.append(str(lab[j % len(lab)]))
+                j //= len(lab)
+            out.append(
+                {
+                    "group": "+".join(keys),
+                    "value": "|".join(reversed(parts)),
+                    "train_rows": int(n_tr[i]),
+                    "cleaned_fraud_rate": float(f_tr[i] / n_tr[i]),
+                    "train_called_fraud": float(c_tr[i] / n_tr[i]),
+                    "october_rows": int(n_te[i]),
+                    "october_called_fraud": float(c_te[i] / n_te[i]),
+                }
+            )
+    out.sort(
+        key=lambda r: (r["train_called_fraud"] - r["october_called_fraud"]) * r["october_rows"],
+        reverse=True,
+    )
+    drops = [r for r in out if r["october_called_fraud"] < r["train_called_fraud"] - 0.05]
+    print(f"{len(out)} fraud-pure groups; {len(drops)} with an October call share 0.05 lower")
+    for r in out[:15]:
+        print(r)
+    rep = {"groups": len(out), "drops": drops, "top": out[:50]}
+    (out_dir() / "scan.json").write_text(json.dumps(rep, indent=1))
+    return rep
+
+
+SCAN_TEXT = ("txn_type", "receiver_type", "app", "s_kyc_level", "r_kyc", "s_os")
+
+
 # ---------------------------------------------------------------------------------------------
 # the bar and the candidate files
 
@@ -612,6 +698,7 @@ COMMANDS = {
     "volume": cmd_volume,
     "pairs": cmd_pairs,
     "october": cmd_october,
+    "scan": cmd_scan,
     "gate": cmd_gate,
     "build": cmd_build,
 }
