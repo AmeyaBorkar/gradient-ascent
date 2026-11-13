@@ -78,3 +78,8 @@ Short records of design choices.
     (`scripts/catboost_repro.py`) differ by at most 0.165 in one probability, by 4.3e-6 on average,
     and change the argmax of 2 of 510,143 rows. Scores move in the fourth decimal at most; the
     saved `oof.npy` / `test.npy` are the reference copy for the blend.
+15. **Event-cleaned training labels are rebuilt inside each month fold** (`ringtrace.eventclean`):
+    only the fit months' rows vote and change, so an event spanning a month boundary cannot carry
+    held-out labels into training. The events are the six event-id modules in the teacher's order
+    (bursts, drains, flows, requests, merchant, repeats). The `l2` minority flip uses the same
+    chosen event (highest fraud share) and needs no fraud-share threshold of its own.

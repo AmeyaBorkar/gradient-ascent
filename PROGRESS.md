@@ -18,6 +18,6 @@ counter-anchored template rule.
 - [x] Import of the standalone pipeline (features, evidence modules, cascade, decoder, template
       rule); `recipes/champion.json` reproduces member 1.
 - [x] Member 2: LightGBM cascade (`recipes/lgbm.json`; results in RESULTS.md).
-- [ ] Member 3: CatBoost cascade.
-- [ ] Members 4 and 5: event-cleaned labels and their XGBoost cascades.
+- [x] Member 3: CatBoost cascade (`recipes/catboost.json`; results in RESULTS.md).
+- [x] Members 4 and 5: event-cleaned labels and their XGBoost cascades (`recipes/clean-event.json`, `recipes/clean-l2.json`).
 - [~] The blend (`ringtrace.blend`, `recipes/blend.json`), the one-command build (`scripts/build_submission.sh`) and the README drafted; member 1 rerun from this branch (`blend-champion-m1`, same sha256). Blend run waits for members 2-5.
