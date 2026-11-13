@@ -186,15 +186,75 @@ def cmd_october(run: str) -> dict:
     return report
 
 
+def cmd_rule(run: str, rule: str, draws: int = 2000) -> dict:
+    """The blend's calls with and without one extra rule: per-month scores on the three targets,
+    a paired event bootstrap (95 % bounds) and the number of October calls changed."""
+    import scipy.sparse as sp
+
+    from ringtrace import rules as rulebook
+    from ringtrace.blend import month_scores
+    from ringtrace.compare import _counts, _macro
+    from ringtrace.teacher import union_events
+
+    led, proba, base = load(run)
+    chal = rulebook.apply([rule], base, proba, led, log=print)
+    te = led["is_test"].to_numpy()
+    tr = np.flatnonzero(~te)
+    period = led["period"].to_numpy()[tr]
+    targets = {"given": led["y"].to_numpy().astype(np.int64)[tr]}
+    for t, w in (("cleaned", "label"), ("gen", "structured")):
+        targets[t] = silver.load(led, w).astype(np.int64)[tr]
+    sa, sb = month_scores(base[tr], targets, period), month_scores(chal[tr], targets, period)
+    ev = union_events(led.height)[tr]
+    groups = np.unique(np.where(ev >= 0, ev, -1 - np.arange(len(tr))), return_inverse=True)[1]
+    rng = np.random.default_rng(0)
+    rep = {"rule": rule, "october_changed": int((base[te] != chal[te]).sum())}
+    rep["train_changed"] = int((base[tr] != chal[tr]).sum())
+    for t, y in targets.items():
+        deltas, point = np.zeros(draws), 0.0
+        for m in MONTHS:
+            s = period == m
+            gm = np.unique(groups[s], return_inverse=True)[1]
+            ng = int(gm.max()) + 1
+            ca, cb = _counts(gm, y[s], base[tr][s], ng), _counts(gm, y[s], chal[tr][s], ng)
+            w = sp.csr_matrix(rng.poisson(1.0, size=(draws, ng)).astype(np.float64))
+            deltas += (
+                _macro(np.asarray((w @ cb).todense())) - _macro(np.asarray((w @ ca).todense()))
+            ) / 3
+        diff = [b - a for a, b in zip(sa[t]["months"], sb[t]["months"], strict=True)]
+        point = float(np.mean(diff))
+        lo, hi = np.percentile(deltas, [2.5, 97.5])
+        rep[t] = {
+            "months": diff,
+            "mean": point,
+            "boot_mean": float(deltas.mean()),
+            "lo": float(lo),
+            "hi": float(hi),
+        }
+        print(
+            f"[rule] {t:<8} per month "
+            + " / ".join(f"{d:+.5f}" for d in diff)
+            + f"  mean {point:+.5f}  95% [{lo:+.5f}, {hi:+.5f}]"
+        )
+    print(f"[rule] rows changed: train {rep['train_changed']}, October {rep['october_changed']}")
+    return rep
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["anatomy", "october"])
+    ap.add_argument("cmd", choices=["anatomy", "october", "rule"])
+    ap.add_argument("--rule", default="blank_merchant_qr")
     ap.add_argument("--run", default="blend")
     a = ap.parse_args(argv)
-    rep = cmd_anatomy(a.run) if a.cmd == "anatomy" else cmd_october(a.run)
+    if a.cmd == "rule":
+        rep = cmd_rule(a.run, a.rule)
+    else:
+        rep = cmd_anatomy(a.run) if a.cmd == "anatomy" else cmd_october(a.run)
     out = paths.out_dir() / "fresh"
     out.mkdir(parents=True, exist_ok=True)
-    (out / f"{a.cmd}-{a.run}.json").write_text(json.dumps(rep, indent=1, default=str))
+    (out / f"{a.cmd}-{a.run}{'-' + a.rule if a.cmd == 'rule' else ''}.json").write_text(
+        json.dumps(rep, indent=1, default=str)
+    )
     return 0
 
 
