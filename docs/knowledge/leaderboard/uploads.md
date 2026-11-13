@@ -1,9 +1,9 @@
 # Every upload, in order
 
-Summary: five uploads are recorded, plus one upload of this repository's champion whose position in
-the sequence is not recorded. The sequence: a probe that read the regime, a champion, then three
-near-ties. Public scores are all **earlier measurements** (this repo makes no uploads; its own CV
-numbers are in [RESULTS.md](../../../RESULTS.md)). The daily limit began at 10 uploads and was later
+Summary: five uploads are recorded in order, then three later ones: this repository's champion, an
+earlier five-member equal-weight blend, and this repository's own five-member blend. The sequence: a
+probe that read the regime, a champion, then near-ties. Public scores of uploads 1-5 are **earlier
+measurements**; CV numbers measured here are in [RESULTS.md](../../../RESULTS.md). The daily limit began at 10 uploads and was later
 raised to 20; it resets at midnight IST. Uploads that fail validation do not count.
 
 ## Overview
@@ -16,6 +16,8 @@ raised to 20; it resets at midnight IST. Uploads that fail validation do not cou
 | 4 | Upload 3 plus two small changes | **0.5488** | none recorded | 9 vs upload 3; 18 vs upload 2 |
 | 5 | "Combined bundle" without the pretrained tabular model | **0.5488** | none recorded | 15 vs upload 4 |
 | - | This repository's champion | 0.5457 | n/a | 49 vs upload 2 (October) |
+| - | Five-member equal-weight blend (earlier build) | 0.5485 | tie with the champion | n/a |
+| - | This repository's five-member blend (`recipes/blend.json`, sha256 `c3af1418...`) | **0.5474** | tie with the earlier build | 40 vs the earlier build |
 
 ## Upload 1: the all-legit file
 
@@ -103,6 +105,21 @@ raised to 20; it resets at midnight IST. Uploads that fail validation do not cou
   of September the rebuild is -0.0003. On a public-sized slice the difference has sd 0.0007 (5-95%
   -0.0016 to +0.0007), and a gap of -0.0013 or worse happens in 11% of slices. The same file's
   public and private scores differ with sd 0.0117.
+
+## This repository's five-member blend and its upload
+
+- **What:** the equal-weight blend of the champion, LightGBM, CatBoost and the two event-cleaned
+  XGBoost members, built with `python -m ringtrace.blend recipes/blend.json` (sha256
+  `c3af1418ffab08f7843b1813359ad7353ee0ac6676f4293609d3cf530a696c05`). LOMO 0.5123 given / 0.5667
+  cleaned / 0.9013 gen-only against the champion's 0.5122 / 0.5665 / 0.9010 (measured in this repo).
+- **Result:** **0.5474** public (13 Nov, 21:09 IST), against 0.5485 for the earlier build of the same
+  five-member recipe.
+- **Rows:** the two files differ on 40 of 260,582 October rows; this build calls 32 fewer rows
+  fraud, most of them `qr_swap` -> legit (24). Members were retrained and CatBoost on the GPU is not
+  byte-reproducible, so a few rows move on every rebuild.
+- **Lesson:** a 40-row difference is inside the public noise for near-identical files (see
+  [cv-vs-public.md](cv-vs-public.md)); the direction is a hint to check `qr_swap` recall on rows
+  whose QR check is blank, never a reason to choose between the files.
 
 ## Candidates built but not uploaded
 
