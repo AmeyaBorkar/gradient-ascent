@@ -111,3 +111,15 @@ fraction 0.5/0.8 (freq 1), lambda_l2 2.0, max_bin 255, 300 rounds, deterministic
 On its own the LightGBM member ties the champion: +0.0000 given and +0.0002 cleaned after the rule, and
 +0.0009 / +0.0010 at the fixed point. CPU only, at 892 % CPU (10 threads), with a peak RSS of 8.0 GB.
 The template rule changed 742 train / 132 test rows. October calls: 3,951 fraud (champion 3,945).
+
+## Member 2: LightGBM cascade (`recipes/lgbm.json`)
+
+Champion recipe (features, drop list, XGBoost screening score and cut-offs, folds, decoder, rule)
+with both cascade stages on LightGBM (lr 0.05, 63 leaves, min 30 per leaf, feature fraction 0.5,
+bagging 0.8 every round, L2 2.0, 255 bins, deterministic, row-wise, 300 rounds, CPU, 10 threads),
+seeds 0, 1, 2 averaged. Final = fixed point + anchored template rule. Outputs:
+`~/outputs/runs/lgbm/{oof,test}.npy`, `summary.json`, `submission.csv`.
+
+| run | commit | given Jul / Aug / Sep (mean) | cleaned Jul / Aug / Sep (mean) | gen-only Jul / Aug / Sep (mean) | wall | notes |
+|---|---|---|---|---|---|---|
+| lgbm | 363eab3 | 0.5130 / 0.5092 / 0.5146 (**0.5122**); fixed point 0.5073 | 0.5646 / 0.5642 / 0.5712 (**0.5667**); fixed point 0.5611 | 0.9021 / 0.9000 / 0.9012 (**0.9011**) | 14.9 min (CPU, 10 threads; ~5 min per fold) | champion (run 9): 0.5122 / 0.5665 / 0.9010, so a tie (+0.0000 / +0.0002 / +0.0001); fixed point +0.0009 / +0.0010 over the champion's. Rule changed 742 train / 132 test rows. October calls: 3,951 fraud |
