@@ -1,0 +1,7 @@
+{
+  "name": "blend-tabmF-hedge-bq",
+  "members": [{"run": "blend-champion-m1", "test_run": "champion-hedge", "weight": 1}, {"run": "lgbm", "test_run": "lgbm-hedge", "weight": 1}, {"run": "catboost", "test_run": "catboost-hedge", "weight": 1}, {"run": "clean-event", "test_run": "clean-event-hedge", "weight": 1}, {"run": "clean-l2", "test_run": "clean-l2-hedge", "weight": 1}],
+  "split": [{"run": "tabm", "weight": 0.5}, {"run": "blend-champion-m1", "test_run": "champion-hedge", "weight": 0.1}, {"run": "lgbm", "test_run": "lgbm-hedge", "weight": 0.1}, {"run": "catboost", "test_run": "catboost-hedge", "weight": 0.1}, {"run": "clean-event", "test_run": "clean-event-hedge", "weight": 0.1}, {"run": "clean-l2", "test_run": "clean-l2-hedge", "weight": 0.1}],
+  "decoder": {"fraud_scale": 0.875},
+  "rules": ["anchored_templates", "blank_merchant_qr"]
+}

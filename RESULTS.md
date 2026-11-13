@@ -272,3 +272,69 @@ October file (template rule, then `blank_merchant_qr`): `candidates/nntech-swa.c
 sha256 `715138bd2d1d6bc48338f34873363c310a2493556f1769ec0cc9a94d2f05fc3a`. Against
 `blend-tabmF-bq.csv` (sha256 `8a461426...fb926eb`) it changes 1 call: legit -> phishing_collect.
 Not a submission candidate.
+
+### Upload: blend-tabmF-bq (public 0.5499354, 13 Nov 23:00 IST)
+
+`candidates/blend-tabmF-bq.csv` scored **0.5499354** public, +0.0013 over the five-way blend with
+the QR rule (0.5486). It now builds with one command from the committed recipe
+`recipes/blend-tabmF-bq.json`:
+
+    python -m ringtrace.blend recipes/blend-tabmF-bq.json --write <out.csv>
+
+Rebuilt from a clean `git archive` of `cd3da2b`, using the existing member runs (no refits):
+sha256 `8a46142660cde2af1576736289f822c1b5c6226204445bce88d4dc311fb926eb`, byte-identical to the
+uploaded file. The first attempt from the clean checkout failed: `blend.py` had the
+`__main__` guard above `fraud_split_from`, so `python -m` stopped with a NameError. Fixed in
+cd3da2b, with a test.
+
+October-only variants (same recipe, trees' October arrays swapped via `test_run`; TabM's October
+array and leave-one-month-out unchanged):
+
+| file | recipe | sha256 | changes vs blend-tabmF-bq |
+|---|---|---|---|
+| blend-tabmF-refit-bq.csv | recipes/blend-tabmF-refit-bq.json (`*-refit` test arrays) | `7ecd86f7ec5bf1d625ee1269febb075c4859d5e839bc5a35084a32373b2083dd` | 9: refund_abuse->qr_swap 2, refund_abuse->loan_app_extortion 1, refund_abuse->mule_account 1, qr_swap->refund_abuse 1, fake_cashback->refund_abuse 1, loan_app_extortion->fake_cashback 1, legit->qr_swap 1, legit->phishing_collect 1 |
+| blend-tabmF-hedge-bq.csv | recipes/blend-tabmF-hedge-bq.json (`*-hedge` test arrays) | `30192d71ff9093f6bd331083fc05e1c4e56314c98e1ac2ffcf18fc2c9ebc37e9` | 6: refund_abuse->qr_swap 1, qr_swap->refund_abuse 1, fake_cashback->refund_abuse 1, loan_app_extortion->fake_cashback 1, legit->qr_swap 1, legit->phishing_collect 1 |
+
+**Rebuild order from scratch** (each step one command; data in `$RINGTRACE_DATA`):
+1. Members, each `python -m ringtrace.run <recipe>` (seeds 0, 1, 2; leave-one-month-out; October
+   = fold mean): the champion (run name `blend-champion-m1` on the box), `lgbm`, `catboost`,
+   `clean-event` and `clean-l2`. Their recipes are on the other members' branches.
+2. TabM: `python -m ringtrace.run recipes/tabm.json` (run `tabm`).
+3. Blend: `python -m ringtrace.blend recipes/blend-tabmF-bq.json --write submission.csv`.
+
+**TabM from scratch:** torch 2.14.1+cu130 (`pip install torch==2.14.1 --index-url
+https://download.pytorch.org/whl/cu130`, the `nn` extra), laptop RTX 5070 Ti, 16 threads.
+`recipes/tabm.json` = TabMSpec defaults with seeds 0, 1, 2 and 10 epochs (k 16, width 512,
+3 blocks, dropout 0.1, periodic embedding 24 frequencies to 8 dims, batch 2,048, AdamW lr 2e-3,
+weight decay 3e-4, 5 % warm-up then linear decay). Determinism: `torch.manual_seed(seed)`,
+a seeded `torch.Generator` for the batch order, `torch.use_deterministic_algorithms(True)`,
+`CUBLAS_WORKSPACE_CONFIG=:4096:8`, cudnn benchmark off, TF32 off; preprocessing quantiles use
+a numpy generator seeded 0. Verified: two GPU runs on a synthetic problem (40,000 rows) are
+bit-identical with no nondeterminism warnings, and the CPU test reruns are identical. **Not yet
+verified:** a byte-identical rerun of the full `tabm` member (51 min). Another GPU or driver may
+change float rounding, so a rebuilt `test.npy` can differ slightly and move a few October calls.
+Wall time 51.5 min (3 folds x 3 seeds, about 17 min per fold).
+
+October-like s13, seed sets r1 and r2 (TabM seeds 3-5 and 6-8): given / cleaned / gen-only
+0.5243 / 0.5829 / 0.9062 and 0.5241 / 0.5830 / 0.9063, 15.5-16 min each. The champion's r1 and
+r2 in the same frame: 0.5241 / 0.5824 / 0.9057 and 0.5240 / 0.5827 / 0.9060.
+
+### October-like gate on s13, all three seed sets (`score champion <c> --seeds 13 --sets 0,1,2`)
+
+| challenger vs champion | given change (lower bound) | cleaned | gen-only | verdict |
+|---|---|---|---|---|
+| tabm | +0.0001 (-0.0003) | +0.0005 (-0.0001) | +0.0004 (-0.0006) | FAIL |
+| champion+tabm | +0.0003 (-0.0001) | +0.0005 (+0.0000) | +0.0006 (-0.0001) | FAIL |
+
+The s14 and s15 r1-r2 cells are not on the laptop, so the nine-cell gate is pending.
+
+### TabM share of the fraud mass (fraud-only split, both rules), change vs w = 1/2
+
+| w | given Jul / Aug / Sep | cleaned | gen-only |
+|---|---|---|---|
+| 1/3 | +0.00000 / -0.00001 / -0.00002 | +0.00000 / -0.00004 / -0.00006 | +0.00000 / +0.00017 / +0.00007 |
+| 2/3 | -0.00014 / -0.00005 / +0.00010 | -0.00015 / -0.00005 / +0.00004 | -0.00047 / -0.00014 / +0.00003 |
+| 4/5 | -0.00007 / -0.00027 / +0.00006 | -0.00008 / -0.00028 / -0.00001 | -0.00039 / -0.00071 / -0.00015 |
+| 1 | +0.00004 / -0.00027 / -0.00002 | +0.00002 / -0.00024 / -0.00009 | -0.00027 / -0.00069 / -0.00038 |
+
+No share beats 1/2 on given and cleaned in every month; no file written.

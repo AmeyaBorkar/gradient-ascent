@@ -1,0 +1,7 @@
+{
+  "name": "blend-tabmF-bq",
+  "members": [{"run": "blend-champion-m1", "weight": 1}, {"run": "lgbm", "weight": 1}, {"run": "catboost", "weight": 1}, {"run": "clean-event", "weight": 1}, {"run": "clean-l2", "weight": 1}],
+  "split": [{"run": "tabm", "weight": 0.5}, {"run": "blend-champion-m1", "weight": 0.1}, {"run": "lgbm", "weight": 0.1}, {"run": "catboost", "weight": 0.1}, {"run": "clean-event", "weight": 0.1}, {"run": "clean-l2", "weight": 0.1}],
+  "decoder": {"fraud_scale": 0.875},
+  "rules": ["anchored_templates", "blank_merchant_qr"]
+}

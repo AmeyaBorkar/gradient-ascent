@@ -210,3 +210,14 @@ def test_realmlp_prep_and_learning():
     np.testing.assert_array_equal(p1, p2)
     np.testing.assert_allclose(p1.sum(1), 1.0, atol=1e-5)
     assert macro_f1(yh, p1.argmax(1)) > 0.7
+
+
+def test_blend_module_defines_everything_before_its_main_guard():
+    import ast
+    from pathlib import Path
+
+    from ringtrace import blend
+
+    tree = ast.parse(Path(blend.__file__).read_text())
+    last = tree.body[-1]
+    assert isinstance(last, ast.If) and "__main__" in ast.unparse(last.test)
