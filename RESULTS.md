@@ -204,3 +204,33 @@ rule. Details and per-class tables: `docs/findings/more-data.md`.
 | clean-event-refit / clean-event-hedge | 031e194 | — | — | — | 5.0 min | 48 / 24 argmax rows changed |
 | clean-l2-refit / clean-l2-hedge | 031e194 | — | — | — | 7.1 min | 61 / 38 argmax rows changed |
 | refit-october, first launch | ec37c9d | — | — | — | <1 min | failed: shell quoting in the recipe loop; relaunched via `scripts/refit_october.sh` |
+
+## Squeeze: label-free candidates on top of the blend
+
+`python -m ringtrace.squeeze lomo | select | audit | final` (commit c237d98), CPU only on the box,
+6-8 threads per job. The base is the blend as `ringtrace.blend` decodes it, recomputed here at
+0.5123 / 0.5667 / 0.9013 (given / cleaned / gen-only, as recorded). Changes are against the
+blend, Jul / Aug / Sep. The bootstrap is the paired event bootstrap, 2,000 draws, 95 %.
+October-like ran on the champion's cells (`scripts/squeeze_gate.sh`), because the other members'
+cells did not exist yet. Box outputs: `~/outputs/squeeze-out/squeeze/{lomo,select,audit}.json`,
+gate reports in `~/outputs/squeeze-out/octlike/`, logs in `~/logs/squeeze-*.log`.
+
+| candidate | given | cleaned | gen-only | bootstrap, given | October-like given per seed (lower bound) | rows, train / Oct | wall | verdict |
+|---|---|---|---|---|---|---|---|---|
+| event types, before the rule | +0.0003 / +0.0001 / +0.0000 | +0.0005 / +0.0001 / +0.0000 | +0.0007 / +0.0002 / +0.0000 | +0.0002 [+0.0000, +0.0004] | +0.0001 / +0.0001 / +0.0000 (+0.0000) FAIL | 7 / 0 | 20 min (whole lomo job) | tie, rejected |
+| event types, after the rule | -0.0035 / -0.0040 / -0.0037 | -0.0037 / -0.0043 / -0.0054 | -0.0033 / -0.0053 / -0.0063 | -0.0037 [-0.0057, -0.0017] | -0.0052 / -0.0008 / -0.0050 (-0.0089) FAIL | 639 / 132 | (same) | rejected |
+| anchor rescue (blind spot) | +0.00005 / -0.00002 / +0.00009 | +0.00004 / -0.00002 / +0.00016 | -0.00001 / -0.00005 / +0.00015 | +0.00004 [-0.00003, +0.00012] | +0.0000 / +0.0001 / -0.0000 (-0.0001) FAIL | 14 / 1 | (same) | rejected |
+| greedy selection, probability (nested) | +0.00011 / +0.00005 / -0.00009 | +0.00011 / +0.00004 / -0.00004 | +0.00017 / +0.00003 / -0.00003 | +0.00002 [-0.00008, +0.00015] | not run (no member cells) | 18 / 5 | 26 min (whole select job) | rejected |
+| greedy selection, rank (nested) | +0.00006 / +0.00006 / -0.00008 | +0.00006 / +0.00006 / -0.00003 | +0.00034 / +0.00012 / +0.00001 | +0.00001 [-0.00012, +0.00015] | not run | 16 / 2 | (same) | rejected |
+| equal-weight rank blend | +0.00017 / +0.00008 / +0.00021 | +0.00016 / +0.00007 / +0.00020 | +0.00024 / +0.00010 / -0.00010 | +0.00015 [+0.00003, +0.00030] | not run | 8 / 2 | (same) | rejected (gen-only Sep) |
+| anchored rule min_conf 0.70 or 0.75 (edge audit) | +0.0000 / +0.0000 / +0.0008 | +0.0000 / +0.0000 / +0.0009 | +0.0000 / +0.0000 / +0.0016 | +0.0003 [+0.0000, +0.0009] | not run | 24 / 0 | 12 min (audit job) | no October change |
+| anchored rule min_conf 0.85 / 0.90 | +0.0000 / -0.0003 / +0.0000 | +0.0000 / -0.0003 / +0.0000 | +0.0000 / -0.0005 / +0.0000 | -0.0001 [-0.0003, +0.0000] | not run | 10 / 1 and 12 | (same) | rejected |
+| event-level expected-utility decoder | — | — | — | — | — | — | — | not run |
+
+Nothing is adopted. The adopted combination is therefore the blend itself:
+- `~/outputs/runs/squeeze-final/submission.csv` is VALID against the sample, with sha256
+  `c3af1418ffab08f7843b1813359ad7353ee0ac6676f4293609d3cf530a696c05`, the blend's own file;
+- 0 October rows change against the blend;
+- the event-types file (`~/outputs/runs/squeeze-event-types/`) has the same sha256.
+
+Findings: `docs/findings/squeeze-*.md`.
