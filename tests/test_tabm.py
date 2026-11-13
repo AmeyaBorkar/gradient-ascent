@@ -76,3 +76,13 @@ def test_run_dispatches_on_model():
     assert fn is tabm.fit_predict and spec.seeds == (3, 4) and spec.epochs == 2
     spec, fn = run.model({})
     assert fn.__module__ == "ringtrace.cascade"
+
+
+def test_check_proba_rejects_empty_or_nan_rows():
+    from ringtrace.run import check_proba
+
+    good = np.full((3, N_CLASSES), 1 / N_CLASSES)
+    check_proba(good, "ok")
+    for bad in (np.zeros((1, N_CLASSES)), np.full((1, N_CLASSES), np.nan)):
+        with pytest.raises(ValueError):
+            check_proba(np.vstack([good, bad]), "bad")
