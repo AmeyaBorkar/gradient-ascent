@@ -53,23 +53,44 @@ Short records of design choices.
     both runs' saved probabilities (fixed point + rules) instead of trusting stored calls, uses
     the first family event of a row as its unit, and averages the per-month macro-F1 like the
     headline score. One sparse product per month gives all 2,000 resamples.
-13. **October-like mode** (`python -m ringtrace.octlike`), on thinned frames (`~/data-oct/s13|s14|s15`: September thinned to
-    October's density, fraud events whole, devices in the counter's legit block renumbered, the QR
-    check blanked on ~150 QR payments to a person):
-    - every family is rebuilt on the frame's own ledger (frame train + original test) with the
-      normal code, in a cache per frame (`~/cache/octlike/s<seed>`), except the device counter:
-      its columns come from the unthinned build, exported once and joined by stacked row (the
-      block finder sees no legit block once September is thinned);
-    - the champion recipe is fitted on July + August only; the screening score inside the
-      cascade is cross-fitted between those two months; seed set r uses cascade seeds 3r..3r+2;
-    - the cleaned-label variant (`recipes/champion-cleantrain.json` = champion trained on cleaned
-      labels) builds its labels on the frame from July + August only, the teacher scoring July
-      with a model fitted on August and vice versa (`silver.build(..., mask=...)`);
-    - outputs: `~/outputs/octlike/{champion,cleantrain}_s<seed>_r<r>.npz` (`rows` = stacked row of
-      each September row, `prob` = pre-decoder n x 12 probabilities) and `summary_s<seed>.json`
-      (September given-label macro-F1 after the fixed-point decoder, and cleaning statistics).
-      The template rule is not applied in this mode (it needs the counter's event view of the
-      frame); the scores are fixed-point only.
+13. **October-like mode** (`python -m ringtrace.octlike build|fit|score`): September made to look
+    like October, scored by models fitted on July + August only. Everything is built here from
+    the normal ledger.
+    - **Protected units.** September rows are grouped into units that are kept or dropped whole:
+      generator events (rows sharing an event id in any of the six event modules, joined across
+      modules where events share rows), and label units (connected groups of fraud-labelled rows
+      plus the legit-labelled rows next to them: same sender or device within 1 h, same
+      receiving person within 72 h, same sender-receiver pair within 7 days, money passed on
+      within 24 h). A label unit and an event that share a row are one unit (connected
+      components over both edge sets). Every other row, marked rows outside events included, is
+      its own unit. Label units alone would cut merchant rings and repeat bursts (different
+      senders, a merchant receiver); with both, no event is cut. A legit row next to two fraud
+      groups joins them into one unit; legit-legit adjacency never joins anything.
+    - **Thinning.** Each unit is kept with probability 0.494 (October's legit rows per day against
+      September's), RNG seeded by the thinning seed s in {13, 14, 15}; July, August and October
+      stay complete. Among kept September QR payments to a person, `qr_vpa_mismatch` is blanked
+      on 44 % (separate seeded stream), as in October. The frame definition (kept stacked rows,
+      blanked rows, unit of each row) is cached as `octlike/s<seed>.npz`; `build` prints its sizes.
+    - **Features.** The frame's ledger (rows renumbered, `stacked_row` kept) is installed in the
+      store under its own cache key (`store.use_frame`), so every family is rebuilt on it with
+      the normal code, except the device counter: its columns are held at their values on the
+      unthinned build, joined by stacked row (thinning breaks the block finder).
+    - **Model.** The recipe is fitted on July + August only (the cascade's screening score is
+      cross-fitted between those two months); seed set r in {0, 1, 2} uses cascade seeds 3r,
+      3r + 1, 3r + 2. A `train_on = cleaned` recipe builds its labels on the frame from July +
+      August only. September's pre-decoder probabilities go to
+      `$RINGTRACE_OUT/octlike/<recipe>_s<seed>_r<r>.npz` (`rows` = stacked row, `prob` = n x 12).
+    - **Decoding.** September is decoded on its own, like a test month: the fixed point at
+      0.875, then the recipe's rules (the counter-anchored template rule, which reads the held
+      counter and the frame's own event families). Blends use the same decoding.
+    - **Gate** (`score <base> <challenger>`; a challenger is a recipe or a fixed-weight blend
+      `a+b` / `a*0.6+b*0.4` of recipes' cells). Per cell: macro-F1 change on the given, cleaned
+      and gen-only targets (cleaned and gen-only are the existing silver labels, read by stacked
+      row), and a paired bootstrap over the protected units (1,000 Poisson draws, seeded per
+      cell, 2.5-97.5 %). Reported: the change per thinning seed (mean over seed sets) and the
+      lower bound averaged over the 9 cells. It passes when the change is positive on every
+      thinning seed for given and cleaned, and the averaged lower bound is above 0 for both
+      given and cleaned (gen-only is reported, not gated). Aggregates only.
 14. **CatBoost stages (member 3, `recipes/catboost.json`).** The cascade's binary and type stages
     can be CatBoost (`"stages": "catboost"`): 300 iterations, depth 8, learning rate 0.08, 254
     borders, GPU device 0, Logloss / MultiClass, seed per model, seeds 0-2 averaged. The screening

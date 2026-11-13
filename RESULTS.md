@@ -8,9 +8,9 @@ ordinary-looking fraud rows set to legit. Decoder = fixed point per month unless
 
 | # | run (recipe) | commit | given Jul / Aug / Sep (mean) | cleaned Jul / Aug / Sep (mean) | wall | notes |
 |---|---|---|---|---|---|---|
-| 1 | context-only | 6fdef89 | 0.4660 / 0.4607 / 0.4748 (**0.4671**); argmax 0.4623 | — (silver not built yet) | 6.6 min | 123 relational features, cascade 3 seeds x 300 rounds |
-| 2 | context-hygiene | 1421970 | 0.4563 / 0.4510 / 0.4654 (**0.4576**); argmax 0.4572 | — | 4.0 min | raw amounts, capped gaps, no calendar/whole-frame totals, receiver windows blanked on merchants; ordinary rows legit in stage one. -0.0095: refund (-0.064) and collusion (-0.037) lose the merchant-receiver windows; kept, since the merchant/repeat families carry those classes |
-| 3 | evidence-nophones | e954038 | — | — | — | died at fold 9 (its code dir was replaced by a later ship; the launcher now snapshots code per job); rerun as run 5 |
+| 1 | context-only | 6fdef89 | 0.4660 / 0.4607 / 0.4748 (**0.4671**); argmax 0.4623 | â€” (silver not built yet) | 6.6 min | 123 relational features, cascade 3 seeds x 300 rounds |
+| 2 | context-hygiene | 1421970 | 0.4563 / 0.4510 / 0.4654 (**0.4576**); argmax 0.4572 | â€” | 4.0 min | raw amounts, capped gaps, no calendar/whole-frame totals, receiver windows blanked on merchants; ordinary rows legit in stage one. -0.0095: refund (-0.064) and collusion (-0.037) lose the merchant-receiver windows; kept, since the merchant/repeat families carry those classes |
+| 3 | evidence-nophones | e954038 | â€” | â€” | â€” | died at fold 9 (its code dir was replaced by a later ship; the launcher now snapshots code per job); rerun as run 5 |
 | 4 | **evidence** (context + 7 families + counter, anchored template rule) | 41deb00 | 0.5130 / 0.5090 / 0.5146 (**0.5122**); fixed point 0.5064, argmax 0.5066 | 0.5645 / 0.5639 / 0.5712 (**0.5665**); fixed point 0.5601, argmax 0.5602 | 5.8 min | 230 features; generator-only target 0.9010. Template rule changed 773 train / 137 test rows (+0.0058 given / +0.0064 cleaned over the fixed point) |
 | 5 | rescore: context-only (run 1) on cleaned labels | 4bed3e0 | 0.4660 / 0.4608 / 0.4741 (0.4670) | 0.5149 / 0.5135 / 0.5292 (**0.5192**) | <1 min | |
 | 6 | rescore: context-hygiene (run 2) | 4bed3e0 | 0.4563 / 0.4510 / 0.4654 (0.4576) | 0.5046 / 0.5021 / 0.5185 (0.5084) | <1 min | |
@@ -21,7 +21,7 @@ ordinary-looking fraud rows set to legit. Decoder = fixed point per month unless
 | 11 | champion from a clean checkout (`git archive`) with an empty cache and fresh silver labels | c46528d | 0.5130 / 0.5090 / 0.5146 (0.5122) | 0.5645 / 0.5639 / 0.5712 (0.5665) | 11.1 min | reproducibility check: same sha256 `a36833d5...`, same silver stats (3,629 rows changed) |
 | 12 | ablation: champion without the counter features (rule still on) | 4bed3e0 | 0.4849 / 0.4809 / 0.4879 (0.4846); fixed point 0.4788 | 0.5358 / 0.5362 / 0.5445 (0.5388); fixed point 0.5322 | 9.7 min | counter features: -0.028 / -0.028 at the fixed point, -0.028 / -0.028 after the rule |
 | 13 | ablation: champion without the money-flow features (rule still on) | 4bed3e0 | 0.5121 / 0.5086 / 0.5141 (0.5116); fixed point 0.5065 | 0.5639 / 0.5636 / 0.5707 (0.5661); fixed point 0.5601 | 9.7 min | a tie (-0.0006 / -0.0004): the other families and the rule cover chains and bursts |
-| 14 | ablations without drains / merchant | — | — | — | — | dropped at fold 9 when the ablation queue was stopped for wrap-up; requests, marks, bursts, repeats, context never started |
+| 14 | ablations without drains / merchant | â€” | â€” | â€” | â€” | dropped at fold 9 when the ablation queue was stopped for wrap-up; requests, marks, bursts, repeats, context never started |
 
 ### Per-class F1 of run 4 (pooled over the three held-out months)
 
@@ -55,40 +55,42 @@ qr 518, refund 280, cashback 207, loan 99, collusion 84 (3,945 fraud).
 | evidence (run 4) vs evidence-nophones (run 10): counter + template rule | +0.0333 [+0.0310, +0.0358] | +0.0343 [+0.0319, +0.0369] | challenger |
 | evidence-nophones (run 10) vs context-only (run 1): seven families (with hygiene) | +0.0118 [+0.0094, +0.0142] | +0.0130 [+0.0104, +0.0155] | challenger |
 
-## October-like September
+## October-like September (member octlike, laptop: RTX 5070 Ti, 16 threads)
 
-`python -m ringtrace.octlike run ~/data-oct/s<seed> champion:0,1,2 champion-cleantrain:0,1,2`
-(commit a2b10b5). Fit on July + August of each thinned frame, September predicted; counter
-columns from the unthinned build joined by stacked row. Score = September given-label macro-F1
-after the fixed-point decoder (no template rule in this mode), aggregates only. Files:
-`~/outputs/octlike/<variant>_s<seed>_r<r>.npz`.
+Native mode (`docs/decisions.md` item 13), commit 6b6b8e4:
+`python -m ringtrace.octlike build`, `fit champion:0,1,2`, `score champion champion`.
+September thinned by protected units to 0.494, fitted on July + August, decoded on its own
+(fixed point 0.875 + anchored template rule). Probabilities in
+`$RINGTRACE_OUT/octlike/champion_s<seed>_r<r>.npz`.
 
-| frame | seed set (cascade seeds) | champion, fixed point | argmax |
-|---|---|---|---|
-| s13 | r0 (0, 1, 2) | 0.5060 | 0.5056 |
-| s13 | r1 (3, 4, 5) | 0.5061 | 0.5056 |
-| s13 | r2 (6, 7, 8) | 0.5058 | 0.5056 |
-| s14 | r0 | 0.5094 | 0.5098 |
-| s14 | r1 | 0.5095 | 0.5097 |
-| s14 | r2 | 0.5098 | 0.5095 |
-| s15 | r0 | 0.5126 | 0.5124 |
-| s15 | r1 | 0.5125 | 0.5126 |
-| s15 | r2 | 0.5124 | 0.5130 |
+Frames (September 510,143 rows, 502,823 units, 2,546 of them multi-row, largest 72 rows;
+with label units alone 191 of 3,008 September events would be cut, with both 0):
 
-Champion mean over the 9 cells 0.5093 (frames 0.5060 / 0.5096 / 0.5125; seed sets within
-+-0.0003), against 0.5097 for September at full density in the month folds (run 4, fixed point).
-Wall time: 4.5-5 min per cell with three frames sharing the GPU and 4 CPU threads each.
-
-Cleaned-label variant (`recipes/champion-cleantrain.json`; cleaned labels built on each frame
-from July + August only, the teacher fitted on the other month), same scoring:
-
-| frame | r0 (0, 1, 2) | r1 (3, 4, 5) | r2 (6, 7, 8) | rows changed by cleaning (of 1,053,917) |
+| frame | September rows kept | share | QR-to-person kept / blanked | frame rows |
 |---|---|---|---|---|
-| s13 | 0.5063 | 0.5061 | 0.5064 | 2,419 (1,954 legit -> fraud, 465 wrong types) |
-| s14 | 0.5080 | 0.5094 | 0.5089 | 2,421 (1,950 legit -> fraud, 471 wrong types) |
-| s15 | 0.5125 | 0.5120 | 0.5121 | 2,408 (1,935 legit -> fraud, 473 wrong types) |
+| s13 | 252,462 | 0.4949 | 326 / 137 | 1,566,961 |
+| s14 | 251,850 | 0.4937 | 350 / 161 | 1,566,349 |
+| s15 | 252,111 | 0.4942 | 343 / 150 | 1,566,610 |
 
-Cleantrain mean over the 9 cells 0.5091 against 0.5093 for the given-label champion: a tie on the
+Champion, September macro-F1 per cell (given / cleaned / gen-only):
+
+| frame | r0 (seeds 0-2) | r1 (3-5) | r2 (6-8) |
+|---|---|---|---|
+| s13 | 0.5240 / 0.5822 / 0.9054 | 0.5241 / 0.5824 / 0.9057 | 0.5240 / 0.5827 / 0.9060 |
+| s14 | 0.5092 / 0.5663 / 0.8897 | 0.5089 / 0.5661 / 0.8893 | 0.5092 / 0.5664 / 0.8898 |
+| s15 | 0.5134 / 0.5707 / 0.8986 | 0.5135 / 0.5708 / 0.8986 | 0.5134 / 0.5707 / 0.8984 |
+
+Mean over the 9 cells: given 0.5155, cleaned 0.5731, gen-only 0.8980. Wall time: build 10 s for
+the three frames (after a 2.2 min unthinned build with cleaned labels); fit about 110 s per cell
+plus about 15 s of feature build per frame, about 20 min for all 9; gate scoring 4.8 min.
+The first fit job was stopped by a 10 min shell limit after 4 cells and resumed (finished cells
+are skipped), with identical outputs.
+
+Self-check `score champion champion`: change +0.0000 on every thinning seed and target, averaged
+lower bound +0.0000 (given, cleaned, gen-only) -> FAIL, as it should (the gate needs a positive
+change).
+
+Earlier thinned-frame mode (before the native rewrite): Cleantrain mean over the 9 cells 0.5091 against 0.5093 for the given-label champion: a tie on the
 given labels (the cleaned target cannot be scored on September here, which has no cleaned labels
 by protocol). All 18 cells ran in 28 min (16:39-17:07 IST), three frames in parallel.
 
