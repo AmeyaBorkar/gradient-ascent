@@ -1,6 +1,6 @@
 # Decisions
 
-Short records of choices that differ from, or add to, the research notes.
+Short records of design choices.
 
 1. **One stacked "ledger" frame with integer keys** (`ringtrace.tables`): accounts, merchants and
    devices become integers (merchants offset by 10,000,000 so one `receiver` key covers both).
