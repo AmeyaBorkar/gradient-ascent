@@ -18,6 +18,9 @@ raised to 20; it resets at midnight IST. Uploads that fail validation do not cou
 | - | This repository's champion | 0.5457 | n/a | 49 vs upload 2 (October) |
 | - | Five-member equal-weight blend (earlier build) | 0.5485 | tie with the champion | n/a |
 | - | This repository's five-member blend (`recipes/blend.json`, sha256 `c3af1418...`) | **0.5474** | tie with the earlier build | 40 vs the earlier build |
+| - | Five-member blend + blank-check merchant QR rule (sha256 `e7c59467...`) | **0.5486269** | +20 base-rate rows | 20 vs the five-member blend |
+| - | + TabM, full use (fraud and type) (sha256 `07aee8f5...`) | 0.5483 | never loses on LOMO | 7 vs the previous row |
+| - | + TabM for fraud only (sha256 `8a461426...`) | **0.5499354** | never loses on LOMO | 7 vs the blank-QR file, all legit -> fraud |
 
 ## Upload 1: the all-legit file
 
@@ -120,6 +123,20 @@ raised to 20; it resets at midnight IST. Uploads that fail validation do not cou
 - **Lesson:** a 40-row difference is inside the public noise for near-identical files (see
   [cv-vs-public.md](cv-vs-public.md)); the direction is a hint to check `qr_swap` recall on rows
   whose QR check is blank, never a reason to choose between the files.
+
+## The blank-check rule and TabM uploads (13 Nov, evening)
+
+- **Blank-check merchant QR rule** (0.5486269, +0.0012 over the five-member blend from 20 rows): a QR
+  payment to a merchant with a blank QR check is fraud in 678 of 678 train rows; October's shift hid
+  20 such rows from the models. The public gain confirms the base rate.
+- **TabM, full use** (0.5483, 7 rows: 4 legit -> fraud, 3 type switches): a decomposition on the train
+  months shows TabM's fraud adds are right 59-70% of the time and its type switches are a coin flip
+  (2 of 5 wrong on cleaned labels). The public loss of 0.0003 matches a wrong type switch.
+- **TabM for fraud only** (0.5499354, +0.0013 over the blank-QR file): TabM sets each row's total fraud
+  probability, the trees keep the split among the fraud types. Never loses on LOMO (given +0.0007 /
+  +0.0003 / +0.0003, cleaned +0.0007 / +0.0003 / +0.0004 against the five-member blend). Its 7 October
+  changes are all legit -> fraud, including rare classes where one correct call carries a large
+  macro-F1 weight.
 
 ## Candidates built but not uploaded
 
