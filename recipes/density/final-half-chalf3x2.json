@@ -1,0 +1,86 @@
+{
+ "name": "final-half-chalf3x2",
+ "members": [
+  {
+   "name": "champion-d0",
+   "run": "density-champion-half0",
+   "variant": "fold",
+   "cells": "champion-half0"
+  },
+  {
+   "name": "champion-d1",
+   "run": "density-champion-half1",
+   "variant": "fold",
+   "cells": "champion-half1"
+  },
+  {
+   "name": "lgbm",
+   "run": "lgbm",
+   "variant": "fold",
+   "cells": "lgbm"
+  },
+  {
+   "name": "catboost",
+   "run": "catboost",
+   "variant": "fold",
+   "cells": "catboost"
+  },
+  {
+   "name": "clean-event-d0",
+   "run": "density-clean-event-half0",
+   "variant": "fold",
+   "cells": "clean-event-half0"
+  },
+  {
+   "name": "clean-event-d1",
+   "run": "density-clean-event-half1",
+   "variant": "fold",
+   "cells": "clean-event-half1"
+  },
+  {
+   "name": "clean-l2-d0",
+   "run": "density-clean-l2-half0",
+   "variant": "fold",
+   "cells": "clean-l2-half0"
+  },
+  {
+   "name": "clean-l2-d1",
+   "run": "density-clean-l2-half1",
+   "variant": "fold",
+   "cells": "clean-l2-half1"
+  },
+  {
+   "name": "tabm",
+   "run": "final-tabm",
+   "variant": "fold",
+   "cells": "tabm",
+   "role": "fraud"
+  }
+ ],
+ "weights": {
+  "mode": "fixed",
+  "values": {
+   "champion-d0": 0.05,
+   "champion-d1": 0.05,
+   "lgbm": 0.1,
+   "catboost": 0.1,
+   "clean-event-d0": 0.05,
+   "clean-event-d1": 0.05,
+   "clean-l2-d0": 0.05,
+   "clean-l2-d1": 0.05,
+   "tabm": 0.5
+  }
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ],
+ "base_rate_rules": [
+  {
+   "name": "blank_merchant_qr",
+   "max_october_rows": 40
+  }
+ ]
+}

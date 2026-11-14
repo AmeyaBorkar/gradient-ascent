@@ -41,21 +41,24 @@ counter-anchored template rule.
       legit, adopted only if it never loses on leave-one-month-out and the October-like cells.
 - [ ] Finish the leave-one-family-out ablations left over in run 14.
 
-## Density: the device counter at October's density (in progress, 14 Nov)
+## Density: the device counter at October's density (14 Nov)
 - October's counter is computed on October alone (its own pass, half density). The October-like
   frames held September's counter at its value on the shared three-month, full-density pass.
 - `ringtrace.density` rebuilds a held-out month's counter as its own pass (renumbered phones,
   own gaps kept, dropped units' phones removed): block assignment unchanged (100 %), segment
   agreement with the held counter 0.92 to 0.96 on the thinned frames, mean segment confidence
   0.971 to 0.975 (held 0.993 to 0.997; October's own 0.975).
-- First cells (seed 13): the held counter overstates a tree member by about 0.004 macro-F1.
-- Every box job runs CPU-only: `scripts/density_queue.sh` hides every GPU
-  (`CUDA_VISIBLE_DEVICES` empty) and sets `RINGTRACE_DEVICE=cpu`, which forces XGBoost `device`
-  cpu and CatBoost `task_type` CPU whatever the recipe says. With no GPU visible, the CUDA build
-  of XGBoost 3.4.1 fails in `xgb.train`'s per-round evaluation of a multiclass model; CPU fits now
-  run the same boosting loop without that evaluation (identical model bytes, tested).
-- The box container has a CPU quota of 46 cores shared by every job, so the queue was ordered by
-  value: September cells of the five trees (seeds 13 to 15), month folds and cells of the three
-  XGBoost members with and without `ctr_pos`, then the champion on a half-density counter (draw
-  0, then draw 1), then October-mix frames and the LightGBM / CatBoost `ctr_pos` variants.
-  TabM cells and month folds with the standalone counter run on Colab.
+- `--train-counter half<d>` trains on every train month split into two halves by protected units,
+  each half its own pass (October's density). Month folds also predict every held-out month with
+  its standalone counter (`oof_alone.npy`) and at October's density (`oof_half0.npy`).
+- `RINGTRACE_DEVICE=cpu|cuda` forces every XGBoost and CatBoost booster onto one device; cells and
+  month folds record it. The September cells of the XGBoost members and CatBoost are GPU fits on
+  one RTX 4060 (they reproduce the earlier GPU cells under the held counter to four decimals);
+  LightGBM cells s14 and s15 are CPU fits (s13 is the earlier CPU fit); TabM cells came from an L4.
+- Jobs: `scripts/density_queue.sh <queue> 2 <logs> cuda`, gates `scripts/density_gate.sh <step>`.
+- Results and verdicts: RESULTS.md, "Density: the counter at October's density";
+  `docs/findings/density-counter.md`.
+- Dropped for time (GPU shared with other work): the no-position variants of clean-event,
+  clean-l2, LightGBM and CatBoost (cells and month folds); the second half-density draw; the
+  October-mix frames; TabM with the half-density training counter and TabM month folds under the
+  rebuilt counters.
