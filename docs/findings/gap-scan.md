@@ -61,6 +61,14 @@ rows only.
   fraud-block devices with no mark (213 rows). Their amounts carry the festival scale: the
   geometric-mean ratio to legit-block rows is 1.17 (95 % 0.96 to 1.41). If these rows kept the
   unscaled train amounts, the ratio would be 0.86. In train the same ratio is 1.02 (0.95 to 1.10).
+- **October's ordinary rows are not tied to October's events either.** We measured the share of
+  legit-called rows whose sender, P2P receiver or device appears in a fraud-called row within 24 h.
+  It is 0.30 to 0.31 / 0.19 to 0.20 / 0.20 to 0.21 % in the train months, and 0.148 / 0.087 /
+  0.100 % in October. That is 0.44 to 0.48 times train, which is what a month written at half
+  volume gives (half the events, half the legit rows per account). September with legit rows
+  thinned and fraud rows whole stays at 0.31 / 0.19 / 0.21 %. If October's ordinary rows (about
+  2.6 % of legit-called rows) linked at even 10 %, October's sender share would be at least 0.41 %.
+  The observed value bounds their link rate at about 1 %.
 - **Within-template signal left on the table is small.** Out-of-fold AUC of the type inside
   templates 1, 2, 5 and 6 is 0.54 to 0.67 (template 6 reaches 0.88 in August). The decoder calls the
   majority, as the F1 trade-off between class sizes requires. Template 4 calls fake_cashback on
@@ -77,7 +85,7 @@ rows only.
 - October enters only as counts, rates and quantiles.
 
 **Command.** `RINGTRACE_THREADS=4 python analysis/gapscan.py all` (70 s on the laptop). It writes
-`$RINGTRACE_OUT/gapscan/{ceiling,omnibus,boundary,lookalike,festival}.json`.
+`$RINGTRACE_OUT/gapscan/{ceiling,omnibus,boundary,lookalike,festival,octlink}.json`.
 
 **What it changes.**
 - No upload candidate. Nothing here passes the bar, and nothing is a probe worth a slot.

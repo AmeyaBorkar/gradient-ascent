@@ -661,6 +661,8 @@ truth = cleaned labels with each class's ordinary rows scaled by `r`. Finding:
 | rows dated after their filing month: train (dated October) / October (dated November) | 147, all generator-made, all called fraud / 46, all anchored, all called fraud |
 | type AUC inside drain shape 3 (new phone), Jul / Aug / Sep | 0.999 / 0.994 / 0.995; counter zone matches the label on 99.5 % |
 | festival amount ratio of October ordinary-row proxies to legit-block rows | 1.17 (95 % 0.96 to 1.41); unscaled would be 0.86 |
+| legit-called rows sharing sender / P2P receiver / device with a fraud-called row within 24 h, train months | 0.30-0.31 / 0.19-0.20 / 0.20-0.21 % (September thinned: 0.31 / 0.19 / 0.21 %) |
+| same, October | 0.148 / 0.087 / 0.100 % (0.44 to 0.48 times train, the half-volume month; ordinary link rate at most about 1 %) |
 
 Verdict: no candidate. Every route to ordinary-looking rows is closed, and month-boundary filing is
 already used. The look-alike minority is a real generator type.
