@@ -200,8 +200,16 @@ def blank_merchant_qr(pred, proba, led, log=print) -> np.ndarray:
     return out
 
 
+def recovery_rule(pred, proba, led, log=print, **params) -> np.ndarray:
+    """The operator-role recovery stage on legit calls (``ringtrace.recovery``)."""
+    from ringtrace.recovery import recovery
+
+    return recovery(pred, proba, led, log=log, **params)
+
+
 RULES = {
     "blank_merchant_qr": blank_merchant_qr,
+    "recovery": recovery_rule,
     "counter": counter_rule,
     "legit_block": legit_block_rule,
     "plain_templates": plain_templates,

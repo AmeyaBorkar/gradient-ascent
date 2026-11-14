@@ -690,3 +690,22 @@ sha256 `3b25869e1cd7ac3e390dd33568033d25d3b765b23f0e1f35dbbf3f2dff5e1974` (passe
 A-clean change (Jul / Aug / Sep): `roles` +0.00009 / +0.00001 / +0.00008, `pay` +0.00020 / +0.00004 /
 -0.00001, `pay-roles` +0.00020 / +0.00016 / +0.00007, `combo` +0.00029 / +0.00017 / +0.00016.
 Expected October change of `bait-combo`: about +0.0003.
+
+## Recovery stage on legit calls (operator roles in other months): rejected
+
+`recipes/recovery.json` = `bait-combo` plus the base-rate rule `recovery` (threshold 0.5,
+`ringtrace.recovery`): a LightGBM multiclass model on the rows the calls leave legit, with the blend
+probabilities, the sender's and person receiver's operator roles in other train months, and a few
+row fields; train months out of fold, October from a fit on all three months. Against `bait-combo`
+(`python -m ringtrace.final table recipes/bait-combo.json recipes/recovery.json`, 2,000 draws):
+
+| target | Jul | Aug | Sep | 95 % interval |
+|---|---|---|---|---|
+| given | +0.00007 | -0.000001 | -0.000001 | [-0.00002, +0.00008] |
+| cleaned | +0.00006 | +0.00004 | +0.00009 | [+0.00001, +0.00013] |
+| gen-only | +0.00008 | +0.00001 | +0.00009 | [-0.00002, +0.00015] |
+
+10 train rows and 3 October rows change (legit -> phishing_collect 2, legit -> qr_swap 1). The
+October-like cells cannot fit the stage (no aligned labels on a thinned frame), so it is skipped
+there. It fails the bar on the given target in August and September: a tie worth about one
+October row. Not used.
