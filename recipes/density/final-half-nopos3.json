@@ -9,13 +9,13 @@
   },
   {
    "name": "lgbm",
-   "run": "density-lgbm",
+   "run": "lgbm",
    "variant": "fold",
    "cells": "lgbm"
   },
   {
    "name": "catboost",
-   "run": "density-catboost",
+   "run": "catboost",
    "variant": "fold",
    "cells": "catboost"
   },
