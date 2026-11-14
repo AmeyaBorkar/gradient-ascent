@@ -642,3 +642,89 @@ augmentation never loses there, but it has no full run, so it has no arrays to g
 - 2026-11-14 03:20 IST: every arrived component judged; `recipes/final.json` unchanged since
   02:15 (`final.csv` sha256 `39cb4952...4db3`).
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+## The 0.04-cut cascade member (member gate, 14 Nov; commits 2640483 / 332b88e)
+
+The member is the champion recipe with `type_min_score` 0.04 instead of 0.10. Everything else is
+the champion's: the legit drop at 0.70, the features, the booster, the decoder and the rule. The
+finding is `docs/findings/member-cut04.md`.
+
+The fits are GPU fits, seed by seed (`python -m ringtrace.member`):
+- **Leave-one-month-out:** the three month folds, seeds 0-4.
+- **October-like cells:** frames s13-15 on seeds 0-14. Cell r uses seeds 3r..3r+2 for the
+  three-seed member and 5r..5r+4 for the five-seed one.
+
+Device check, so that a seed fitted on either GPU is the same array:
+- the champion's seeds 0-2 on the build GPU equal its saved cell s14 r0 byte for byte;
+- member seed 0 of frame 14, refitted on the RTX 4060, equals the build GPU's array byte for
+  byte.
+
+Commands:
+- Assemble the member (only the stored seeds are read):
+  `python -m ringtrace.member lomo recipes/member-x5.json --seeds 0-2 --as member-cut04=0-2`
+  and
+  `python -m ringtrace.member cells recipes/member-x5.json --frames 13,14,15 --seeds 0-8 --as member-cut04=0-2/3-5/6-8 --cells $RINGTRACE_OUT/member/cells`.
+- Gate it, with the cells directory holding the six base members' nine cells:
+  `python analysis/member_gate.py gate --cells $RINGTRACE_OUT/member/cells --tabm-run tabm --report gate-gpu`.
+
+The gate takes 40 min on 5 threads; October-like scoring alone takes 872 s. It needs about 3.5 GB
+of RAM.
+
+### The three-seed member (`member-cut04`), against `final-half` (the best file)
+
+Leave-one-month-out columns: Jul / Aug / Sep [bootstrap 95 % of the mean]. October-like columns:
+s13 / s14 / s15 (pooled 95 % lower bound).
+
+| candidate | given | cleaned | gen-only | October-like given | October-like cleaned | rows train / Oct | verdict |
+|---|---|---|---|---|---|---|---|
+| member-type6 (sixth tree, type split, 1/10) | +0.00000 / +0.00004 / +0.00001 [-0.00003, +0.00006] | +0.00000 / +0.00005 / +0.00001 [-0.00002, +0.00007] | +0.00000 / +0.00019 / +0.00004 [-0.00001, +0.00019] | -0.00007 / -0.00005 / -0.00000 (-0.00010) | -0.00006 / -0.00005 / -0.00000 (-0.00009) | 5 / 3 | FAIL: October-like |
+| member-mass6 (fraud mass: TabM 1/2, six trees 1/12 each) | -0.00004 / +0.00000 / +0.00005 [-0.00003, +0.00005] | -0.00004 / +0.00000 / +0.00005 [-0.00003, +0.00005] | -0.00013 / +0.00001 / +0.00009 [-0.00011, +0.00009] | -0.00003 / +0.00000 / -0.00001 (-0.00003) | +0.00003 / +0.00000 / -0.00001 (-0.00002) | 7 / 0 | FAIL: July |
+| member-full6 (both roles) | -0.00001 / +0.00007 / +0.00001 [-0.00001, +0.00006] | -0.00001 / +0.00008 / +0.00001 [-0.00001, +0.00006] | -0.00003 / +0.00020 / +0.00004 [-0.00002, +0.00018] | -0.00000 / -0.00005 / +0.00003 (-0.00006) | +0.00003 / -0.00005 / +0.00002 (-0.00005) | 6 / 3 | FAIL: July |
+| member-swap (in place of the champion) | -0.00001 / +0.00000 / +0.00003 [-0.00004, +0.00004] | -0.00001 / +0.00001 / -0.00002 [-0.00005, +0.00004] | -0.00003 / +0.00008 / -0.00001 [-0.00007, +0.00012] | +0.00001 / -0.00005 / +0.00000 (-0.00007) | +0.00007 / -0.00005 / -0.00000 (-0.00005) | 7 / 1 | FAIL: July, cleaned Sep |
+| member-solo-cut04 vs the champion alone | +0.00008 / +0.00014 / -0.00011 [-0.00017, +0.00024] | +0.00004 / +0.00009 / +0.00003 [-0.00015, +0.00025] | +0.00013 / +0.00011 / -0.00010 [-0.00027, +0.00035] | +0.00047 / +0.00015 / +0.00013 (+0.00004) | +0.00066 / +0.00030 / +0.00015 (+0.00014) | 59 / 12 | FAIL: given Sep |
+
+October class moves against `final-half`:
+- type6 and full6: qr_swap -> phishing_collect, refund_abuse -> qr_swap and
+  loan_app_extortion -> fake_cashback, one row each;
+- swap: refund_abuse -> qr_swap, one row;
+- mass6: none.
+
+Moved train calls, right after the change / right before it, given:
+- type6: 0 of 0 / 3 vs 1 of 4 / 1 vs 0 of 1;
+- mass6: 0 vs 2 of 2 / 1 vs 2 of 3 / 2 vs 0 of 2.
+
+A-clean change:
+- type6: +0.00000 / +0.00005 / +0.00001;
+- mass6: -0.00004 / +0.00000 / +0.00005;
+- full6: -0.00001 / +0.00007 / +0.00001;
+- swap: -0.00001 / +0.00001 / -0.00002.
+
+The member alone, as a run, after the rule:
+- given 0.5130 / 0.5091 / 0.5144;
+- cleaned 0.5645 / 0.5640 / 0.5712;
+- gen-only 0.9021 / 0.8997 / 0.9013.
+
+The champion scores 0.5130 / 0.5090 / 0.5146, 0.5645 / 0.5639 / 0.5712 and 0.9020 / 0.8996 /
+0.9014.
+
+### The five-seed member (`member-x5`), against `final-half` (`gate-x5`, 22 min)
+
+| candidate | given | cleaned | gen-only | October-like given | October-like cleaned | rows train / Oct | verdict |
+|---|---|---|---|---|---|---|---|
+| member-x5-type6 | +0.00000 / +0.00004 / +0.00001 [-0.00003, +0.00006] | +0.00000 / +0.00005 / +0.00001 [-0.00002, +0.00007] | +0.00000 / +0.00019 / +0.00004 [-0.00001, +0.00019] | -0.00004 / -0.00005 / -0.00000 (-0.00009) | -0.00004 / -0.00005 / -0.00000 (-0.00008) | 5 / 3 | FAIL: October-like |
+| member-x5-mass6 | -0.00004 / +0.00000 / +0.00001 [-0.00004, +0.00002] | -0.00004 / +0.00000 / +0.00001 [-0.00004, +0.00002] | -0.00013 / +0.00001 / +0.00004 [-0.00013, +0.00006] | -0.00003 / +0.00000 / +0.00002 (-0.00003) | +0.00003 / +0.00000 / +0.00002 (-0.00002) | 6 / 0 | FAIL: July |
+| member-x5-full6 | -0.00001 / +0.00008 / +0.00001 [-0.00000, +0.00006] | -0.00001 / +0.00009 / +0.00001 [-0.00000, +0.00007] | -0.00003 / +0.00024 / +0.00004 [-0.00001, +0.00019] | -0.00000 / -0.00005 / +0.00002 (-0.00007) | +0.00003 / -0.00005 / +0.00001 (-0.00005) | 5 / 3 | FAIL: July |
+| member-x5-swap | -0.00001 / +0.00000 / +0.00003 [-0.00004, +0.00004] | -0.00001 / +0.00001 / -0.00002 [-0.00005, +0.00004] | -0.00003 / +0.00008 / -0.00001 [-0.00007, +0.00012] | -0.00001 / -0.00005 / +0.00001 (-0.00007) | +0.00005 / -0.00005 / +0.00001 (-0.00005) | 7 / 2 | FAIL: July |
+
+The five-seed member alone, after the rule:
+- given 0.5128 / 0.5091 / 0.5146;
+- cleaned 0.5643 / 0.5640 / 0.5713;
+- gen-only 0.9018 / 0.8998 / 0.9014.
+
+The October moves are the same three look-alike swaps for type6 and full6. The swap moves
+refund_abuse -> qr_swap and loan_app_extortion -> fake_cashback.
+
+
+- 2026-11-14 17:15 IST: the 0.04-cut member is rejected in every role, with three seeds and with
+  five; no candidate file. The
+  best file stays `blend-tabmF-bq.csv` (`final-half`).

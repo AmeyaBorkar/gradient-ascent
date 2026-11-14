@@ -63,3 +63,26 @@ counter-anchored template rule.
   member (`member-x5-cpu` = seeds 0-4, `member-cut04-cpu` = seeds 0-2) on the three month folds
   and the cells s13-15, and a CPU-built champion (`champion-cpu`, seeds 0-2) as the like-for-like
   base of the swaps and of the cut alone.
+- 15:10 IST: the CPU path was dropped. The cut's GPU fits are byte-equal to the champion's
+  device:
+  - the build GPU's champion seeds 0-2 equal its saved cell s14 r0 byte for byte;
+  - an RTX 4060 refit of member seed 0 on s14 equals the build GPU's array byte for byte.
+
+  So the stored GPU seeds were reused, and only the missing seeds were fitted (folds 8-9
+  seed 2; cells seeds 7-8). The saved champion is the like-for-like base.
+- `ringtrace.member` now assembles outputs without loading the feature matrix when every seed is
+  stored.
+- 16:20 IST: gate `gate-gpu` (`analysis/member_gate.py`, 2,000 draws, nine cells). The
+  three-seed 0.04-cut member fails in every role:
+  - **type split:** leave-one-month-out passes (+0.00000 / +0.00004 / +0.00001 given), but
+    October-like is -0.00004 given and cleaned, with the lower bound at -0.00010;
+  - **fraud mass, both roles, and replacing the champion:** each fails July, by 1 to 4 x 1e-5.
+
+  Inside the blend it moves 5 to 7 train rows and 0 to 3 October rows. Alone against the
+  champion alone, it is ahead on October-like (lower bound above zero, given and cleaned) but
+  loses 0.00011 given in September.
+- 17:15 IST: the five-seed member (`member-x5`, cells from seeds 0-4 / 5-9 / 10-14) gives the
+  same verdicts in the same four roles (`gate-x5`): the type split passes leave-one-month-out and
+  fails October-like (-0.00003, lower bound -0.00009); the other roles fail July.
+- **Outcome:** the member is rejected in every role, so no candidate file. Finding:
+  `docs/findings/member-cut04.md`.
