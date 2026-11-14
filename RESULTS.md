@@ -642,3 +642,155 @@ augmentation never loses there, but it has no full run, so it has no arrays to g
 - 2026-11-14 03:20 IST: every arrived component judged; `recipes/final.json` unchanged since
   02:15 (`final.csv` sha256 `39cb4952...4db3`).
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+## Density: the counter at October's density
+
+October's device counter is computed on the October test file alone (its own pass, about half a
+train month's density). The October-like frames thinned September but kept its counter columns at
+their values on the shared full-density pass of July to September ("held"). `ringtrace.density`
+rebuilds September's counter as its own pass on each thinned frame ("honest"); every cell is one
+fit on July + August predicted twice, so held and honest differ only in September's counter
+columns (and in what the template rule reads). Cells: frames s13-s15, seed set r0 (cascade seeds
+0-2), 2,000 event-bootstrap draws, 95 % pooled bounds of the mean (`ringtrace.density cellgate`).
+Month folds: `python -m ringtrace.final table` (production counter) and
+`python -m ringtrace.density table --counter alone|half0` (held-out month as a pass of its own at
+full density, or in two halves at October's density). Box: one RTX 4060 (8 GB), 32 threads, at
+most 2 GPU fits and 10 threads for these jobs; commits 25edb86-731a07d.
+
+Devices: XGBoost and CatBoost cells are GPU fits on this box (`RINGTRACE_DEVICE=cuda`); their held
+cells reproduce the earlier GPU cells to the fourth decimal (champion s13 0.5240 / 0.5822 / 0.9054,
+s15 0.5134 / 0.5707 / 0.8986; clean-event s13 0.5241 / 0.5823 / 0.9058), and the refitted
+champion's month folds are byte-identical to the best file's (`oof.npy` max difference 0.0, 0
+argmax changes; October max difference 2.8e-9). LightGBM cells are CPU fits (s13 earlier, s14 and
+s15 here), CatBoost s13 is the earlier CPU fit, TabM cells are L4 fits. In every comparison both
+arms of a cell share their devices.
+
+### Member cells under either counter (given / cleaned / gen-only, held -> honest)
+
+| member | s13 | s14 | s15 | wall per cell |
+|---|---|---|---|---|
+| champion | 0.5240 / 0.5822 / 0.9054 -> 0.5197 / 0.5777 / 0.9029 | 0.5092 / 0.5663 / 0.8897 -> 0.5052 / 0.5623 / 0.8876 | 0.5134 / 0.5707 / 0.8986 -> 0.5111 / 0.5678 / 0.8964 | 336-413 s |
+| clean-event | 0.5241 / 0.5823 / 0.9058 -> 0.5192 / 0.5770 / 0.9025 | 0.5092 / 0.5667 / 0.8901 -> 0.5049 / 0.5623 / 0.8883 | 0.5135 / 0.5706 / 0.8985 -> 0.5114 / 0.5680 / 0.8959 | 247-776 s |
+| clean-l2 | 0.5240 / 0.5824 / 0.9059 -> 0.5189 / 0.5769 / 0.9020 | 0.5096 / 0.5670 / 0.8901 -> 0.5048 / 0.5622 / 0.8883 | 0.5135 / 0.5707 / 0.8986 -> 0.5110 / 0.5679 / 0.8961 | 207-263 s |
+| lgbm (CPU) | earlier CPU cell | 0.5085 / 0.5658 / 0.8897 -> 0.5044 / 0.5616 / 0.8872 | 0.5141 / 0.5713 / 0.8985 -> 0.5108 / 0.5676 / 0.8970 | 1,253-1,277 s (2 threads) |
+| catboost | earlier CPU cell | 0.5082 / 0.5654 / 0.8880 -> 0.5033 / 0.5605 / 0.8874 | 0.5132 / 0.5703 / 0.8979 -> 0.5091 / 0.5659 / 0.8968 | 104-134 s |
+| TabM (L4) | given 0.5243 -> 0.5197 | 0.5096 -> 0.5042 | 0.5142 -> 0.5086 | 1,296-1,301 s |
+| champion, no `ctr_pos` | 0.5240 / 0.5824 / 0.9057 -> 0.5193 / 0.5773 / 0.9022 | 0.5093 / 0.5664 / 0.8898 -> 0.5047 / 0.5617 / 0.8884 | 0.5134 / 0.5706 / 0.8984 -> 0.5110 / 0.5676 / 0.8958 | 412-455 s |
+| champion, trained at October's density (half0) | 0.5223 / 0.5808 / 0.9063 -> 0.5215 / 0.5798 / 0.9048 | 0.5082 / 0.5654 / 0.8906 -> 0.5089 / 0.5657 / 0.8910 | 0.5130 / 0.5704 / 0.8989 -> 0.5124 / 0.5693 / 0.8974 | 789-1,114 s (shared GPU) |
+| clean-event, half0 | 0.5226 / 0.5811 / 0.9069 -> 0.5218 / 0.5801 / 0.9051 | 0.5078 / 0.5653 / 0.8910 -> 0.5090 / 0.5664 / 0.8929 | 0.5129 / 0.5702 / 0.8993 -> 0.5122 / 0.5694 / 0.8980 | 221-239 s |
+| clean-l2, half0 | 0.5224 / 0.5809 / 0.9069 -> 0.5213 / 0.5796 / 0.9049 | 0.5077 / 0.5652 / 0.8909 -> 0.5089 / 0.5661 / 0.8928 | 0.5127 / 0.5701 / 0.8994 -> 0.5124 / 0.5693 / 0.8978 | 227-234 s |
+
+Every member loses 0.002 to 0.006 per cell when September's counter is rebuilt at October's
+density. Trained on a counter at October's density, the XGBoost members lose 0.0001 to 0.0019
+under the held counter but gain under the honest one on every seed: given +0.0008 to +0.0041 per
+member and seed against the same member trained on the production counter (each decoded alone).
+
+### Step 1: how much the held counter overstates (same fits, September's counter only)
+
+| recipe | held | honest | change per seed s13 / s14 / s15 | mean [95 %] |
+|---|---|---|---|---|
+| best recipe (`final-half-cpu`: refitted trees + TabM, fixed point, anchored rule, blank-QR) | 0.5160 / 0.5737 / 0.8984 | 0.5125 / 0.5699 / 0.8954 | given -0.00440 / -0.00442 / -0.00180; cleaned -0.00486 / -0.00450 / -0.00229 | given -0.00354 [-0.00528, -0.00192]; cleaned -0.00388 [-0.00588, -0.00194]; gen -0.00297 [-0.00645, +0.00050] |
+| champion alone | 0.5155 / 0.5731 / 0.8979 | 0.5120 / 0.5692 / 0.8956 | given -0.00431 / -0.00396 / -0.00232 | given -0.00353 [-0.00523, -0.00189]; cleaned -0.00384 [-0.00591, -0.00190]; gen -0.00227 [-0.00567, +0.00117] |
+
+Calls changed per cell: 25 to 69 of about 252,000 September rows; the loss sits in the small
+classes. In month folds the standalone counter (each held-out month its own pass, full density)
+costs the champion -0.0023 / -0.0009 / -0.0018 given (Jul / Aug / Sep: 0.5130 / 0.5090 / 0.5146
+-> 0.5107 / 0.5081 / 0.5128).
+
+Choices of the best recipe re-checked under the rebuilt counter (cells, same models):
+
+| comparison | held: mean [95 %] given; cleaned | honest: mean [95 %] given; cleaned | rows per cell (honest) |
+|---|---|---|---|
+| anchored template rule on vs off | +0.00423 [+0.00189, +0.00701]; +0.00551 [+0.00292, +0.00849] | +0.00456 [+0.00207, +0.00744]; +0.00603 [+0.00331, +0.00919] | 130 / 127 / 102 |
+| TabM fraud mass 1/2 vs 1/3 | +0.00010 [-0.00002, +0.00024]; +0.00008 [-0.00002, +0.00021] | +0.00024 [+0.00005, +0.00050]; +0.00022 [+0.00004, +0.00046] | 4 / 2 / 5 |
+
+Both choices hold, and both look slightly better under the rebuilt counter.
+
+### (a) no absolute position column, (b) training on the counter at October's density
+
+Cells: change against the same recipe with production-trained members, per seed s13 / s14 / s15,
+mean [95 % pooled bounds]; given / cleaned (gen-only in the notes). `chalf0` = the best recipe with
+the champion trained at October's density (draw 0), `chalf3` = with all three XGBoost members
+(champion, clean-event, clean-l2) trained so; LightGBM, CatBoost and TabM unchanged.
+
+| comparison | honest cells, given | honest cells, cleaned | held cells, given | rows per cell (honest) |
+|---|---|---|---|---|
+| (a) champion without `ctr_pos` | -0.00036 / -0.00049 / -0.00011, -0.00032 [-0.00088, +0.00023] | -0.00040 / -0.00053 / -0.00011, -0.00035 [-0.00095, +0.00024] | +0.00006 [-0.00014, +0.00028] | 19 / 16 / 11 |
+| (b) champion at October's density | +0.00186 / +0.00367 / +0.00130, **+0.00227 [+0.00109, +0.00363]** | +0.00214 / +0.00342 / +0.00158, **+0.00238 [+0.00116, +0.00379]** | -0.00100 [-0.00158, -0.00045] | 37 / 36 / 29 |
+| (b) chalf0 (blend, champion only) | +0.00008 / -0.00003 / -0.00001, +0.00001 [-0.00003, +0.00007] | +0.00001 [-0.00003, +0.00007] | +0.00013 [+0.00000, +0.00045] | 1 / 1 / 1 |
+| (b) chalf3 (blend, three XGBoost members) | +0.00191 / +0.00291 / -0.00019, **+0.00155 [+0.00072, +0.00252]** | +0.00225 / +0.00281 / -0.00020, **+0.00162 [+0.00076, +0.00266]** | -0.00029 [-0.00068, +0.00012] | 29 / 28 / 14 |
+
+gen-only, honest: (a) -0.00015 [-0.00103, +0.00064]; (b) champion +0.00210 [+0.00024, +0.00438];
+chalf3 +0.00139 [+0.00014, +0.00316]. Under the held counter, (b) loses: the October-like cells
+as they were would have rejected it.
+
+Month folds (Jul / Aug / Sep change [95 % bootstrap of the mean], given; cleaned; gen-only):
+
+| comparison | production counter (held-out month on the shared full-density pass) | standalone counter (own pass, full density) | at October's density (two halves, own passes) |
+|---|---|---|---|
+| (b) champion at October's density vs champion | -0.00078 / -0.00173 / -0.00096 [-0.00170, -0.00071]; -0.00080 / -0.00152 / -0.00090; +0.00041 / +0.00031 / +0.00095 | +0.00058 / -0.00135 / +0.00037 [-0.00074, +0.00046]; +0.00035 / -0.00126 / +0.00062; -0.00124 / -0.00032 / +0.00167 | **+0.00086 / +0.00063 / +0.00080 [+0.00002, +0.00151]; +0.00081 / +0.00118 / +0.00128 [+0.00029, +0.00190]**; -0.00049 / +0.00218 / +0.00190 |
+| (b) chalf0b vs the best recipe | -0.00001 / -0.00004 / +0.00017 [-0.00005, +0.00018]; -0.00001 / -0.00004 / +0.00016; -0.00003 / -0.00005 / -0.00012 (5 train / 1 October rows) | not run | -0.00001 / -0.00005 / -0.00001 [-0.00006, +0.00000]; -0.00001 / -0.00005 / -0.00001; -0.00003 / -0.00008 / -0.00002 (against `final-half-r1`, the best recipe with the refitted champion) |
+| (b) chalf3b vs the best recipe | -0.00059 / -0.00028 / -0.00028 [-0.00069, -0.00014]; -0.00058 / -0.00027 / -0.00027 [-0.00067, -0.00013]; -0.00076 / -0.00017 / -0.00022 (30 train / 11 October rows) | +0.00024 / -0.00087 / +0.00097 [-0.00040, +0.00065]; +0.00016 / -0.00085 / +0.00132; -0.00126 / -0.00079 / +0.00241 (against `final-half-cpu3-alone`) | **+0.00025 / +0.00046 / +0.00092 [+0.00001, +0.00108]; +0.00025 / +0.00073 / +0.00127 [+0.00018, +0.00137]**; -0.00063 / +0.00116 / +0.00199 (against `final-half-cpu3`, 98 train rows) |
+
+The production-counter month folds put the held-out month on the same full-density pass as the
+fit months: the same mismatch as the held cells, in the other direction for (b). The bar is met
+on the October-density cells and on the October-density month folds, and missed on the
+production-counter month folds by construction.
+
+The baselines of the October-density month folds: champion 0.5130 / 0.5090 / 0.5146 (production)
+-> 0.5107 / 0.5081 / 0.5128 (standalone); best recipe with refitted XGBoost members 0.5137 /
+0.5093 / 0.5150 (production) -> 0.5114 / 0.5078 / 0.5128 (October's density; LightGBM, CatBoost
+and TabM keep their production-counter arrays there, so this understates the month-fold
+overstatement).
+
+Second training draw and TabM (cells under the rebuilt counter, given / cleaned / gen-only):
+
+| comparison | per seed, given | mean [95 %] | rows per cell |
+|---|---|---|---|
+| champion trained on draw 1 vs production-trained | +0.00142 / +0.00281 / +0.00057 | +0.00160 [+0.00063, +0.00273]; +0.00154 [+0.00058, +0.00264]; +0.00021 [-0.00119, +0.00182] | 26 / 39 / 22 |
+| draw 1 vs draw 0 | -0.00044 / -0.00086 / -0.00074 | -0.00068 [-0.00162, +0.00020]; -0.00083 [-0.00190, +0.00010]; -0.00189 [-0.00344, -0.00063] | 20 / 19 / 23 |
+| TabM refitted on the RTX 4060 vs the L4 fit (same recipe, s13) | -0.00246 | -0.00246 [-0.00364, -0.00141]; -0.00249; -0.00260 | 25 |
+| TabM trained at October's density vs TabM, both RTX 4060 (s13 only) | +0.00443 | +0.00443 [+0.00276, +0.00632]; +0.00464 [+0.00289, +0.00667]; +0.00502 [+0.00262, +0.00867] | 57 |
+
+The gain from training at October's density holds on a second split of the training months
+(draw 1 is a little smaller than draw 0). TabM's rebuilt-counter cell moves by 0.0025 between
+two GPUs, so TabM comparisons stay on one device; on one device and one frame, TabM trained at
+October's density gains +0.0044.
+
+### Verdicts and candidate
+
+- Step 1: the held counter overstated the best recipe by 0.0035 given / 0.0039 cleaned / 0.0030
+  gen-only per October-like cell (and the champion's month folds by 0.0009 to 0.0023 given).
+- (a) `ctr_pos` dropped: **rejected** (champion loses on every seed under the rebuilt counter).
+- (b) chalf3 (champion, clean-event, clean-l2 trained at October's density): **passes** the
+  October-density cells (lower bounds +0.00072 given, +0.00076 cleaned) and the October-density
+  month folds (given and cleaned positive in every month); **fails** the production-counter month
+  folds (every month -0.0003 to -0.0006), which put the held-out month on the shared full-density
+  pass like the held cells. chalf0 (champion only) is a tie (1 October row).
+- Candidate `C:/Users/ameya/Documents/GradientAscent-local/outputs/candidates/density-half3.csv`
+  (`recipes/density/final-half-chalf3b.json` over `blend-tabmF-bq.csv`'s member arrays), sha256
+  `d34f9386508b66f1ade7ff382994b2ba32114a8188aef0b2db3b64cf35edea6f`, VALID against the sample
+  submission, 11 October rows changed against `blend-tabmF-bq.csv`: sim_swap -> account_takeover
+  8, velocity_bot -> mule_account 1, qr_swap -> phishing_collect 1, qr_swap -> refund_abuse 1.
+  October calls: legit 256,609, mule 790, bot 317, chain 556, sim 363, takeover 238, phishing 503,
+  qr 528, refund 287, cashback 207, loan 100, collusion 84.
+
+Commands (box, `RINGTRACE_OUT=~/outputs/dlane`): cells
+`python -m ringtrace.density cells <member>:0 --seeds <s> --recipes recipes/density
+[--tag=-half0 --train-counter half0]`; month folds `python -m ringtrace.density lomo
+recipes/density/<member>.json --name density-<member>[-half0] [--train-counter half0]`; jobs
+through `bash scripts/density_queue.sh <queue> 2 <logs> cuda`; gates
+`bash scripts/density_gate.sh step1|rule|nopos|half|tabm|tabm-lomo|lomo`; the candidate
+`python -m ringtrace.final build recipes/density/final-half-chalf3b.json --out <dir> --against
+blend-tabmF-bq.csv`. Wall: GPU cells 3.5 to 18 min each (the GPU was shared with other jobs for
+part of the run), month folds 15 to 60 min, a cell gate 3 to 5 min and a month-fold table about
+9 min at 2 threads.
+
+Not run (time): no-position variants of clean-event, clean-l2, LightGBM and CatBoost; the
+champion's no-position month folds (stopped by GPU memory while TabM trained); LightGBM and
+CatBoost at October's density; draw 1 for clean-event and clean-l2 and all draw-1 month folds;
+the October-mix frames. Still running on the box after this entry (one job at a time, ends about
+01:00 IST): TabM at October's density on s14 and s15, TabM refitted on this GPU for s14 and s15,
+then the month folds `density-tabm-half0` and `density-tabm`; then
+`bash scripts/density_gate.sh tabm` and `tabm-lomo`, and the file of
+`recipes/density/final-half-chalf3t.json`.

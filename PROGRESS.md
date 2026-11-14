@@ -58,7 +58,14 @@ counter-anchored template rule.
 - Jobs: `scripts/density_queue.sh <queue> 2 <logs> cuda`, gates `scripts/density_gate.sh <step>`.
 - Results and verdicts: RESULTS.md, "Density: the counter at October's density";
   `docs/findings/density-counter.md`.
-- Dropped for time (GPU shared with other work): the no-position variants of clean-event,
-  clean-l2, LightGBM and CatBoost (cells and month folds); the second half-density draw; the
-  October-mix frames; TabM with the half-density training counter and TabM month folds under the
-  rebuilt counters.
+- Verdicts (14 Nov): the held counter overstated the best recipe by 0.0035 given per cell;
+  (a) dropping `ctr_pos` rejected; (b) the three XGBoost members trained at October's density pass
+  the October-density cells and month folds and fail the production-counter month folds
+  (candidate `candidates/density-half3.csv`, 11 October rows).
+- Not run for time: the no-position variants of clean-event, clean-l2, LightGBM and CatBoost and
+  the champion's no-position month folds; LightGBM and CatBoost at October's density; the second
+  draw beyond the champion's cells; the October-mix frames.
+- [ ] TabM at October's density: one like-for-like frame gains +0.0044 given. Queued on the box:
+      TabM half0 cells s14 and s15, TabM refitted on the same GPU for s14 and s15, month folds
+      `density-tabm-half0` and `density-tabm`; then `bash scripts/density_gate.sh tabm` and
+      `tabm-lomo`, and build `recipes/density/final-half-chalf3t.json`.
