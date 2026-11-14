@@ -642,3 +642,43 @@ augmentation never loses there, but it has no full run, so it has no arrays to g
 - 2026-11-14 03:20 IST: every arrived component judged; `recipes/final.json` unchanged since
   02:15 (`final.csv` sha256 `39cb4952...4db3`).
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+### festival (commits bd37713, 734eece; fits on an RTX 4060, 3-9 min each): October's amounts and class mix
+
+Finding: `docs/findings/festival-shift-and-class-mix.md`. Scaled ledgers from
+`python -m ringtrace.festival` (ordinary rows x1.166, balances x1.02, each roundness class
+kept, equal amounts kept equal, balance ceiling kept); aggregates from
+`analysis/festival_check.py` match October's called-legit rows (round shares exact; quantile
+ratios 1.00-1.02; amount/balance above 0.3: 0.170 against 0.174; none above the balance).
+
+Shift test, champion recipe, after the fixed point and the template rule (baseline refitted the
+same way on the same GPU):
+
+| run | given | cleaned | gen-only | wall |
+|---|---|---|---|---|
+| fold 9 unscaled (`augment-base-fold-9`) | 0.51455 | 0.57120 | 0.90144 | 191 s |
+| fold 9, September scaled (`augment-fest9-fold-9`) | +0.00003 | -0.00006 | -0.00010 | 539 s |
+| fold 9, scaled without the balance ceiling (`augment-fest9nocap-fold-9`) | -0.00259 | -0.00288 | -0.00707 | 506 s |
+| fold 8 unscaled (`augment-base-fold-8`) | 0.50897 | 0.56389 | 0.89960 | 293 s |
+| fold 8, August scaled (`augment-fest8-fold-8`) | -0.00016 | -0.00009 | +0.00011 | 536 s |
+
+- The loss without the ceiling comes from 718 ordinary rows pushed past their balance (refund
+  calls 606 -> 690, phishing 950 -> 992 on September). October has no such rows.
+- With the ceiling, the cost is under 0.0005 in both folds: the festival line stops, and training
+  on scaled months is not run.
+
+Prior correction of the best file's out-of-fold probabilities (`analysis/augment_em.py --draws 8`,
+226 s on the laptop; months also resampled by unit to October's estimated mix). Change against no
+correction, Jul / Aug / Sep:
+
+| correction | plain given | plain cleaned | resampled given (8 draws) | resampled cleaned | October rows | verdict |
+|---|---|---|---|---|---|---|
+| EM prior | -0.00061 / -0.00007 / +0.00005 | -0.00088 / -0.00013 / +0.00005 | -0.00029 / +0.00015 / +0.00025 | -0.00048 / +0.00021 / +0.00025 | 20 | rejected |
+| EM prior, type split only | -0.00058 / -0.00013 / +0.00004 | -0.00084 / -0.00019 / +0.00003 | -0.00019 / +0.00017 / +0.00015 | -0.00039 / +0.00024 / +0.00010 | 10 | rejected |
+| October's ratios | -0.00004 / +0.00000 / +0.00008 | -0.00001 / -0.00001 / +0.00007 | +0.00007 / +0.00015 / +0.00025 | +0.00013 / +0.00021 / +0.00024 | 6 | rejected (July < 0; 6 rows) |
+| October's ratios, type split only | -0.00003 / 0 / +0.00004 | -0.00003 / 0 / +0.00004 | +0.00011 / +0.00016 / +0.00014 | +0.00014 / +0.00023 / +0.00015 | 7 | rejected (July < 0; 7 rows) |
+
+- EM's prior estimate is noise: 0.51-2.28 times the reference on months whose true ratio is 1.
+- Even the exact mix moves about 8 rows per resampled month and 6 October rows, so class-mix
+  training weights (bounded by the same shift, through one member) were not run.
+- 2026-11-14 16:10 IST: no candidate from this line; the best file stands.
