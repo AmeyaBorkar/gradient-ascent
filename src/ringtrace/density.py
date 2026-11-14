@@ -439,6 +439,143 @@ def lomo(recipe_path: Path, name: str, log=print) -> dict:
 
 
 # ---------------------------------------------------------------------------------------------
+# gates: the October-like cells under either counter, and month folds with the standalone counter
+
+
+def paired_draws(units, truth, pred_a, pred_b, draws: int, seed: int) -> tuple[float, np.ndarray]:
+    """Point change and Poisson-bootstrap draws of macro-F1(b) - macro-F1(a) over units."""
+    import scipy.sparse as sp
+
+    from ringtrace.compare import _counts, _macro
+
+    _, g = np.unique(units, return_inverse=True)
+    ng = int(g.max()) + 1
+    ca, cb = _counts(g, truth, pred_a, ng), _counts(g, truth, pred_b, ng)
+    rng = np.random.default_rng(seed)
+    w = sp.csr_matrix(rng.poisson(1.0, size=(draws, ng)).astype(np.float64))
+    d = _macro(np.asarray((w @ cb).todense())) - _macro(np.asarray((w @ ca).todense()))
+    one = np.ones((1, ng))
+    point = float(_macro(np.asarray(one @ cb))[0] - _macro(np.asarray(one @ ca))[0])
+    return point, d
+
+
+def cell_calls(recipe: dict, cells_dir: Path, seed: int, r: int, frame) -> np.ndarray:
+    """September calls of a final recipe from its members' cells, decoded under the counter the
+    store currently serves (fixed point, rules, base-rate rules)."""
+    from ringtrace import final, octlike
+    from ringtrace import rules as rulebook
+
+    rows, probs = None, []
+    for m in recipe["members"]:
+        f = np.load(Path(cells_dir) / f"{m['cells']}_s{seed}_r{r}.npz")
+        if rows is None:
+            rows = f["rows"]
+        elif not np.array_equal(rows, f["rows"]):
+            raise ValueError(f"{m['cells']}: rows differ in s{seed} r{r}")
+        probs.append(f["prob"].astype(np.float64))
+    if not np.array_equal(rows, frame.stacked[frame.hold]):
+        raise ValueError(f"cells s{seed} r{r} do not match the frame")
+    p = final.mix(probs, final.static_weights(recipe), [m["role"] for m in recipe["members"]])
+    pred = octlike.decode(frame, p, recipe["decoder"], recipe["rules"])
+    if recipe["base_rate_rules"]:
+        hold = np.flatnonzero(frame.hold)
+        full_pred = np.zeros(frame.led.height, dtype=np.int64)
+        full_pred[hold] = pred
+        full_p = np.zeros((frame.led.height, p.shape[1]))
+        full_p[hold] = p
+        names = [
+            {k: v for k, v in x.items() if k != "max_october_rows"}
+            for x in recipe["base_rate_rules"]
+        ]
+        pred = rulebook.apply(names, full_pred, full_p, frame.led, log=lambda *_: None)[hold]
+    return pred
+
+
+def cell_gate(
+    sides: list[tuple[dict, Path, str]],
+    seeds: list[int],
+    sets: list[int],
+    draws: int = 2000,
+    log=print,
+) -> dict:
+    """Side b against side a in every cell; a side is (final recipe, cells dir, counter), the
+    counter "held" or "honest". Per-seed mean change, the pooled 95 % bounds of the mean change
+    over the cells, and the scores of both sides."""
+    from ringtrace import octlike, store
+    from ringtrace.scoring import macro_f1
+
+    (ra, da, ca), (rb, db, cb) = sides
+    line = _production_line()
+    cells: dict = {}
+    pooled: dict = {}
+    for seed in seeds:
+        honest = honest_phones(seed, line, log)
+        frame = octlike.Frame(seed)
+        held = store.family("phones")
+        key = store._KEY
+        units = frame.unit[frame.hold]
+        truth = {t: v[frame.hold] for t, v in frame.targets.items()}
+        for r in sets:
+            out = []
+            for rec, d, counter in ((ra, da, ca), (rb, db, cb)):
+                ph = honest if counter == "honest" else held
+                store.use_frame(frame.led, key=key, fixed={"phones": ph})
+                out.append(cell_calls(rec, d, seed, r, frame))
+            store.use_frame(frame.led, key=key, fixed={"phones": held})
+            ya, yb = out
+            cell: dict = {"rows_changed": int((ya != yb).sum())}
+            for t, yt in truth.items():
+                point, dr = paired_draws(units, yt, ya, yb, draws, seed * 100 + r)
+                pooled.setdefault(t, []).append(dr)
+                cell[t] = {"a": macro_f1(yt, ya), "b": macro_f1(yt, yb), "delta": point}
+            cells[(seed, r)] = cell
+            log(
+                f"[density] cell s{seed} r{r}: "
+                + ", ".join(f"{t} {cell[t]['delta']:+.5f}" for t in truth)
+                + f" ({cell['rows_changed']} rows)"
+            )
+    store.use_frame(None)
+    tg = list(pooled)
+    rep = {
+        "a": [ra["name"], str(da), ca],
+        "b": [rb["name"], str(db), cb],
+        "per_seed": {
+            t: {
+                s: float(np.mean([v[t]["delta"] for (s2, _), v in cells.items() if s2 == s]))
+                for s in seeds
+            }
+            for t in tg
+        },
+        "mean": {t: float(np.mean([v[t]["delta"] for v in cells.values()])) for t in tg},
+        "lower_bound": {t: float(np.percentile(np.mean(pooled[t], axis=0), 2.5)) for t in tg},
+        "upper_bound": {t: float(np.percentile(np.mean(pooled[t], axis=0), 97.5)) for t in tg},
+        "a_mean": {t: float(np.mean([v[t]["a"] for v in cells.values()])) for t in tg},
+        "b_mean": {t: float(np.mean([v[t]["b"] for v in cells.values()])) for t in tg},
+        "cells": {f"s{s}_r{r}": v for (s, r), v in cells.items()},
+    }
+    for t in tg:
+        log(
+            f"[density] {t:<8} a {rep['a_mean'][t]:.4f} b {rep['b_mean'][t]:.4f} per seed "
+            + " / ".join(f"{v:+.5f}" for v in rep["per_seed"][t].values())
+            + f"  mean {rep['mean'][t]:+.5f} [{rep['lower_bound'][t]:+.5f}, "
+            f"{rep['upper_bound'][t]:+.5f}]"
+        )
+    return rep
+
+
+def standalone_bench(runs_dir: Path, log=print):
+    """A ``final.Bench`` whose rules read every train month's standalone counter (point its
+    recipes at runs that hold the standalone predictions)."""
+    from ringtrace import final
+
+    bench = final.Bench.from_store(runs_dir, None, log=log)
+    alone_ph = lomo_phones(log=log)
+    cols = [c for c in bench.led.columns if c.startswith(CTR)]
+    bench.led = bench.led.with_columns([alone_ph[c] for c in cols])
+    return bench
+
+
+# ---------------------------------------------------------------------------------------------
 # the check: how far the rebuilt counter moves from the held one
 
 
@@ -511,6 +648,17 @@ def main(argv=None):
     lo = sub.add_parser("lomo")
     lo.add_argument("recipe")
     lo.add_argument("--name", required=True)
+    g = sub.add_parser("cellgate", help="side b against side a on the October-like cells")
+    g.add_argument("a", help="recipe.json:cells_dir:held|honest")
+    g.add_argument("b", help="recipe.json:cells_dir:held|honest")
+    g.add_argument("--seeds", default="13,14,15")
+    g.add_argument("--sets", default="0")
+    g.add_argument("--draws", type=int, default=2000)
+    g.add_argument("--report", required=True)
+    t = sub.add_parser("table", help="final.table on the month folds, standalone counter rules")
+    t.add_argument("recipes", nargs="+")
+    t.add_argument("--draws", type=int, default=2000)
+    t.add_argument("--report", required=True)
     args = ap.parse_args(argv)
     if args.cmd == "check":
         return check(_ints(args.seeds))
@@ -520,7 +668,27 @@ def main(argv=None):
             name, _, sets = spec.partition(":")
             cells.append((name, _ints(sets) if sets else [0]))
         return fit_cells(_ints(args.seeds), cells, Path(args.recipes), args.tag)
-    return lomo(Path(args.recipe), args.name)
+    if args.cmd == "lomo":
+        return lomo(Path(args.recipe), args.name)
+    from ringtrace import final
+
+    if args.cmd == "cellgate":
+        sides = []
+        for spec in (args.a, args.b):
+            rec, d, counter = spec.rsplit(":", 2)
+            if counter not in ("held", "honest"):
+                raise ValueError(f"counter must be held or honest: {spec}")
+            sides.append((final.load_recipe(rec), Path(d), counter))
+        rep = cell_gate(sides, _ints(args.seeds), _ints(args.sets), args.draws)
+        Path(args.report).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.report).write_text(json.dumps(rep, indent=1))
+        return rep
+    bench = standalone_bench(paths.out_dir() / "runs")
+    recipes = [final.load_recipe(p) for p in args.recipes]
+    rep = final.table(bench, recipes[0], recipes[1:], args.draws, 1000)
+    Path(args.report).parent.mkdir(parents=True, exist_ok=True)
+    Path(args.report).write_text(json.dumps(rep, indent=1, default=final._json_default))
+    return rep
 
 
 if __name__ == "__main__":

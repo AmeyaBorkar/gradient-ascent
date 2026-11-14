@@ -134,3 +134,17 @@ def test_swap_counter_takes_only_counter_columns():
     assert out[:, 1].tolist() == [11.0, 13.0]
     assert out[:, 0].tolist() == [3.0, 9.0]
     assert X[1, 1] == 4.0  # the input is untouched
+
+
+def test_paired_draws_is_zero_for_equal_calls_and_signs_a_gain():
+    rng = np.random.default_rng(4)
+    truth = rng.integers(0, 3, 400)
+    units = rng.integers(0, 120, 400)
+    pred = truth.copy()
+    pred[:80] = (truth[:80] + 1) % 3
+    point, draws = density.paired_draws(units, truth, pred, pred, 50, 0)
+    assert point == 0.0 and np.all(draws == 0.0)
+    better = pred.copy()
+    better[:40] = truth[:40]
+    point, draws = density.paired_draws(units, truth, pred, better, 200, 0)
+    assert point > 0 and np.mean(draws > 0) > 0.95
