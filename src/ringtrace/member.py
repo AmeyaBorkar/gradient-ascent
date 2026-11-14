@@ -1,6 +1,7 @@
 """Seed-by-seed cascade fits: one set of fits serves several seed subsets of the same recipe.
 
     python -m ringtrace.member lomo <recipe> --seeds 0-4 --as member-cut04=0-2 --as member-x5=0-4
+        [--folds 7]            # fit one held-out month only (one job per fold)
     python -m ringtrace.member cells <recipe> --frames 13,14,15 --seeds 0-14 \\
         --as member-cut04=0-2/3-5/6-8 --as member-x5=0-4/5-9/10-14 --cells <dir>
 
@@ -183,7 +184,9 @@ def write_run(name: str, recipe: dict, oof_tr, test, led, log=print) -> dict:
     return report
 
 
-def lomo(recipe_path: str, seeds, outputs: dict, log=print) -> dict:
+def lomo(recipe_path: str, seeds, outputs: dict, folds=TRAIN_MONTHS, log=print) -> dict:
+    """Fit the held-out months in ``folds`` (the others are left as stored, so several jobs can
+    fit one fold each); write each output once every fold of it is stored."""
     from ringtrace import run as runner
     from ringtrace import store
 
@@ -200,7 +203,7 @@ def lomo(recipe_path: str, seeds, outputs: dict, log=print) -> dict:
     tr_idx, te_idx = np.flatnonzero(~is_test), np.flatnonzero(is_test)
     st = SeedStore(paths.out_dir() / "member" / recipe["name"] / "lomo")
     log(f"[member] {recipe['name']}: {len(cols)} features, seeds {list(seeds)}")
-    for m in TRAIN_MONTHS:
+    for m in folds:
         fit = tr_idx[period[tr_idx] != m]
         hold = tr_idx[period[tr_idx] == m]
         log(f"fold {m}: train {len(fit)} rows, hold {len(hold)} ({time.time() - t0:.0f}s)")
@@ -218,6 +221,11 @@ def lomo(recipe_path: str, seeds, outputs: dict, log=print) -> dict:
     del X
     reports = {}
     for name, (sub,) in outputs.items():
+        if not all(
+            st.has(f"{k}{m}", s) for m in TRAIN_MONTHS for k in ("hold", "oct") for s in sub
+        ):
+            log(f"[member] {name}: not every fold is stored yet, not written")
+            continue
         oof = np.zeros((len(y), N_CLASSES), dtype=np.float64)
         test_sum = np.zeros((len(te_idx), N_CLASSES), dtype=np.float64)
         for m in TRAIN_MONTHS:
@@ -301,6 +309,7 @@ def main(argv=None):
     lo = sub.add_parser("lomo")
     lo.add_argument("recipe")
     lo.add_argument("--seeds", required=True)
+    lo.add_argument("--folds", default="7,8,9", help="held-out months to fit in this job")
     lo.add_argument("--as", dest="outputs", action="append", default=[], required=True)
     ce = sub.add_parser("cells")
     ce.add_argument("recipe")
@@ -315,7 +324,10 @@ def main(argv=None):
     if missing:
         raise SystemExit(f"outputs use seeds that are not fitted: {sorted(missing)}")
     if a.cmd == "lomo":
-        return lomo(a.recipe, seeds, outputs)
+        folds = parse_seeds(a.folds)
+        if not set(folds) <= set(TRAIN_MONTHS):
+            raise SystemExit(f"folds must be among {TRAIN_MONTHS}")
+        return lomo(a.recipe, seeds, outputs, folds)
     return cells(a.recipe, parse_seeds(a.frames), seeds, outputs, Path(a.cells))
 
 
