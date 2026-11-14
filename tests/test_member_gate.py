@@ -59,8 +59,8 @@ def test_gate_groups_load_and_read_the_gpu_built_member():
                 m["cells"] == m["run"] or m["run"] in ("blend-champion-m1", "final-tabm")
                 for m in r["members"]
             )
-    assert "member-cut04" in runs
-    assert not runs & {"member-x5", "member-cut04-cpu", "champion-cpu", "member-x5-cpu"}
+    assert {"member-cut04", "member-x5"} <= runs
+    assert not runs & {"member-cut04-cpu", "champion-cpu", "member-x5-cpu"}
 
 
 def test_load_renames_the_tabm_run():

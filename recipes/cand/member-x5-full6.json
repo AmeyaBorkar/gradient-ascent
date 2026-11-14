@@ -1,0 +1,72 @@
+{
+ "name": "member-x5-full6",
+ "members": [
+  {
+   "name": "champion",
+   "run": "blend-champion-m1",
+   "variant": "fold",
+   "cells": "champion"
+  },
+  {
+   "name": "lgbm",
+   "run": "lgbm",
+   "variant": "fold",
+   "cells": "lgbm"
+  },
+  {
+   "name": "catboost",
+   "run": "catboost",
+   "variant": "fold",
+   "cells": "catboost"
+  },
+  {
+   "name": "clean-event",
+   "run": "clean-event",
+   "variant": "fold",
+   "cells": "clean-event"
+  },
+  {
+   "name": "clean-l2",
+   "run": "clean-l2",
+   "variant": "fold",
+   "cells": "clean-l2"
+  },
+  {
+   "name": "tabm",
+   "run": "final-tabm",
+   "variant": "fold",
+   "cells": "tabm",
+   "role": "fraud"
+  },
+  {
+   "name": "member",
+   "run": "member-x5",
+   "variant": "fold",
+   "cells": "member-x5"
+  }
+ ],
+ "weights": {
+  "mode": "fixed",
+  "values": {
+   "champion": 1,
+   "lgbm": 1,
+   "catboost": 1,
+   "clean-event": 1,
+   "clean-l2": 1,
+   "tabm": 6,
+   "member": 1
+  }
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ],
+ "base_rate_rules": [
+  {
+   "name": "blank_merchant_qr",
+   "max_october_rows": 40
+  }
+ ]
+}

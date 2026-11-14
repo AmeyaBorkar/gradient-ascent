@@ -7,7 +7,8 @@
 
 ``gate`` scores each group of ``GROUPS`` against its base with ``ringtrace.final.table``: the
 blend candidates (the member as a sixth tree in the type split, in the fraud mass, in both, and
-in place of the champion) against ``recipes/final-half.json``, and the 0.04 cut alone against the
+in place of the champion) against ``recipes/final-half.json``, the same four with the five-seed
+member (seeds 0-4, cells from seeds 0-4 / 5-9 / 10-14), and the 0.04 cut alone against the
 champion alone. The member's fits are GPU fits made the way the champion's were (the champion's
 seeds refitted on the same device give its saved cells byte for byte), so the saved champion is
 the like-for-like base. Each table has the per-month change on the given, cleaned and gen-only
@@ -51,6 +52,11 @@ GROUPS = (
             C + "member-full6.json",
             C + "member-swap.json",
         ),
+    ),
+    (
+        "blend-x5",
+        BASE,
+        tuple(C + f"member-x5-{r}.json" for r in ("type6", "mass6", "full6", "swap")),
     ),
     ("solo", C + "member-solo-champion.json", (C + "member-solo-cut04.json",)),
 )
