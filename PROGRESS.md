@@ -37,11 +37,17 @@ TabM fitted on the same machine (`<job>-base-sd0`).
 | shift reweighting toward the scored rows | box GPU | rejected, near-miss: positive in s13-15 on 1-5 calls, sep -0.2 |
 | REINFORCE macro-F1 term | laptop GPU | rejected: sep -0.4, s13 -1.9 |
 | TabM on generator-only labels | box GPU | rejected: -12 to -22 given, +15 to +30 gen-only |
-| entity ablations (pooled history alone, embeddings alone) | box / laptop GPU | fitting |
+| entity ablation: pooled history alone | box GPU | rejected: sep -0.8 (5 calls), s13-15 +0.0 to +0.5 (2 calls each) |
+| entity ablation: embeddings alone | laptop GPU | rejected: -2.6 to -16.7 in every cell; the embeddings do the damage |
 
 Numbers are in `RESULTS.md` ("Neural techniques, second screen"), and each technique has a
 finding in `docs/findings/nn-*.md`. Nothing passed, so nothing was promoted and no October file
 was written.
+
+Now running: seeds 1 and 2 of `shift` (box) and of SWA (laptop), each with a base of the same
+seed on the same GPU, and the scores of two plain averages as the fraud-mass source (seven seed-0
+variants, and base + SWA + shift). Each average is judged against the seed-0 base and against
+the 3-seed TabM the blend uses.
 
 Current best idea: none from this screen. No neural training technique moves more than a few
 dozen October-like calls in the fraud-mass role without losing on given labels.
