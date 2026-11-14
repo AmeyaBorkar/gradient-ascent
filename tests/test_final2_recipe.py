@@ -31,9 +31,27 @@ def test_final2_is_bait_rules_on_the_density_members():
     assert final.recipe_key(f2) not in {final.recipe_key(r) for r in (best, bait, half3)}
 
 
-@pytest.mark.parametrize("rel", ["recipes/final2/cpu3-bait.json", "recipes/final2/r1-bait.json"])
-def test_gate_baselines_carry_the_bait_rules(rel):
+@pytest.mark.parametrize(
+    "rel",
+    [
+        "recipes/final2/cpu3-bait.json",
+        "recipes/final2/r1-bait.json",
+        "recipes/final2/bait-half3t.json",
+        "recipes/final2/bait-half3-t4060.json",
+    ],
+)
+def test_gate_recipes_carry_the_bait_rules(rel):
     bait = _load("recipes/bait-combo.json")
     r = _load(rel)
     assert r["rules"] == bait["rules"]
     assert r["base_rate_rules"] == bait["base_rate_rules"]
+
+
+def test_tabm_follow_up_differs_from_its_baseline_in_tabm_only():
+    a = _load("recipes/final2/bait-half3-t4060.json")
+    b = _load("recipes/final2/bait-half3t.json")
+    f2 = _load("recipes/final2.json")
+    diff = {x["name"] for x, y in zip(a["members"], b["members"], strict=True) if x != y}
+    assert diff == {"tabm"}
+    trees = [m for m in f2["members"] if m["name"] != "tabm"]
+    assert [m for m in b["members"] if m["name"] != "tabm"] == trees

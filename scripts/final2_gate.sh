@@ -2,7 +2,7 @@
 # Joint gate of the final file: the bait rules and the three XGBoost members trained on the
 # device counter at October's density, together on the best recipe. From saved arrays and cells
 # only (no refits).
-#   bash scripts/final2_gate.sh [prod|half0|cells|held|build|all]
+#   bash scripts/final2_gate.sh [prod|half0|cells|held|build|all|tabm]
 # Inputs under $RINGTRACE_OUT: the member runs (runs/<run>/, with runs/<run>-at-half0/ for the
 # month folds predicted at October's density) and the October-like cells
 # (density/cells-honest, density/cells-held) of `python -m ringtrace.density cells`.
@@ -55,6 +55,15 @@ if [[ "$what" == held || "$what" == all ]]; then
     --report "$G/cells-held-joint.json"
   cellgate "$D/final-half-cpu3.json:$H:held" "$F/cpu3-bait.json:$H:held" \
     --report "$G/cells-held-bait.json"
+fi
+
+if [[ "$what" == tabm ]]; then
+  # follow-up, once TabM trained at October's density has its cells and month folds
+  # (runs density-tabm, density-tabm-half0; cells tabm-4060, tabm-half0): both arms on one GPU
+  cellgate "$F/bait-half3-t4060.json:$N:honest" "$F/bait-half3t.json:$N:honest" \
+    --seeds "${TABM_SEEDS:-13,14,15}" --report "$G/cells-honest-tabm.json"
+  half "$F/bait-half3-t4060.json" "$F/bait-half3t.json" --report "$G/half0-tabm.json"
+  lomo "$F/bait-half3-t4060.json" "$F/bait-half3t.json" --report "$G/prod-tabm.json"
 fi
 
 if [[ "$what" == build || "$what" == all ]]; then
