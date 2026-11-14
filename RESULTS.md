@@ -642,3 +642,33 @@ augmentation never loses there, but it has no full run, so it has no arrays to g
 - 2026-11-14 03:20 IST: every arrived component judged; `recipes/final.json` unchanged since
   02:15 (`final.csv` sha256 `39cb4952...4db3`).
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+## Event completion survey (commit e4a8b25, about 5 s)
+
+`python analysis/events.py all` over the best file's calls (`blend-tabmF-bq`, out of fold on the
+train months). Finding: `docs/findings/events-completion-survey.md`.
+
+- Label-free evidence events called in part: 1 / 0 / 1 per month (1 / 0 / 1 legit rows), 0 in
+  October; every other event is called whole or not at all.
+- Legit-called non-generator rows linked to a fraud call: cleaned fraud share 0.010 to 0.083
+  (base 0.023), same class as the anchor 0 to 0.083 (0.0016 to 0.0045 on cells above 20 rows);
+  October volume per 100k 0.42 to 0.57 times train (half-volume month: 0.494).
+- Evidence share on single-row fraud-block devices: 0.325 / 0.323 / 0.335, October 0.338.
+- Clean-label F1 ceiling of calling exactly the generator-made rows: 0.569 macro.
+
+Completion rules (linked row takes the anchor's class), change against the best file, Jul / Aug /
+Sep:
+
+| rule | rows train / Oct | given | cleaned | gen-only | verdict |
+|---|---|---|---|---|---|
+| sender 10 min | 32 / 3 | -0.00012 / -0.00012 / -0.00020 | -0.00013 / -0.00013 / -0.00022 | -0.00040 / -0.00037 / -0.00065 | rejected |
+| sender 1 h | 187 / 16 | -0.00065 / -0.00109 / -0.00104 | -0.00070 / -0.00120 / -0.00114 | -0.00198 / -0.00357 / -0.00332 | rejected |
+| device 1 h | 158 / 15 | -0.00054 / -0.00096 / -0.00087 | -0.00059 / -0.00105 / -0.00095 | -0.00173 / -0.00315 / -0.00272 | rejected |
+| person receiver 1 h | 12 / 2 | -0.00007 / +0.00001 / -0.00005 | -0.00007 / +0.00001 / -0.00006 | -0.00019 / -0.00011 / -0.00015 | rejected |
+| person receiver 24 h | 382 / 31 | -0.00196 / -0.00185 / -0.00210 | -0.00211 / -0.00201 / -0.00228 | -0.00555 / -0.00567 / -0.00630 | rejected |
+| onward 1 h | 36 / 3 | -0.00016 / -0.00017 / -0.00015 | -0.00017 / -0.00018 / -0.00016 | -0.00046 / -0.00051 / -0.00048 | rejected |
+| onward 24 h | 663 / 57 | -0.00341 / -0.00331 / -0.00365 | -0.00368 / -0.00363 / -0.00400 | -0.01003 / -0.01065 / -0.01129 | rejected |
+| back 24 h | 400 / 28 | -0.00212 / -0.00194 / -0.00186 | -0.00230 / -0.00213 / -0.00204 | -0.00699 / -0.00652 / -0.00615 | rejected |
+
+No candidate file: nothing passes, and October-like was not run for rules that lose on every
+train month.

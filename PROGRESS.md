@@ -40,3 +40,8 @@ counter-anchored template rule.
 - [ ] The blind-spot rule: a label-free rule that calls generator-made rows the champion calls
       legit, adopted only if it never loses on leave-one-month-out and the October-like cells.
 - [ ] Finish the leave-one-family-out ablations left over in run 14.
+- [x] Event completion survey (`python analysis/events.py all`,
+      `docs/findings/events-completion-survey.md`): evidence events are called whole, rows
+      linked to fraud calls are fraud at the base rate, every completion rule loses in every
+      month; October shows no excess of linked rows and recognises its fraud pass as well as
+      train. Structure-only clean-label ceiling 0.569. No candidate.
