@@ -93,11 +93,58 @@ small classes have few zone rows. Within that error, the October picture holds:
 The per-class estimates for October are mule 0.46, bot 0.42, layering 0.59, sim 0.60, takeover
 0.49, phishing 0.49, qr 0.59, refund 0.68, cashback 0.45, loan 0.59, collusion 0.32.
 
-**Verdict.** No candidate. `velocity_bot` and `layering_chain` are saturated on every row the data
+## One misplaced edge: the mule/bot cut on the device counter
+
+The counter HMM decodes each split's fraud phase separately. October's mule zone is 1.21 times
+train's share of the phase (positions 0 to 0.193, against 0 to 0.159). That matches the October
+mule event volume (1.24 to 1.28 times). The other zones keep 0.81 to 1.11 times their train
+share.
+
+The model calls 10 October single-row zone devices `velocity_bot` although the HMM puts them in
+the mule segment (posterior 0.86 to 0.96). They sit at positions 0.164 to 0.188. In train the
+model learned the exact edge (the first bot row is at 0.1563) from the one fraud phase that all
+three train months share. Out-of-fold scoring therefore never tests whether a position cut
+transfers to a new phase.
+
+Which reading is right?
+
+- **For the HMM (mule).** The band from 0.156 to 0.196 holds 4 mule-template anchored devices
+  per 12 zone rows in October. That density (0.33) is close to October's mule zone (0.36) and
+  far above the start of train's bot zone (4 per 85, 0.047). At the train density,
+  P(>= 4 anchors) is about 0.003. Under the bot reading, these four events would be bot-written
+  fan-ins, and the model calls all four mule anyway.
+- **For the model (bot).** With the HMM reading, ordinary mule zone rows run at 1.46 times train
+  and bot at 1.04. With the model's reading they run at 1.20 and 1.41. Ordinary counts per class
+  are otherwise flat (about 1.08 times), which favours the model's reading by about 2 to 1.
+- **Combined.** The HMM reading is favoured by roughly 40 to 1.
+
+The probe `velocity-muleedge` moves the 10 rows from bot to mule. On the train months the same
+rule changes 6 rows, all at the true edge and all truly bot. It loses there:
+
+| target | Jul | Aug | Sep |
+|---|---|---|---|
+| given | -0.00004 | -0.00008 | -0.00012 |
+| cleaned | -0.00003 | -0.00008 | -0.00012 |
+| gen-only | +0.000001 | +0.00001 | +0.00001 |
+
+So it fails the bar and is a hypothesis probe only. It needs one assumption: October's zone edges
+moved with its class mix. The evidence for that is the zone shares and the anchor density
+above.
+
+Expected full-October change: about +0.0007 if the HMM is right and -0.0011 if not, so about
++0.0006 at 40 to 1. The public slice holds about 3 of the 10 rows, so a public upload cannot
+resolve it.
+
+**Verdict.** No upload candidate. `velocity_bot` and `layering_chain` are saturated on every row the data
 marks. Their October call rates are real changes in event volume (bot bursts 0.5 times,
 fan-ins down, slow chains up). They are not drift and not missed events. A score above our
 ceiling must come from the ordinary-looking rows, which these two classes cannot reach.
 
+The mule/bot edge probe is the only disagreement left between
+the calls and the counter. It is worth about +0.0006 in expectation and is not testable on the
+train months.
+
 **Command.** `python analysis/velocity.py` (about 30 s on 4 threads). The report goes to
 `$RINGTRACE_OUT/velocity/report.json`, with sections `bursts`, `offpool`, `zones`, `layering`,
-`estimate` and `probe`.
+`estimate`, `probe` and `edge`. `python analysis/velocity.py build` writes the probe
+`velocity-muleedge.csv`.

@@ -669,3 +669,11 @@ Finding: `docs/findings/velocity-october.md`.
 | bot on P(bot) >= 0.35 | 68 | 0 | -0.00108 / 0.00000 / -0.00064 | -0.00112 / 0.00000 / -0.00061 | -0.00195 / 0.00000 / -0.00115 | rejected |
 | bot on P(bot) >= 0.20 | 195 | 22 | -0.00279 / -0.00028 / -0.00102 | -0.00303 / -0.00027 / -0.00098 | -0.00528 / -0.00051 / -0.00188 | rejected |
 | bot on P(bot) >= 0.10 | 386 | 39 | -0.00449 / -0.00084 / -0.00346 | -0.00493 / -0.00096 / -0.00383 | -0.00859 / -0.00181 / -0.00706 | rejected |
+| velocity-muleedge: zone row in the HMM mule segment called bot -> mule (`python analysis/velocity.py build`) | 6 | 10 | -0.00004 / -0.00008 / -0.00012 | -0.00003 / -0.00008 / -0.00012 | +0.000001 / +0.00001 / +0.00001 | hypothesis probe (fails the bar); sha256 `2eaa5e7a6c562f1c2854404685ab99187fbb0b35b96206218c0c2c13fcc7d5f2`; 10 October rows velocity_bot -> mule_account |
+
+Mule/bot edge: the counter HMM puts October's mule zone at positions 0 to 0.193 (train 0 to
+0.159; share 1.21 times, the other zones 0.81 to 1.11). The calls follow train's edge (0.1563)
+on 10 single-row zone devices at 0.164 to 0.188. Mule-template anchored devices per zone row in
+the band 0.156 to 0.196: October 4 / 12, train 4 / 85. Anchored rows follow the HMM in both splits
+(1 disagreement each).
+
