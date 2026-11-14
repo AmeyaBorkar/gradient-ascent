@@ -80,11 +80,11 @@ def check_recipe(recipe: dict) -> dict:
     for m in members:
         m.setdefault("variant", "fold")
         m.setdefault("role", "full")
-        if m["role"] not in ("full", "fraud"):
-            raise RecipeError(f"{m['name']}: role must be 'full' or 'fraud'")
+        if m["role"] not in ("full", "fraud", "type"):
+            raise RecipeError(f"{m['name']}: role must be 'full', 'fraud' or 'type'")
         if m["variant"] not in VARIANTS:
             raise RecipeError(f"{m['name']}: unknown variant {m['variant']!r}")
-    if all(m["role"] == "fraud" for m in members):
+    if not any(m["role"] == "full" for m in members):
         raise RecipeError("at least one member must have role 'full'")
     w = recipe.setdefault("weights", {"mode": "equal"})
     if w.get("mode") not in WEIGHT_MODES:
@@ -123,12 +123,13 @@ def static_weights(recipe: dict) -> np.ndarray:
 
 def mix(arrays: list[np.ndarray], weights, roles=None) -> np.ndarray:
     """Weighted mean of probabilities. A member whose role is ``fraud`` moves only the legit /
-    fraud split: the legit probability is the weighted mean over every member, and the fraud mass
-    is shared out by the ``full`` members' mean fraud-type distribution."""
+    fraud split, and one whose role is ``type`` only the type split: the legit probability is the
+    weighted mean over the ``full`` and ``fraud`` members, and the fraud mass is shared out by the
+    weighted fraud-type mass of the ``full`` and ``type`` members."""
     roles = roles or ["full"] * len(arrays)
     out = np.zeros_like(arrays[0], dtype=np.float64)
     for a, w, r in zip(arrays, weights, roles, strict=True):
-        if w and r == "full":
+        if w and r in ("full", "type"):
             out += float(w) * a
     if all(r == "full" for r in roles):
         return out
@@ -136,8 +137,10 @@ def mix(arrays: list[np.ndarray], weights, roles=None) -> np.ndarray:
         # the full members carry no weight: they still set the type split, equally
         full = [a for a, r in zip(arrays, roles, strict=True) if r == "full"]
         out = mix(full, [1.0] * len(full))
-    legit = sum(float(w) * a[:, 0] for a, w in zip(arrays, weights, strict=True) if w)
-    legit = legit / float(sum(weights))
+    legit_w = [
+        (a, float(w)) for a, w, r in zip(arrays, weights, roles, strict=True) if r != "type" and w
+    ]
+    legit = sum(w * a[:, 0] for a, w in legit_w) / sum(w for _, w in legit_w)
     types = out[:, 1:]
     tot = types.sum(axis=1, keepdims=True)
     share = np.where(tot > 0, types / np.where(tot > 0, tot, 1), 1.0 / types.shape[1])

@@ -1,0 +1,13 @@
+{
+  "name": "member-x5",
+  "families": ["context", "marks", "bursts", "drains", "flows", "requests", "merchant", "repeats", "phones"],
+  "drop": ["ctr_dev_rows", "ctr_dev_single"],
+  "cascade": {
+    "seeds": [0, 1, 2, 3, 4],
+    "booster": {"rounds": 300, "eta": 0.08, "depth": 8},
+    "drop_legit_min_score": 0.70,
+    "type_min_score": 0.04
+  },
+  "decoder": {"fraud_scale": 0.875},
+  "rules": ["anchored_templates"]
+}

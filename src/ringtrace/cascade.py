@@ -239,28 +239,41 @@ def screen_score(
     return out
 
 
-def fit_predict(
+def training_rows(
+    fraud: np.ndarray, score: np.ndarray, spec: CascadeSpec
+) -> tuple[np.ndarray, np.ndarray]:
+    """(stage-one rows, stage-two rows) from the labels and the cross-fitted screening score.
+
+    Stage one keeps every fraud-labelled row and the legit-labelled rows scoring below
+    ``drop_legit_min_score``; its target is 1 only on the stage-two rows (fraud-labelled rows
+    scoring at least ``type_min_score``), so fraud-labelled rows the screen cannot see are legit
+    for stage one and absent from stage two."""
+    keep_bin = (fraud == 1) | (score < spec.drop_legit_min_score)
+    type_rows = (fraud == 1) & (score >= spec.type_min_score)
+    return keep_bin, type_rows
+
+
+def seed_outputs(
     X_tr: np.ndarray,
     y_tr: np.ndarray,
     period_tr: np.ndarray,
     X_out: list[np.ndarray],
     spec: CascadeSpec,
     log=print,
-) -> list[np.ndarray]:
-    """Train on (X_tr, y_tr) and return 12-class probabilities for every matrix in X_out."""
+):
+    """Yield ``(seed, [12-class probabilities for every matrix in X_out])`` seed by seed; the
+    screening score is computed once and shared by every seed."""
     t0 = time.time()
     fraud = (y_tr > 0).astype(np.float32)
     # screen off (one month cannot be cross-fitted): every label is taken as it is
     score = screen_score(X_tr, fraud, period_tr, spec) if spec.use_screen else fraud.copy()
-    keep_bin = (fraud == 1) | (score < spec.drop_legit_min_score)
-    type_rows = (fraud == 1) & (score >= spec.type_min_score)
+    keep_bin, type_rows = training_rows(fraud, score, spec)
     # fraud-labelled rows the screen cannot see are the ordinary-looking ones: legit for stage one
     target_bin = type_rows.astype(np.float32)
     log(
         f"  screen: dropped {int((~keep_bin).sum())} legit rows, type rows {int(type_rows.sum())}"
         f" of {int(fraud.sum())} fraud ({time.time() - t0:.0f}s)"
     )
-    outs = [np.zeros((len(X), N_CLASSES), dtype=np.float64) for X in X_out]
     for seed in spec.seeds:
         mb, mt = _fit_stages(
             X_tr[keep_bin],
@@ -270,10 +283,30 @@ def fit_predict(
             spec,
             seed,
         )
-        for o, X in zip(outs, X_out, strict=True):
+        res = []
+        for X in X_out:
             pf = _predict(mb, X).astype(np.float64)
             pt = _predict(mt, X).astype(np.float64).reshape(len(X), N_CLASSES - 1)
-            o[:, 0] += 1 - pf
-            o[:, 1:] += pf[:, None] * pt
+            o = np.empty((len(X), N_CLASSES), dtype=np.float64)
+            o[:, 0] = 1 - pf
+            o[:, 1:] = pf[:, None] * pt
+            res.append(o)
+        yield seed, res
     log(f"  cascade fitted with {len(spec.seeds)} seeds ({time.time() - t0:.0f}s)")
+
+
+def fit_predict(
+    X_tr: np.ndarray,
+    y_tr: np.ndarray,
+    period_tr: np.ndarray,
+    X_out: list[np.ndarray],
+    spec: CascadeSpec,
+    log=print,
+) -> list[np.ndarray]:
+    """Train on (X_tr, y_tr) and return 12-class probabilities for every matrix in X_out (the
+    mean over ``spec.seeds``)."""
+    outs = [np.zeros((len(X), N_CLASSES), dtype=np.float64) for X in X_out]
+    for _, res in seed_outputs(X_tr, y_tr, period_tr, X_out, spec, log=log):
+        for o, r in zip(outs, res, strict=True):
+            o += r
     return [o / len(spec.seeds) for o in outs]

@@ -165,6 +165,25 @@ def test_fraud_role_with_zero_full_weight_keeps_the_trees_types():
     assert out[0, 1] / out[0, 2] == pytest.approx(3.0)
 
 
+def test_type_role_moves_only_the_type_split():
+    a = np.array([[0.6, 0.3, 0.1] + [0.0] * (N_CLASSES - 3)])
+    b = np.array([[0.2, 0.1, 0.7] + [0.0] * (N_CLASSES - 3)])
+    f = np.array([[0.9, 0.05, 0.05] + [0.0] * (N_CLASSES - 3)])
+    base = final.mix([a, f], [0.5, 0.5], ["full", "fraud"])
+    out = final.mix([a, f, b], [0.5, 0.5, 0.5], ["full", "fraud", "type"])
+    assert out[0, 0] == base[0, 0] == pytest.approx(0.75)
+    # type mass 0.4 (a) + 0.8 (b): class 1 gets 0.4 / 1.2 of the fraud mass
+    assert out[0, 1] == pytest.approx(0.25 * 0.4 / 1.2)
+    assert out.sum() == pytest.approx(1.0)
+    assert final.check_recipe(
+        {"members": [{"name": "a", "run": "a"}, {"name": "b", "run": "b", "role": "type"}]}
+    )
+    with pytest.raises(final.RecipeError):
+        final.check_recipe({"members": [{"name": "b", "run": "b", "role": "type"}]})
+    with pytest.raises(final.RecipeError):
+        final.check_recipe({"members": [{"name": "b", "run": "b", "role": "both"}]})
+
+
 def test_two_fraud_members_differ_from_one(bench):
     one = _recipe(
         members=[
