@@ -72,12 +72,13 @@ if [[ "$what" == half || "$what" == all ]]; then
 fi
 
 if [[ "$what" == tabm || "$what" == all ]]; then
-  # TabM trained on the counter at October's density (cells only; the earlier TabM cells are L4
-  # fits, so one baseline cell is refitted on this GPU to measure the device difference)
-  cellgate "$R/m-tabm.json:$N:honest" "$R/m-tabm-4060.json:$N:honest" --seeds 13     --report "$G/tabm-device-cells-honest.json"
-  cellgate "$R/m-tabm.json:$N:honest" "$R/m-tabm-half0.json:$N:honest"     --report "$G/half0-tabm-cells-honest.json"
-  cellgate "$R/final-half-cpu3.json:$N:honest" "$R/final-half-chalf3t.json:$N:honest"     --report "$G/half3t-blend-cells-honest.json"
-  cellgate "$R/final-half-chalf3.json:$N:honest" "$R/final-half-chalf3t.json:$N:honest"     --report "$G/half3t-vs-half3-cells-honest.json"
+  # TabM trained on the counter at October's density (cells only). The first TabM cells are L4
+  # fits; tabm-4060 refits them on this GPU, so every TabM comparison below is on one device.
+  cellgate "$R/m-tabm.json:$N:honest" "$R/m-tabm-4060.json:$N:honest" \
+    --report "$G/tabm-device-cells-honest.json"
+  both "$R/m-tabm-4060.json" "$R/m-tabm-half0.json" half0-tabm
+  both "$R/final-half-cpu3-t4060.json" "$R/final-half-chalf3t.json" half3t-blend
+  both "$R/final-half-chalf3-t4060.json" "$R/final-half-chalf3t.json" half3t-vs-half3
 fi
 
 if [[ "$what" == lomo || "$what" == all ]]; then
