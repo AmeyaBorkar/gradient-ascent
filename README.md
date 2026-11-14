@@ -55,6 +55,7 @@ validates the file against `sample_submission.csv` and prints its sha256:
 ```bash
 python -m ringtrace.final build recipes/bait-edge.json --out <dir>    # sha256 b571af3e...2f9dfc (best public, 0.5506)
 python -m ringtrace.final build recipes/research-combo-2.json --out <dir>  # sha256 214926a6...986344 (public 0.5506, tied)
+python -m ringtrace.final build recipes/counter-news.json --out <dir>  # sha256 b8c3183a...967799 (rules on the refined counter)
 python -m ringtrace.final build recipes/bait-combo.json --out <dir>   # sha256 3b25869e...e1974
 python -m ringtrace.final build recipes/final-half.json --out <dir>   # sha256 8a461426...fb926eb
 ```
@@ -65,6 +66,15 @@ TabM and a tenth from each tree, decoded at fraud scale 0.875 with the anchored 
 (`docs/findings/bait-operator-roles.md`), and `bait-edge` the counter's mule/bot edge
 (`mule_edge`). `research-combo-2` adds three October base-rate rules to `bait-edge` (`far_segment`,
 `legit_topup` for qr_swap, `just_under_pay`; 4 October rows) and builds from the same six member runs.
+
+`counter-news` keeps those six member runs, which were trained on the champion device counter
+(`ringtrace.evidence.phones`). Its rules read the refined counter instead
+(`"rule_counter": "refined"`, `ringtrace.evidence.refined`): the same blocks and HMM, plus each
+phone's allocation geometry, meaning the run of unused numbers below it and its row count. A last
+base-rate rule (`counter_news`) then moves a row whose call still follows the champion segment
+when the refined counter puts it one class away with posterior at least 0.7. Against
+`research-combo-2` this changes 4 October rows: sim_swap → account_takeover 3, velocity_bot →
+mule_account 1. The evidence is in `docs/findings/counter-news.md`.
 
 From a clean checkout and an empty cache, one command builds the features and cleaned labels, runs
 the six member recipes behind the recipe's runs (`python -m ringtrace.run recipes/<member>.json
@@ -139,7 +149,10 @@ October rows. Compare such a rebuild through the scores and October calls in `su
 | `ringtrace.cascade` | P(fraud) x P(type given fraud): XGBoost on the GPU, LightGBM, or CatBoost stages |
 | `ringtrace.eventclean` | event-cleaned training labels (members 4 and 5), rebuilt inside each fold |
 | `ringtrace.decode` | label-free fixed-point rule for macro-F1, per month |
-| `ringtrace.rules` | counter-anchored look-alike template rule |
+| `ringtrace.evidence.refined` | the refined device counter (allocation geometry), read by rules only |
+| `ringtrace.rules` | counter-anchored look-alike template rule, operator-role and base-rate rules |
+| `ringtrace.counternews` | the `counter_news` rule: champion against refined counter |
+| `ringtrace.final` | final recipes: mix, decode, rules, scoring harness and the October file |
 | `ringtrace.run` | one recipe end to end on month folds |
 | `ringtrace.blend` | weighted mean of finished runs, decoded, scored and validated |
 
