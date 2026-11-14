@@ -9,15 +9,15 @@ effect of half density and festival amounts on legit traffic. No evidence family
 October-only excess of traffic just outside one of its thresholds. Measured on the calls of
 `bait-edge` (train calls out of fold), aggregates only.
 
-## Call rates per 100k rows (October / mean of July-September)
+## Call rates per 100k rows (October test rows / mean of the July-September periods)
 
 | class | ratio | traced to |
 |---|---|---|
 | velocity_bot | 0.52 | 7 bot phones in October against about 13 expected at half density. Every device in every month with 3 or more ecommerce or gaming PAYs within 30 minutes is a bot-range phone, and all of them are called bot: fewer bot events, none missed. |
-| mule_account | 1.29 | Mule bursts 1.26x and layering fan-ins 0.71x, total flow events 1.0x. The counter's mule zone is 1.21x wider in October, and the public mule probe's F1 (0.544 against 0.46 predicted) says the mule calls are precise: more mule events. |
+| mule_account | 1.24 | Mule bursts 1.24x and layering fan-ins 0.71x. The counter's mule zone is 1.21x wider in October, and the public mule probe's F1 (0.544 against 0.46 predicted) says the mule calls are precise: more mule events. |
 | layering_chain | 0.89 | Pass-through hops inside the law: 130 per 100k against 127-139 in train. The in-law hops not called chain are mule rows in train and October alike. |
-| refund_abuse | 1.38 | Merchant ring events: refund rings have 3-8 rows and collusion rings 10-28 in train (all pure). October has 6 rings of exactly 8 rows (about 2 expected), none of 9-19, and 3 of 20 or more. No chain splits (no consecutive rings at a merchant share a sender), no other payments by the ring's senders to its merchant, and no non-size feature separates the two types (AUC 0.52). An upward shift of event sizes (refund piling at its 8-row cap, collusion moving to 20+) fits; the refund calls stand. |
-| merchant_collusion | 0.76 | The same ring sizes; the whole-amount collusion form has 0 October events against about 1 expected. |
+| refund_abuse | 1.11 (z +1.7, within noise) | Merchant ring events: refund rings have 3-8 rows and collusion rings 10-28 in train (all pure). October has 5 rings of exactly 8 rows (about 1.7 expected), none of 9-19 (about 3.7 expected), and 3 of 20 or more. No chain splits (no consecutive rings at a merchant share a sender), no other payments by the ring's senders to its merchant, and no non-size feature separates the two types (AUC 0.52). An upward shift of event sizes (refund piling at its 8-row cap, collusion moving to 20+) fits; the refund calls stand. |
+| merchant_collusion | 0.63 | The same ring sizes; the whole-amount collusion form has 0 October events against about 1 expected. |
 
 ## Systematic scan (`analysis/drift.py`)
 
