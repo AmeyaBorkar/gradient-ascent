@@ -5,7 +5,8 @@ scored month, it prints the round-amount shares (whole rupee, multiple of 10, mu
 the mean amount, amount quantiles per payment type and the median balance. Train months use their
 ordinary-routine rows (structured silver label 0). The scored month has no such label, so its
 ordinary rows are the rows a submission file calls legit (``--calls``); all rows are shown as
-well. Only aggregates are printed.
+well. The shares of rows above a few amount-to-balance ratios show the balance ceiling. Only
+aggregates are printed.
 
     python analysis/festival_check.py --calls <submission.csv> [--out summary.json]
 """
@@ -22,6 +23,7 @@ import polars as pl
 from ringtrace import festival, paths, silver
 
 QUANTILES = (0.1, 0.25, 0.5, 0.75, 0.9)
+RATIO_THRESHOLDS = (0.3, 0.5, 0.7, 0.9, 0.95, 1.0)
 
 
 def round_shares(amount: np.ndarray) -> dict[str, float]:
@@ -37,6 +39,8 @@ def block(amount: np.ndarray, balance: np.ndarray, txn_type: np.ndarray) -> dict
     out = {"rows": int(len(amount)), "mean_amount": float(np.mean(amount))}
     out.update(round_shares(amount))
     out["median_balance"] = float(np.median(balance))
+    ratio = np.asarray(amount, dtype=np.float64) / np.maximum(np.asarray(balance), 0.01)
+    out["ratio_above"] = {str(t): float(np.mean(ratio > t)) for t in RATIO_THRESHOLDS}
     paise = np.rint(np.asarray(amount, dtype=np.float64) * 100.0).astype(np.int64)
     cls = np.select(
         [paise % 10000 == 0, paise % 1000 == 0, paise % 100 == 0], ["x100", "x10", "x1"], "paise"
@@ -71,6 +75,8 @@ def main(argv: list[str] | None = None) -> dict:
     ap.add_argument("--calls", required=True, help="submission whose legit calls mark ordinary")
     ap.add_argument("--amount-factor", type=float, default=festival.DEFAULT_AMOUNT_FACTOR)
     ap.add_argument("--balance-factor", type=float, default=festival.DEFAULT_BALANCE_FACTOR)
+    ap.add_argument("--ratio-cap", type=float, default=festival.DEFAULT_RATIO_CAP)
+    ap.add_argument("--no-ratio-cap", action="store_true")
     ap.add_argument("--out", default=None)
     args = ap.parse_args(argv)
 
@@ -84,7 +90,8 @@ def main(argv: list[str] | None = None) -> dict:
         raise SystemExit("structured silver labels are missing")
     periods = tuple(int(p) for p in np.unique(led.filter(~pl.col("is_test"))["period"].to_numpy()))
     mask = festival.festival_mask(led, structured, periods)
-    scaled = festival.scale_rows(led, mask, args.amount_factor, args.balance_factor)
+    cap = None if args.no_ratio_cap else args.ratio_cap
+    scaled = festival.scale_rows(led, mask, args.amount_factor, args.balance_factor, ratio_cap=cap)
 
     calls = pl.read_csv(args.calls).rename({"id": "txn_id"})
     test = led.filter(pl.col("is_test")).join(calls, on="txn_id", how="left")
@@ -121,7 +128,8 @@ def main(argv: list[str] | None = None) -> dict:
         return (
             f"{name:28s} rows {b['rows']:8d}  mean {b['mean_amount']:9.2f}  whole "
             f"{b['whole_rupee']:.4f}  x10 {b['mult_10']:.4f}  x100 {b['mult_100']:.4f}  "
-            f"bal50 {b['median_balance']:10.2f}"
+            f"bal50 {b['median_balance']:10.2f}  amt/bal > "
+            + " ".join(f"{t} {v:.5f}" for t, v in b["ratio_above"].items())
         )
 
     for p in periods:

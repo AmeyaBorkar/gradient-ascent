@@ -146,12 +146,33 @@ def test_scale_rows_never_moves_a_row_into_a_rounder_class():
         assert cents[:3].tolist() == [11000, 1100, 9999]
         assert cents[3] in (30000, 40000)
 
-    # Small multiples of 100 scale on average too: 100, 200 and 300 do not stay where they are.
-    hundreds = np.repeat(np.array([100.0, 200.0, 300.0]), 4000)
+    # Small multiples of 100 scale on average too: nearest rounding would keep 100, 200 and 300.
+    hundreds = 100.0 * np.arange(1, 4001)
+    small = hundreds <= 1000
     frame = pl.DataFrame({"amount": hundreds, "balance_before": np.ones(len(hundreds))})
     up = festival.scale_rows(frame, np.ones(len(hundreds), dtype=bool), FACTOR)["amount"]
     assert np.all(np.rint(up.to_numpy() * 100).astype(np.int64) % 10000 == 0)
-    assert up.to_numpy().mean() / hundreds.mean() == pytest.approx(FACTOR, rel=0.01)
+    assert up.to_numpy().mean() / hundreds.mean() == pytest.approx(FACTOR, rel=0.005)
+    many = festival.scale_rows(
+        pl.DataFrame({"amount": np.tile(hundreds[small], 400), "balance_before": 1.0}),
+        np.ones(4000, dtype=bool),
+        FACTOR,
+        seed=7,
+    )["amount"].to_numpy()
+    ratios = [
+        festival.scale_rows(
+            pl.DataFrame({"amount": hundreds[small], "balance_before": 1.0}),
+            np.ones(int(small.sum()), dtype=bool),
+            FACTOR,
+            seed=s,
+        )["amount"]
+        .to_numpy()
+        .mean()
+        / hundreds[small].mean()
+        for s in range(400)
+    ]
+    assert np.mean(ratios) == pytest.approx(FACTOR, rel=0.01)
+    assert len(np.unique(many.reshape(400, -1), axis=0)) == 1  # one seed: one value per amount
 
     # A realistic grid: every class share is kept exactly, rounding hits included.
     rng = np.random.default_rng(3)
@@ -165,6 +186,46 @@ def test_scale_rows_never_moves_a_row_into_a_rounder_class():
     got = scaled["amount"].to_numpy()
     assert _roundness_counts(got) == _roundness_counts(grid)
     assert got.mean() / grid.mean() == pytest.approx(FACTOR, rel=0.005)
+
+
+def test_scale_rows_maps_equal_amounts_to_equal_amounts():
+    amount = np.array([437.25] * 5 + [90.0] * 3 + [13.0] * 4, dtype=np.float64)
+    led = pl.DataFrame({"amount": amount, "balance_before": np.full(len(amount), 1e6)})
+    for seed in range(20):
+        got = festival.scale_rows(led, np.ones(len(amount), dtype=bool), FACTOR, seed=seed)
+        got = got["amount"].to_numpy()
+        assert len(set(got[:5])) == 1 and len(set(got[5:8])) == 1 and len(set(got[8:])) == 1
+
+
+def test_ratio_cap_keeps_the_ratio_of_rows_that_would_pass_it():
+    # 80 / 100 (ratio 0.8) -> amount 90: 90 / 102 = 0.88 would pass 0.8, so balance 112.50.
+    # 45 / 100 (0.45) -> 52 or 53: above the 0.5 cap and above 0.45, so the balance follows.
+    # 10.50 / 105 (0.1) -> about 12.24: ratio 0.11, the balance is scaled by 1.02 to 107.10.
+    # A zero balance stays zero.
+    amount = np.array([80.0, 45.0, 10.5, 50.0], dtype=np.float64)
+    balance = np.array([100.0, 100.0, 105.0, 0.0], dtype=np.float64)
+    led = pl.DataFrame({"amount": amount, "balance_before": balance})
+    mask = np.ones(len(amount), dtype=bool)
+    out = festival.scale_rows(led, mask, FACTOR, 1.02, ratio_cap=0.5)
+    a, b = out["amount"].to_numpy(), out["balance_before"].to_numpy()
+    assert np.rint(a[0] * 100) == 9000 and np.rint(b[0] * 100) == 11250
+    assert a[1] / b[1] == pytest.approx(0.45, abs=1e-3)
+    assert np.rint(b[2] * 100) == 10710
+    assert b[3] == 0.0
+    assert np.all(a[:3] <= b[:3])
+    plain = festival.scale_rows(led, mask, FACTOR, 1.02)
+    assert np.rint(plain["balance_before"].to_numpy()[0] * 100) == 10200
+    assert np.array_equal(plain["amount"].to_numpy(), a)
+
+    # Ordinary-looking ratios up to 0.9: none passes its balance after scaling.
+    rng = np.random.default_rng(5)
+    bal = rng.uniform(1000, 50000, size=5000).round(2)
+    amt = (bal * rng.uniform(0.01, 0.9, size=5000)).round(2)
+    frame = pl.DataFrame({"amount": amt, "balance_before": bal})
+    capped = festival.scale_rows(frame, np.ones(5000, dtype=bool), FACTOR, 1.02, ratio_cap=0.5)
+    r_new = capped["amount"].to_numpy() / capped["balance_before"].to_numpy()
+    assert r_new.max() < 0.905
+    assert np.all(r_new <= np.maximum(amt / bal, 0.5) + 1e-3)
 
 
 def test_scale_rows_keeps_roundness_shares_and_the_mean_ratio():
@@ -259,7 +320,7 @@ def test_install_scaled_ledger_and_key(monkeypatch):
     summary = festival.install((8, 7), FACTOR, 1.02)
     got = store.ledger()
     mask = festival.festival_mask(led, structured, (7, 8))
-    expect = festival.scale_rows(led, mask, FACTOR, 1.02)
+    expect = festival.scale_rows(led, mask, FACTOR, 1.02, ratio_cap=festival.DEFAULT_RATIO_CAP)
 
     assert summary["key"] == store._ledger_key()
     assert store._ledger_key() != base_key
@@ -352,7 +413,7 @@ def test_run_forwards_argv(monkeypatch):
     )
     assert seen[2] == ["recipes/lgbm.json", "--name", "custom", "--folds", "8"]
     mask = festival.festival_mask(led, structured, (8,))
-    expect = festival.scale_rows(led, mask, 1.5, 1.1)
+    expect = festival.scale_rows(led, mask, 1.5, 1.1, ratio_cap=festival.DEFAULT_RATIO_CAP)
     got = store.ledger()
     assert got["amount"].to_numpy().tobytes() == expect["amount"].to_numpy().tobytes()
     assert (

@@ -6,6 +6,17 @@ shift on any chosen months. Ordinary-routine rows (structured silver label 0) ar
 fraud-routine rows keep their amounts, and the scored month (``is_test``) is never scaled.
 Labels and every other column stay as they are.
 
+Three properties of the scored month are kept, because the feature families read them:
+
+* each amount stays in its roundness class (multiple of 100, of 10, whole rupee, paise);
+* equal amounts stay equal: the rounding draw is a hash of the amount itself, not a stream;
+* the amount-to-balance ratio keeps its ceiling. An ordinary row never pays more than its
+  balance, in the training months or in the scored month, and the share of rows above any
+  ratio from 0.5 up is only slightly larger in the scored month. A row whose scaled ratio would
+  pass both ``ratio_cap`` (default 0.5) and its own original ratio has its balance scaled with
+  its amount instead, so it keeps its original ratio. Without this, about 0.15 % of ordinary
+  rows pay more than their balance, a mark of the fraud routine.
+
 The scaled ledger is installed with ``store.use_frame`` under its own cache key: the base
 file digest, the factors, the periods, a hash of the mask and a hash of the scaled amounts.
 Feature families are cached per ledger key, so a run on the scaled ledger cannot read families
@@ -36,6 +47,8 @@ from ringtrace import silver, store
 # October's ordinary payments, from the measured month-to-month amount and balance ratios.
 DEFAULT_AMOUNT_FACTOR = 1.166
 DEFAULT_BALANCE_FACTOR = 1.02
+# Above this amount-to-balance ratio a scaled row keeps its own ratio (see the module docstring).
+DEFAULT_RATIO_CAP = 0.5
 # Coarsest first would also work; the loop below writes fine units first so a coarser hit wins.
 _UNITS = (0.01, 1.0, 10.0, 100.0)
 # Slack on amount/unit against the nearest integer. Tight enough that one extra paisa does not
@@ -69,6 +82,24 @@ def _coarsest_unit(amount: np.ndarray) -> np.ndarray:
     return unit
 
 
+_M1, _M2, _M3 = (
+    np.uint64(0x9E3779B97F4A7C15),
+    np.uint64(0xBF58476D1CE4E5B9),
+    np.uint64(0x94D049BB133111EB),
+)
+
+
+def _value_uniform(amount: np.ndarray, seed: int) -> np.ndarray:
+    """A uniform draw in [0, 1) that is a pure function of (seed, amount in paise)."""
+    paise = np.rint(np.asarray(amount, dtype=np.float64) * 100.0).astype(np.int64)
+    with np.errstate(over="ignore"):
+        x = paise.astype(np.uint64) + np.uint64(seed) * _M3 + _M1
+        x = (x ^ (x >> np.uint64(30))) * _M2
+        x = (x ^ (x >> np.uint64(27))) * _M3
+        x = x ^ (x >> np.uint64(31))
+    return (x >> np.uint64(11)).astype(np.float64) * (1.0 / 9007199254740992.0)
+
+
 def _next_ratio(unit: np.ndarray) -> np.ndarray:
     """Steps of ``unit`` in the next coarser unit (0.01 -> 100, 1 -> 10, 10 -> 10, 100 -> 0)."""
     ratio = np.zeros(unit.shape, dtype=np.float64)
@@ -81,9 +112,10 @@ def _round_amounts(amount: np.ndarray, factor: float, seed: int = 0) -> np.ndarr
     """Scale amounts and snap each one back onto its own roundness class.
 
     Each scaled amount lies between two multiples of its coarsest unit. It takes the upper one
-    with probability equal to its position between them (seeded stochastic rounding), so the
-    mean of every class scales by ``factor``; nearest rounding would leave a small multiple of
-    100 such as 100, 200 or 300 where it was. Of two neighbouring multiples, at most one is also
+    with probability equal to its position between them (stochastic rounding), so the mean of
+    every class scales by ``factor``; nearest rounding would leave a small multiple of 100 such
+    as 100, 200 or 300 where it was. The draw is a hash of ``seed`` and the amount, so two equal
+    amounts always land on the same value. Of two neighbouring multiples, at most one is also
     a multiple of the next coarser unit. Landing there would move the row into a rounder class
     (about one multiple of 10 in ten would become a multiple of 100, one paise amount in a
     hundred a whole rupee), so the row takes the other neighbour. The share of each class
@@ -96,7 +128,7 @@ def _round_amounts(amount: np.ndarray, factor: float, seed: int = 0) -> np.ndarr
     unit = _coarsest_unit(amount)
     target = (amount * factor) / unit
     low = np.floor(target)
-    up = np.random.default_rng(seed).random(len(target)) < (target - low)
+    up = _value_uniform(amount, seed) < (target - low)
     steps = np.maximum(low + up, 1.0)
     ratio = _next_ratio(unit)
     coarser = (ratio > 0) & (np.fmod(steps, np.where(ratio > 0, ratio, 1.0)) == 0)
@@ -107,9 +139,23 @@ def _round_amounts(amount: np.ndarray, factor: float, seed: int = 0) -> np.ndarr
     return paise.astype(np.float64) / 100.0
 
 
-def _round_balance(balance: np.ndarray, factor: float) -> np.ndarray:
+def _round_balance(balance: np.ndarray, factor) -> np.ndarray:
     balance = np.asarray(balance, dtype=np.float64)
     return np.rint(balance * factor * 100.0) / 100.0
+
+
+def _balance_factor(
+    amount: np.ndarray, scaled: np.ndarray, balance: np.ndarray, factor: float, ratio_cap: float
+) -> np.ndarray:
+    """Per-row balance factor: ``factor``, or the row's own amount factor when the scaled
+    amount-to-balance ratio would pass both ``ratio_cap`` and the row's original ratio."""
+    out = np.full(amount.shape, factor, dtype=np.float64)
+    ok = (balance > 0) & (amount > 0)
+    ratio = np.divide(amount, balance, out=np.zeros_like(amount), where=ok)
+    new_ratio = np.divide(scaled, balance * factor, out=np.zeros_like(amount), where=ok)
+    over = ok & (new_ratio > np.maximum(ratio, ratio_cap))
+    out[over] = scaled[over] / amount[over]
+    return out
 
 
 def scale_rows(
@@ -118,15 +164,18 @@ def scale_rows(
     amount_factor: float,
     balance_factor: float = 1.0,
     seed: int = 0,
+    ratio_cap: float | None = None,
 ) -> pl.DataFrame:
     """Copy ``led`` with money columns rescaled where ``mask`` is true.
 
     ``amount`` keeps the coarsest unit the original value already lands on (100, 10, 1 or 0.01)
     and is rounded, stochastically with ``seed``, to a neighbouring multiple of that unit that
-    is not a multiple of a coarser one, never below one unit. ``balance_before``
-    is rounded to the paisa. Every other row stays bit-identical, every other column is copied
-    through, and ``led`` itself is not modified. Callers that must skip the scored month pass a
-    mask from ``festival_mask``.
+    is not a multiple of a coarser one, never below one unit. ``balance_before`` is scaled by
+    ``balance_factor`` and rounded to the paisa. With ``ratio_cap``, a row whose scaled
+    amount-to-balance ratio would pass both the cap and its original ratio has its balance
+    scaled by its own amount factor instead, keeping its ratio; ``None`` turns this off. Every
+    other row stays bit-identical, every other column is copied through, and ``led`` itself is
+    not modified. Callers that must skip the scored month pass a mask from ``festival_mask``.
     """
     amount_factor = _finite("amount_factor", amount_factor)
     balance_factor = _finite("balance_factor", balance_factor)
@@ -136,8 +185,15 @@ def scale_rows(
     amount = np.asarray(led["amount"].to_numpy(), dtype=np.float64).copy()
     balance = np.asarray(led["balance_before"].to_numpy(), dtype=np.float64).copy()
     if bool(mask.any()):
-        amount[mask] = _round_amounts(amount[mask], amount_factor, seed)
-        balance[mask] = _round_balance(balance[mask], balance_factor)
+        scaled = _round_amounts(amount[mask], amount_factor, seed)
+        if ratio_cap is None:
+            factor = balance_factor
+        else:
+            factor = _balance_factor(
+                amount[mask], scaled, balance[mask], balance_factor, _finite("ratio_cap", ratio_cap)
+            )
+        amount[mask] = scaled
+        balance[mask] = _round_balance(balance[mask], factor)
     return led.with_columns(
         pl.Series("amount", amount, dtype=led.schema["amount"]),
         pl.Series("balance_before", balance, dtype=led.schema["balance_before"]),
@@ -223,6 +279,7 @@ def install(
     periods: Iterable[int],
     amount_factor: float = DEFAULT_AMOUNT_FACTOR,
     balance_factor: float = DEFAULT_BALANCE_FACTOR,
+    ratio_cap: float | None = DEFAULT_RATIO_CAP,
 ) -> dict:
     """Reset to the base ledger, scale ordinary rows in ``periods``, and serve that frame.
 
@@ -230,7 +287,7 @@ def install(
     routine wrote. The summary counts scaled rows per period and gives the realised mean amount
     ratio on those rows (sum of scaled amounts over sum of original amounts). Rounding pulls
     that ratio slightly off ``amount_factor``. Calling ``install`` again starts from the base
-    ledger, so the factors are not applied twice.
+    ledger, so the factors are not applied twice. ``ratio_cap`` is passed to ``scale_rows``.
     """
     amount_factor = _finite("amount_factor", amount_factor)
     balance_factor = _finite("balance_factor", balance_factor)
@@ -245,12 +302,22 @@ def install(
     mask = festival_mask(base, structured, periods)
     if bool(np.any(mask & np.asarray(base["is_test"].to_numpy(), dtype=bool))):
         raise RuntimeError("festival scaling tried to change the scored month")
-    scaled = scale_rows(base, mask, amount_factor, balance_factor)
+    scaled = scale_rows(base, mask, amount_factor, balance_factor, ratio_cap=ratio_cap)
     # _KEY is still clear, so this is the source-file digest and not a frame key.
     base_key = store._ledger_key()
     key = _cache_key(base_key, amount_factor, balance_factor, periods, mask, scaled)
     store.use_frame(scaled, key=key)
-    return _summary(base, scaled, mask, periods, amount_factor, balance_factor, key)
+    summary = _summary(base, scaled, mask, periods, amount_factor, balance_factor, key)
+    summary["ratio_cap"] = ratio_cap
+    old_bal = base["balance_before"].to_numpy()[mask]
+    new_bal = scaled["balance_before"].to_numpy()[mask]
+    summary["over_balance_rows"] = int(
+        np.count_nonzero(scaled["amount"].to_numpy()[mask] > new_bal)
+    )
+    summary["balance_kept_ratio_rows"] = int(
+        np.count_nonzero(np.abs(new_bal - np.rint(old_bal * balance_factor * 100) / 100) > 0.005)
+    )
+    return summary
 
 
 def _emit(summary: dict) -> None:
@@ -260,6 +327,9 @@ def _emit(summary: dict) -> None:
         "balance_factor": summary["balance_factor"],
         "rows_scaled": {str(p): summary["rows_scaled"][p] for p in summary["periods"]},
         "mean_amount_ratio": summary["mean_amount_ratio"],
+        "ratio_cap": summary.get("ratio_cap"),
+        "over_balance_rows": summary.get("over_balance_rows"),
+        "balance_kept_ratio_rows": summary.get("balance_kept_ratio_rows"),
         "key": summary["key"],
     }
     print(json.dumps(payload, indent=1), flush=True)
@@ -293,11 +363,16 @@ def main(argv: list[str] | None = None) -> dict:
         parser.add_argument("--periods", required=True, type=_parse_periods)
         parser.add_argument("--amount-factor", type=float, default=DEFAULT_AMOUNT_FACTOR)
         parser.add_argument("--balance-factor", type=float, default=DEFAULT_BALANCE_FACTOR)
+        parser.add_argument("--ratio-cap", type=float, default=DEFAULT_RATIO_CAP)
+        parser.add_argument(
+            "--no-ratio-cap", action="store_true", help="scale every balance by --balance-factor"
+        )
     run_p.add_argument("--name", default=None, help="run name; default <recipe>-fest-<periods>")
     run_p.add_argument("--folds", default=None, help="forwarded to the recipe run")
     args = ap.parse_args(argv)
 
-    summary = install(args.periods, args.amount_factor, args.balance_factor)
+    cap = None if args.no_ratio_cap else args.ratio_cap
+    summary = install(args.periods, args.amount_factor, args.balance_factor, cap)
     if args.cmd == "show":
         _emit(summary)
         return summary
