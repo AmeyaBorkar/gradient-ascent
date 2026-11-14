@@ -338,3 +338,77 @@ The s14 and s15 r1-r2 cells are not on the laptop, so the nine-cell gate is pend
 | 1 | +0.00004 / -0.00027 / -0.00002 | +0.00002 / -0.00024 / -0.00009 | -0.00027 / -0.00069 / -0.00038 |
 
 No share beats 1/2 on given and cleaned in every month; no file written.
+
+## Neural techniques, second screen (commits f2c3526-98b546d)
+
+### Screen: one fit on July + August per technique, seed 0, against the plain TabM on the same GPU
+
+`python -m ringtrace.nnexp fit <variant> --seeds 0 --job <job>`, then `nnexp score <job>-<variant>-sd0
+--base <job>-base-sd0` and `nnexp table`. Cells, roles, rules and units are those of the first
+screen above: change in macro-F1 x 1e-4 on given / cleaned / gen-only, calls changed in brackets.
+**Fraud-only** puts the variant in TabM's half of the legit column; the trees keep the type
+split.
+
+The plain TabM was refitted on each machine (`wildrun-base-sd0` on the laptop RTX 5070 Ti,
+`wildrun-box-base-sd0` on the box RTX 5060 Ti), and every variant is judged against the base of
+its own machine. The laptop base and the earlier screen's base (fitted on another GPU) disagree on
+70 September argmax calls, max probability gap 0.52. Hardware alone moves the fit as much as a
+seed change. All scoring ran on the box CPU, with the laptop's tree cells copied over. The box's
+own `champion_s1x_r0` cells hold different rows and were not used.
+
+| technique | where | role | sep | s13 | s14 | s15 | never loses |
+|---|---|---|---|---|---|---|---|
+| selftrain | laptop | fraud-only | -0.1 / -0.1 / +0.2 (2) | -1.2 / +2.3 / +2.7 (2) | +0.0 / +0.0 / +0.0 (0) | +0.0 / +0.0 / +0.0 (0) | no |
+| selftrain | laptop | alone | -0.1 / -0.0 / +1.7 (10) | -3.7 / -3.6 / -3.1 (12) | +1.9 / +3.0 / +8.1 (8) | -2.1 / -1.3 / -5.1 (16) | no |
+| entity | box | fraud-only | -4.2 / -6.1 / -13.1 (46) | -4.5 / -5.1 / -17.6 (37) | -4.6 / -6.0 / -16.3 (25) | -4.7 / -4.7 / -11.2 (23) | no |
+| entity | box | alone | -62.4 / -70.5 / -121.1 (169) | -25.3 / -34.9 / -62.4 (106) | -48.8 / -57.7 / -138.1 (112) | -45.5 / -53.2 / -96.5 (95) | no |
+| tabr | laptop | fraud-only | +0.1 / +1.5 / +1.9 (16) | +0.6 / +2.5 / +3.8 (11) | -1.0 / -3.7 / -5.4 (6) | -3.4 / -1.1 / -0.2 (13) | no |
+| tabr | laptop | alone | -88.6 / -103.2 / -139.7 (180) | -85.5 / -105.4 / -135.9 (110) | -81.9 / -104.1 / -143.5 (91) | -86.9 / -101.6 / -136.9 (99) | no |
+| tabm + tabr, equal mean (no new fit) | laptop | fraud-only | +0.9 / +1.8 / +2.8 (6) | +1.3 / +3.1 / +4.3 (5) | +0.7 / -3.0 / -4.5 (3) | +0.4 / +0.5 / +1.4 (6) | no |
+| tabm + tabr, equal mean (no new fit) | laptop | alone | -7.1 / -6.1 / -17.0 (43) | -10.3 / -14.4 / -22.7 (44) | -4.3 / -3.4 / -4.2 (23) | -20.1 / -20.1 / -25.7 (36) | no |
+| shift | box | fraud-only | -0.2 / -0.1 / +0.3 (3) | +0.4 / +0.5 / +2.5 (5) | +0.3 / +0.3 / +0.7 (1) | +0.2 / +0.3 / +2.1 (5) | no |
+| shift | box | alone | +0.6 / +0.7 / +2.0 (7) | +1.6 / -2.0 / +12.0 (27) | -3.5 / -4.5 / +0.3 (6) | -5.3 / -5.9 / +11.6 (16) | no |
+| metric | laptop | fraud-only | -0.4 / -0.4 / -0.5 (1) | -1.9 / +1.4 / +0.3 (5) | +0.6 / +0.5 / +0.2 (2) | +0.0 / +0.0 / +0.0 (0) | no |
+| metric | laptop | alone | +2.0 / +1.9 / +2.0 (6) | -2.4 / -2.6 / -6.6 (8) | +1.4 / +2.2 / +1.7 (7) | +0.0 / +1.0 / +1.7 (4) | no |
+| gentarget | box | fraud-only | -20.3 / -18.5 / +29.5 (45) | -21.7 / -18.9 / +25.5 (22) | -11.9 / -10.8 / +15.2 (12) | -21.0 / -24.5 / -4.9 (61) | no |
+| gentarget | box | alone | -155.3 / -141.9 / +198.6 (404) | -156.6 / -146.1 / +195.2 (218) | -163.1 / -153.1 / +180.8 (216) | -523.2 / -553.1 / -283.3 (746) | no |
+ABLATION_ROWS
+
+**Nothing passes; nothing was promoted, and no October file was written.** The bar for
+promotion was a fraud-only change that is non-negative in every cell and target and moves more
+than a handful of calls. The closest is `shift`: positive on every target in all three
+October-like cells, but on 1-5 calls, and -0.2 / -0.1 on September.
+
+Settings (all in `nnexp`; each technique's finding in `docs/findings/nn-*.md`):
+- **selftrain**: teacher = the plain seed-0 TabM's probabilities of the scored rows; every scored
+  row kept as a soft target at weight 0.3; fraud classes capped at the floor of the teacher's
+  mass (never binds); legit uncapped.
+- **entity**: sender / receiver / device hashed into 2^18 x 8 embeddings with id dropout 0.2.
+  Ids not seen in the fit rows go to the unknown row. Means of up to 8 strictly earlier rows per
+  sender and per receiver over 8 raw columns.
+- **tabr**: `TabRSpec` defaults (d 256, k 32, memory = all fit fraud rows + 200,000 legit).
+- **shift**: LightGBM domain classifier (cross-fitted halves, balanced, 200 rounds) on 212 of 230
+  columns; weights clipped to [0.2, 5], mean 1.
+- **metric**: cross-entropy + 0.5 x REINFORCE batch macro-F1 with an EMA baseline.
+- **gentarget**: generator-only labels rebuilt per cell from a July <-> August teacher, with every
+  `silver.build` estimate on the fit rows.
+
+Wall time per cell: plain TabM 5.4-5.7 min (laptop) / 5.0-5.1 min (box); selftrain 7.0-8.5 min;
+entity 6.1-6.2 min; tabr 8.7-9.1 min; shift 5.4-5.7 min including the classifier; metric
+5.6-5.9 min; gentarget 5.7-5.9 min including the teacher. Scoring ran at 2 threads on the box
+CPU.
+
+Failures and fixes:
+- **shift, first fit (a6d347d), stopped.** On all 230 columns the domain AUC was 1.0000 on
+  `sep`, and 99.99 % of the weights sat on the clip floor. The 1-day and 7-day window counts are
+  divided by a per-month density factor (`context.density`), so their values name the month.
+  665e150 leaves out the 18 columns whose own AUC between July + August and the unthinned
+  September is more than 0.05 from 0.5. With them out, the `sep` domain AUC is 0.594 and the
+  frames' AUC is 0.786-0.788.
+- **gentarget, s15.** `silver.build`'s old-app likelihood ratio has a near-zero denominator when
+  fit on two months: 2.77 / 5.11 / 10.47 / inf across `sep` / s13 / s14 / s15. In s15 it labels
+  86 % of fraud ordinary, against 63 % elsewhere. The cell was kept as specified; the shared
+  label code is unchanged.
+- **Colab:** the helper script was not present, so no runtime was used.
+- **Laptop memory:** a preliminary score running beside a fit pushed free RAM to 4.8 of 31 GB.
+  From then on the laptop ran one heavy process at a time, and all scoring moved to the box.

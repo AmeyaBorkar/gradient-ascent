@@ -28,17 +28,20 @@ Each technique is a variant of `python -m ringtrace.nnexp`, fitted once on July 
 and scored on `sep`, `s13`, `s14`, `s15`, alone and as the fraud-mass source, against the plain
 TabM fitted on the same machine (`<job>-base-sd0`).
 
-| technique | where | status |
+| technique | where | verdict (fraud-only role, x 1e-4 given) |
 |---|---|---|
-| soft self-training on the scored rows' features (teacher: plain TabM, w 0.3) | laptop GPU | fitted; scoring against the laptop base |
-| entity embeddings (sender, receiver, device) + strictly-past pooled history | box GPU | fitted; loses in every cell (fraud-only -0.0004 to -0.0006 given, cross-machine look) |
-| TabR-style retrieval | laptop GPU | fitting |
-| shift reweighting (domain classifier toward the scored rows) | box GPU | first fit stopped: domain AUC 1.0000 on all features (calendar columns); refit with those columns left out, queued |
-| REINFORCE macro-F1 term (lam 0.5) | laptop GPU, after TabR | queued |
-| TabM on generator-only labels rebuilt from July + August alone | box GPU | fitting |
-| entity ablation: pooled history alone | box GPU, after shift | queued |
+| soft self-training on the scored rows' features | laptop GPU | rejected: 0-2 calls, sep -0.1, s13 -1.2 |
+| entity embeddings + strictly-past pooled history | box GPU | rejected: -4.2 to -4.7 in every cell |
+| TabR-style retrieval | laptop GPU | rejected: +0.1 / +0.6 on sep / s13, -1.0 / -3.4 on s14 / s15 |
+| TabR beside TabM (equal mean, no new fit) | scoring only | rejected: given positive everywhere, s14 cleaned -3.0 |
+| shift reweighting toward the scored rows | box GPU | rejected, near-miss: positive in s13-15 on 1-5 calls, sep -0.2 |
+| REINFORCE macro-F1 term | laptop GPU | rejected: sep -0.4, s13 -1.9 |
+| TabM on generator-only labels | box GPU | rejected: -12 to -22 given, +15 to +30 gen-only |
+| entity ablations (pooled history alone, embeddings alone) | box / laptop GPU | fitting |
 
-The plain TabM refitted on the laptop differs from the earlier screen's base (another GPU) by 70
-September calls, so every comparison uses a base fitted on the same machine.
+Numbers are in `RESULTS.md` ("Neural techniques, second screen"), and each technique has a
+finding in `docs/findings/nn-*.md`. Nothing passed, so nothing was promoted and no October file
+was written.
 
-Current best idea: none yet; the bar is a non-negative fraud-only change in every cell and target.
+Current best idea: none from this screen. No neural training technique moves more than a few
+dozen October-like calls in the fraud-mass role without losing on given labels.
