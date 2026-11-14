@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every gate of the density study, from saved cells and month-fold runs (no refits).
-#   bash scripts/density_gate.sh [step1|rule|nopos|half|lomo|all]
+#   bash scripts/density_gate.sh [step1|rule|nopos|half|tabm|lomo|all]
 # Inputs: cells from `python -m ringtrace.density cells ...` under $RINGTRACE_OUT/density/,
 # month-fold runs `density-<member>[-nopos|-half<d>]` from `python -m ringtrace.density lomo`.
 # The LightGBM, CatBoost and TabM members keep the arrays of the best file in the month-fold
@@ -69,6 +69,15 @@ if [[ "$what" == half || "$what" == all ]]; then
   both "$R/final-half-cpu3.json" "$R/final-half-chalf3.json" half3-blend
   # the same three members, each the mean of two training draws (half0, half1)
   both "$R/final-half-cpu3.json" "$R/final-half-chalf3x2.json" half3x2-blend
+fi
+
+if [[ "$what" == tabm || "$what" == all ]]; then
+  # TabM trained on the counter at October's density (cells only; the earlier TabM cells are L4
+  # fits, so one baseline cell is refitted on this GPU to measure the device difference)
+  cellgate "$R/m-tabm.json:$N:honest" "$R/m-tabm-4060.json:$N:honest" --seeds 13     --report "$G/tabm-device-cells-honest.json"
+  cellgate "$R/m-tabm.json:$N:honest" "$R/m-tabm-half0.json:$N:honest"     --report "$G/half0-tabm-cells-honest.json"
+  cellgate "$R/final-half-cpu3.json:$N:honest" "$R/final-half-chalf3t.json:$N:honest"     --report "$G/half3t-blend-cells-honest.json"
+  cellgate "$R/final-half-chalf3.json:$N:honest" "$R/final-half-chalf3t.json:$N:honest"     --report "$G/half3t-vs-half3-cells-honest.json"
 fi
 
 if [[ "$what" == lomo || "$what" == all ]]; then
