@@ -67,6 +67,8 @@ if [[ "$what" == half || "$what" == all ]]; then
   both "$R/m-champion.json" "$R/m-champion-half0.json" half0-champion
   both "$R/final-half-cpu3.json" "$R/final-half-chalf0.json" half0-blend
   both "$R/final-half-cpu3.json" "$R/final-half-chalf3.json" half3-blend
+  # the same three members, each the mean of two training draws (half0, half1)
+  both "$R/final-half-cpu3.json" "$R/final-half-chalf3x2.json" half3x2-blend
 fi
 
 if [[ "$what" == lomo || "$what" == all ]]; then
@@ -77,6 +79,6 @@ if [[ "$what" == lomo || "$what" == all ]]; then
     --report "$G/champion-lomo-alone.json"
   half "$R/m-champion.json" "$R/m-champion-half0.json" --report "$G/champion-lomo-half0.json"
   lomo recipes/final-half.json "$R/final-half-r1.json" "$R/final-half-chalf0b.json" \
-    "$R/final-half-chalf3b.json" --report "$G/half-best-lomo.json"
+    "$R/final-half-chalf3b.json" "$R/final-half-chalf3x2.json" --report "$G/half-best-lomo.json"
   half "$R/final-half-r1.json" "$R/final-half-chalf0b.json" --report "$G/half-best-lomo-half0.json"
 fi
