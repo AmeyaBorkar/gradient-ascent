@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every gate of the density study, from saved cells and month-fold runs (no refits).
-#   bash scripts/density_gate.sh [step1|nopos3|half|half2|all]
+#   bash scripts/density_gate.sh [step1|rule|nopos3|half|half2|all]
 # Inputs: cells from `python -m ringtrace.density cells ...` under $RINGTRACE_OUT/density/,
 # month-fold runs `density-<member>[-nopos|-half<d>]` from `python -m ringtrace.density lomo`.
 # The LightGBM, CatBoost and TabM members keep the arrays of the best file in the month-fold
@@ -50,6 +50,18 @@ if [[ "$what" == step1 || "$what" == all ]]; then
   alone "$R/m-champion-alone.json" "$R/m-champion-nopos-alone.json" \
     --report "$G/champion-lomo-alone.json"
   half "$R/m-champion.json" "$R/m-champion-nopos.json" --report "$G/champion-lomo-half0.json"
+fi
+
+if [[ "$what" == rule || "$what" == all ]]; then
+  # the anchored template rule's gain and the TabM share (1/3 against 1/2) under each counter
+  for c in held honest; do
+    d="$H"
+    [[ "$c" == honest ]] && d="$N"
+    cellgate "$R/final-half-cpu-norule.json:$d:$c" "$R/final-half-cpu.json:$d:$c" \
+      --report "$G/rule-cells-$c.json"
+    cellgate "$R/final-third-cpu.json:$d:$c" "$R/final-half-cpu.json:$d:$c" \
+      --report "$G/tabm-share-cells-$c.json"
+  done
 fi
 
 if [[ "$what" == nopos3 || "$what" == all ]]; then
