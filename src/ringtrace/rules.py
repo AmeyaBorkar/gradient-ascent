@@ -18,6 +18,10 @@
   summed over the event's fraud-called rows. Legit calls are never touched.
 * ``anchor_rescue``: a row called legit whose family shape or one-class mark anchors a class
   (``anchors.row_anchor``) is called that class.
+* ``bait_roles``: a lone unanswered Rs 10 P2P bait called legit is phishing_collect when its sender
+  is an operator in another month (``ringtrace.baitroles``).
+* ``first_pay``: a first-time P2P PAY of Rs 1,000 or more in whole rupees, not a multiple of ten,
+  called legit, is phishing_collect (``ringtrace.baitroles``).
 
 Rules only read label-free columns; NaN never triggers one. Each logs the rows it changed.
 """
@@ -27,6 +31,7 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
+from ringtrace import baitroles
 from ringtrace.evidence import anchors
 from ringtrace.evidence.anchors import TEMPLATE_CLASS, TEMPLATE_NAMES, TEMPLATE_PAIR
 
@@ -203,6 +208,8 @@ RULES = {
     "anchored_templates": anchored_templates,
     "event_types": event_types,
     "anchor_rescue": anchor_rescue,
+    "bait_roles": baitroles.bait_roles,
+    "first_pay": baitroles.first_pay,
 }
 
 
