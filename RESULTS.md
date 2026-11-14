@@ -642,3 +642,26 @@ augmentation never loses there, but it has no full run, so it has no arrays to g
 - 2026-11-14 03:20 IST: every arrived component judged; `recipes/final.json` unchanged since
   02:15 (`final.csv` sha256 `39cb4952...4db3`).
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+## Merchant classes in October: mule, refund, collusion (`python analysis/merchant.py`, 12 s, laptop)
+
+Best file `blend-tabmF-bq` (out-of-fold calls on the train months; October agrees with the
+uploaded file on 260,582 / 260,582 rows). A month is the split period. Finding:
+`docs/findings/merchant-october-rates.md`.
+
+Calls per 100k rows, Jul / Aug / Sep / Oct (October against the train mean): mule_account
+245.7 / 236.5 / 261.1 / 302.8 (1.22); refund_abuse 79.9 / 99.1 / 119.0 / 109.8 (1.11; 1.53 when
+the 147 October-dated train rows are counted as October); merchant_collusion 34.3 / 59.2 / 59.2 /
+32.2 (0.63). Fraud-block rows per 100k by counter segment: mule 24.5 / 23.7 / 20.4 / 30.7 (1.34),
+refund 7.6 / 6.8 / 5.7 / 8.4 (1.26), collusion 2.8 / 4.7 / 4.7 / 4.6 (1.12).
+
+| rule | October rows | given Jul / Aug / Sep | cleaned Jul / Aug / Sep | gen-only Jul / Aug / Sep | verdict |
+|---|---|---|---|---|---|
+| refund on 8-row rings -> collusion | 40 | -0.0021 / -0.0028 / -0.0022 | -0.0027 / -0.0033 / -0.0023 | -0.0073 / -0.0068 / -0.0048 | rejected |
+| mule in inflow bursts of 24+ senders -> legit | 124 | -0.0030 / -0.0020 / -0.0047 | -0.0032 / -0.0023 / -0.0056 | -0.0045 / -0.0025 / -0.0075 | rejected |
+| refund outside REFUND chains and rings -> legit | 20 | -0.0018 / -0.0014 / -0.0012 | -0.0019 / -0.0012 / -0.0011 | +0.0018 / +0.0018 / +0.0011 | rejected |
+| collusion outside rings -> legit | 13 | -0.0016 / -0.0015 / -0.0018 | -0.0015 / -0.0014 / -0.0017 | +0.0028 / +0.0019 / +0.0030 | rejected |
+| mule outside flows events -> legit | 46 | -0.0019 / -0.0015 / -0.0016 | -0.0018 / -0.0014 / -0.0015 | +0.0025 / +0.0022 / +0.0020 | rejected |
+
+No candidate. Every pattern row of the three classes is called in October, at train precision
+(cleaned 0.82-1.00).

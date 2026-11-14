@@ -40,3 +40,11 @@ counter-anchored template rule.
 - [ ] The blind-spot rule: a label-free rule that calls generator-made rows the champion calls
       legit, adopted only if it never loses on leave-one-month-out and the October-like cells.
 - [ ] Finish the leave-one-family-out ablations left over in run 14.
+
+## Merchant classes in October (mule, refund, collusion)
+- [x] `python analysis/merchant.py`: October's call rates for mule_account (1.22x), refund_abuse
+      (1.11x) and merchant_collusion (0.63x) are real mix changes. The calls sit in template bands
+      at train precision, and the counter's segment volumes agree. The refund 1.53x seen earlier
+      counted the 147 October-dated train rows as October. Five trims and retypes all lose on given
+      and cleaned labels in every month: no candidate
+      (`docs/findings/merchant-october-rates.md`).
