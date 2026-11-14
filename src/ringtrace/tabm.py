@@ -24,6 +24,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from ringtrace.cascade import forced_device
 from ringtrace.classes import N_CLASSES
 
 
@@ -172,7 +173,8 @@ def _seed_all(seed: int) -> None:
 def train_one(Z: np.ndarray, y: np.ndarray, spec: TabMSpec, seed: int, log=print):
     torch = _torch()
     _seed_all(seed)
-    dev = torch.device(spec.device if torch.cuda.is_available() else "cpu")
+    use_gpu = forced_device() is None and torch.cuda.is_available()
+    dev = torch.device(spec.device if use_gpu else "cpu")
     model = build_model(Z.shape[1], spec).to(dev)
     Zt = torch.from_numpy(Z).to(dev)
     yt = torch.from_numpy(y.astype(np.int64)).to(dev)

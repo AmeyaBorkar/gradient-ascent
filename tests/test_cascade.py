@@ -114,3 +114,30 @@ def test_catboost_recipe_parses():
         254,
     )
     assert p["task_type"] == "GPU" and p["random_seed"] == 1 and p["verbose"] is False
+
+
+def test_device_switch_forces_cpu(monkeypatch):
+    from ringtrace.cascade import CatBoostSpec, forced_device
+
+    monkeypatch.delenv("RINGTRACE_DEVICE", raising=False)
+    assert forced_device() is None
+    assert BoosterSpec().params(0)["device"] == "cuda"  # default unchanged
+    assert CatBoostSpec().params(0, "Logloss")["task_type"] == "GPU"
+    monkeypatch.setenv("RINGTRACE_DEVICE", "cpu")
+    assert BoosterSpec().params(0)["device"] == "cpu"
+    cat = CatBoostSpec(gpu_ram_part=0.5).params(0, "Logloss")
+    assert cat["task_type"] == "CPU"
+    assert "devices" not in cat and "gpu_ram_part" not in cat
+    monkeypatch.setenv("RINGTRACE_DEVICE", "gpu")
+    with pytest.raises(ValueError, match="RINGTRACE_DEVICE"):
+        BoosterSpec().params(0)
+
+
+def test_device_switch_fits_a_cuda_spec_on_cpu(monkeypatch):
+    monkeypatch.setenv("RINGTRACE_DEVICE", "cpu")
+    X, y, period = _problem(3000, 0)
+    spec = CascadeSpec(
+        booster=BoosterSpec(rounds=10, depth=3, device="cuda"), seeds=(0,), screen_rounds=5
+    )
+    (p,) = fit_predict(X, y, period, [X[:100]], spec, log=lambda *_: None)
+    np.testing.assert_allclose(p.sum(1), 1.0, atol=1e-5)
