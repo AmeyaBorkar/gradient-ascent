@@ -156,6 +156,9 @@ def test_blank_merchant_qr():
     assert out.tolist() == [7, 0, 0, 0]
     pred2 = np.array([9, 0, 0, 0])
     assert rules.blank_merchant_qr(pred2, proba, led, log=lambda *_: None)[0] == 9
+    nan_led = led.with_columns(pl.Series("qr_vpa_mismatch", [float("nan"), 1.0, None, None]))
+    nan_out = rules.blank_merchant_qr(pred, proba, nan_led, log=lambda *_: None)
+    assert nan_out.tolist() == [7, 0, 0, 0]
 
 
 def test_anchored_templates_class_override():

@@ -8,8 +8,8 @@
 * ``legit_block``: a one-row phone in a legit block is legit.
 * ``plain_templates``: inside each of the six look-alike templates, every call of the template's
   pair takes the template's class.
-* ``blank_merchant_qr``: a QR payment to a merchant with a blank QR check, called legit, takes its
-  most likely fraud class.
+* ``blank_merchant_qr``: a QR payment to a merchant with a blank QR check (missing or NaN),
+  called legit, takes its most likely fraud class.
 * ``anchored_templates``: as ``plain_templates``, except that a template row on a fraud-block phone
   whose counter segment is one of the pair (``ctr_conf >= min_conf``) keeps its segment class and
   hands it to the rest of its family event.
@@ -196,11 +196,12 @@ def anchor_rescue(pred, proba, led, log=print) -> np.ndarray:
 
 def blank_merchant_qr(pred, proba, led, log=print) -> np.ndarray:
     """A QR payment to a merchant whose QR check is blank is generator-made (every such train row
-    is fraud on the cleaned labels); one called legit takes its most likely fraud class."""
+    is fraud on the cleaned labels); one called legit takes its most likely fraud class. A NaN
+    check is blank, the same as a missing one (the mark features read it that way)."""
     hit = (
         (led["txn_type"] == "QR").to_numpy()
         & (led["receiver_type"] == "MERCHANT").to_numpy()
-        & led["qr_vpa_mismatch"].is_null().to_numpy()
+        & led["qr_vpa_mismatch"].fill_nan(None).is_null().to_numpy()
         & (pred == 0)
     )
     out = pred.copy()

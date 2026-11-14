@@ -36,6 +36,18 @@ def test_macro_f1_matches_sklearn():
     assert per_class_f1(y, y).min() == 1.0
 
 
+def _plugin_macro(proba: np.ndarray, pred: np.ndarray) -> float:
+    """Plug-in expected macro-F1, the quantity ``fixed_point`` maximises."""
+    p = np.asarray(proba, dtype=np.float64)
+    k = p.shape[1]
+    expected = p.sum(axis=0)
+    counts = np.bincount(pred, minlength=k).astype(np.float64)
+    tp = np.bincount(pred, weights=p[np.arange(len(p)), pred], minlength=k)
+    denom = expected + counts
+    f1 = np.where(denom > 0, 2 * tp / np.maximum(denom, 1e-12), 0.0)
+    return float(f1.mean())
+
+
 def test_fixed_point_calls_confident_rare_rows():
     rng = np.random.default_rng(1)
     n = 5000
@@ -55,6 +67,41 @@ def test_fixed_point_calls_confident_rare_rows():
     assert (pred[:40] == 3).all()
     assert (pred[40:80] == 5).all()  # argmax would say legit; F1 says call them
     assert (pred[80:] == 0).all()
+
+
+def test_zero_or_nan_row_does_not_collapse_the_month():
+    rng = np.random.default_rng(1)
+    n = 500
+    proba = np.zeros((n, 12))
+    proba[:, 0] = 0.98
+    proba[:, 1:] = 0.02 / 11
+    proba[:20] = 0.0
+    proba[:20, 3] = 0.95
+    proba[:20, 0] = 0.05
+    proba += rng.random(proba.shape) * 1e-4
+    proba /= proba.sum(1, keepdims=True)
+    broken = proba.copy()
+    broken[100] = 0.0
+    broken[101] = np.nan
+    pred = fixed_point(broken, fraud_scale=1.0)
+    assert (pred[:20] == 3).all()
+    assert pred[100] == 0 and pred[101] == 0
+    # the bad rows are not in the totals, so every other call matches the clean month
+    keep = np.r_[:100, 102:n]
+    assert np.array_equal(pred[keep], fixed_point(proba[keep], fraud_scale=1.0))
+
+
+def test_unsettled_fixed_point_returns_the_best_labelling_on_the_path():
+    # Damping 0.5, ten steps: the map is still moving. Step 3 has plug-in macro-F1 0.2825;
+    # the labelling the loop stops on has 0.2584, and the argmax start has 0.2293.
+    rng = np.random.default_rng(189)
+    n = 40
+    logits = rng.normal(size=(n, 12))
+    logits[:, 0] += 1.0
+    proba = np.exp(logits)
+    proba /= proba.sum(1, keepdims=True)
+    pred = fixed_point(proba, fraud_scale=1.0, damping=0.5, max_iter=10)
+    assert _plugin_macro(proba, pred) == pytest.approx(0.2825097016380581)
 
 
 def _toy_ledger(n_train: int, n_test: int) -> pl.DataFrame:
