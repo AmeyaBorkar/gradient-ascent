@@ -330,7 +330,28 @@ def legit_topup(
     return out
 
 
+def posterior_edge(pred, proba, led, log=print, tau: float = 0.8) -> np.ndarray:
+    """A fraud-phase phone whose counter posterior puts at least ``tau`` on a class next to the
+    call of one of its rows moves that row to it. Only adjacent classes (one boundary away in the
+    label order) move, and every row of the phone reads the same posterior, so the counter's own
+    uncertainty decides, never a hand-picked band of phone numbers."""
+    block = anchors.family_columns(led, ["ctr_block"])["ctr_block"].fill_null(0).to_numpy()
+    cols = [f"ctr_p{k:02d}" for k in range(11)]
+    post = anchors.family_columns(led, cols).select(pl.all().cast(pl.Float64)).to_numpy()
+    ok = (block == 2) & np.isfinite(post).all(axis=1)
+    post = np.where(ok[:, None], post, 0.0)
+    seg = post.argmax(axis=1) + 1
+    p_seg = post.max(axis=1)
+    pred = np.asarray(pred, dtype=np.int64)
+    hit = ok & (pred > 0) & (seg != pred) & (np.abs(seg - pred) == 1) & (p_seg >= float(tau))
+    out = pred.copy()
+    out[hit] = seg[hit]
+    log(f"  posterior edge (tau {tau}): {_split_counts(hit, led['is_test'].to_numpy())}")
+    return out
+
+
 RULES = {
+    "posterior_edge": posterior_edge,
     "blank_merchant_qr": blank_merchant_qr,
     "recovery": recovery_rule,
     "mule_edge": mule_edge,
