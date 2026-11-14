@@ -415,3 +415,35 @@ Failures and fixes:
 - **Colab:** the helper script was not present, so no runtime was used.
 - **Laptop memory:** a preliminary score running beside a fit pushed free RAM to 4.8 of 31 GB.
   From then on the laptop ran one heavy process at a time, and all scoring moved to the box.
+
+### Plain averages of seed-0 variants as the fraud-mass source (scoring only, commit d6cd5b9)
+
+`nnexp mean <name> --of ...` averages fitted variants cell by cell. `nnexp member wildrun-tabm3
+--of tabm` turns the blend's own 3-seed TabM into the screen's format: its leave-one-month-out
+fold-9 rows on `sep` (fit on July + August), and its r0 October-like cells. Members:
+- **avg7**: base-sd0, swa-sd0, qraug-sd0, kd30-sd0 (the first screen's GPU), wildrun-box-shift-sd0
+  (box), wildrun-selftrain-sd0 and wildrun-metric-sd0 (laptop);
+- **avg3**: base-sd0, swa-sd0, wildrun-box-shift-sd0.
+
+Every average of three or more fits is also a seed average, so each is judged twice: against
+the single seed-0 base, and against the 3-seed TabM the blend actually uses. The 3-seed TabM
+against the seed-0 base shows how much seed averaging alone moves.
+
+| average | against | role | sep | s13 | s14 | s15 | never loses |
+|---|---|---|---|---|---|---|---|
+| avg7 | base-sd0 | fraud-only | +0.1 / +0.1 / +0.4 (1) | +0.3 / +0.3 / +0.8 (1) | +0.8 / +0.8 / +1.0 (1) | +0.0 / +0.0 / +0.0 (0) | yes |
+| avg7 | base-sd0 | alone | +2.0 / +2.0 / -1.3 (5) | +1.1 / +1.4 / +5.0 (6) | +2.3 / +2.3 / +1.3 (2) | +2.1 / +2.4 / +10.2 (4) | no |
+| avg3 | base-sd0 | fraud-only | +0.1 / +0.1 / +0.4 (1) | +0.5 / +0.6 / +1.6 (2) | +0.0 / +0.0 / +0.0 (0) | +0.5 / +0.5 / +1.5 (2) | yes |
+| avg3 | base-sd0 | alone | +2.2 / +2.1 / -1.6 (5) | +2.1 / +1.5 / +6.3 (10) | +2.3 / +2.3 / +1.3 (2) | +1.3 / +1.6 / +9.2 (5) | no |
+| 3-seed TabM | base-sd0 | fraud-only | -0.1 / -0.1 / -0.4 (1) | +0.3 / +0.3 / +0.8 (1) | +0.8 / +0.8 / +1.0 (1) | +0.2 / +0.3 / +0.8 (1) | no |
+| 3-seed TabM | base-sd0 | alone | +2.1 / +2.0 / +1.4 (5) | +5.9 / +1.7 / +8.3 (15) | +3.6 / +3.5 / +3.3 (5) | -0.4 / -0.2 / +12.9 (6) | no |
+| avg7 | 3-seed TabM | fraud-only | +0.3 / +0.3 / +0.8 (2) | +0.0 / +0.0 / +0.0 (0) | +0.0 / +0.0 / +0.0 (0) | -0.2 / -0.3 / -0.8 (1) | no |
+| avg7 | 3-seed TabM | alone | -0.1 / -0.0 / -2.7 (6) | -4.8 / -0.3 / -3.3 (14) | -1.3 / -1.3 / -2.0 (3) | +2.5 / +2.6 / -2.7 (5) | no |
+| avg3 | 3-seed TabM | fraud-only | +0.3 / +0.3 / +0.8 (2) | +0.3 / +0.3 / +0.8 (1) | -0.8 / -0.8 / -1.0 (1) | +0.2 / +0.3 / +0.8 (1) | no |
+| avg3 | 3-seed TabM | alone | +0.1 / +0.2 / -2.9 (6) | -3.8 / -0.2 / -2.0 (16) | -1.3 / -1.3 / -2.0 (3) | +1.7 / +1.9 / -3.7 (6) | no |
+
+**Not adopted.** Against the seed-0 base both averages never lose, but on 0-2 calls per cell, and
+the 3-seed plain TabM gets the same alone gains (+2.1 given on `sep`) from seed averaging alone.
+Against the 3-seed TabM, the comparison that matters for the blend, each average loses a cell:
+avg7 on s15 and avg3 on s14. The fraud mass moves on 0-2 rows per cell. An October file would
+differ from the current one on a handful of rows, so no full bar was run and no file was written.
