@@ -70,6 +70,10 @@ class BoosterSpec:
             "nthread": threads.budget(),
             "verbosity": 0,
         }
+        if device_override() == "cpu":
+            # the CUDA build of XGBoost fails in the default multiclass metric when no GPU is
+            # visible; no fit here is evaluated, so the trees and predictions are unchanged
+            p["disable_default_eval_metric"] = 1
         p.update(extra)
         return p
 

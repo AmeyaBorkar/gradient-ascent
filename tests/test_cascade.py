@@ -125,9 +125,12 @@ def test_device_switch_forces_cpu_and_refuses_unknown_values(monkeypatch):
     cb = CatBoostSpec(gpu_ram_part=0.3).params(0, "Logloss")
     assert cb["task_type"] == "GPU" and cb["devices"] == "0"
 
+    assert "disable_default_eval_metric" not in BoosterSpec().params(0)
+
     monkeypatch.setenv("RINGTRACE_DEVICE", "cpu")
     assert device_override() == "cpu"
     assert BoosterSpec().params(0)["device"] == "cpu"
+    assert BoosterSpec().params(0)["disable_default_eval_metric"] == 1
     cb = CatBoostSpec(gpu_ram_part=0.3).params(0, "Logloss")
     assert cb["task_type"] == "CPU"
     assert "devices" not in cb and "gpu_ram_part" not in cb
@@ -137,3 +140,16 @@ def test_device_switch_forces_cpu_and_refuses_unknown_values(monkeypatch):
         BoosterSpec().params(0)
     monkeypatch.setenv("RINGTRACE_DEVICE", "")
     assert BoosterSpec().params(0)["device"] == "cuda"
+
+
+def test_cpu_switch_leaves_a_cpu_cascade_byte_equal(monkeypatch):
+    """The switch only adds a no-op parameter to a fit that already runs on the CPU."""
+    X, y, period = _problem(2000, 3)
+    spec = CascadeSpec(
+        booster=BoosterSpec(rounds=15, depth=3, device="cpu"), seeds=(0, 1), screen_rounds=10
+    )
+    monkeypatch.delenv("RINGTRACE_DEVICE", raising=False)
+    (a,) = fit_predict(X, y, period, [X[:300]], spec, log=lambda *_: None)
+    monkeypatch.setenv("RINGTRACE_DEVICE", "cpu")
+    (b,) = fit_predict(X, y, period, [X[:300]], spec, log=lambda *_: None)
+    np.testing.assert_array_equal(a, b)
