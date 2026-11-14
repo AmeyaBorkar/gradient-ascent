@@ -224,11 +224,65 @@ def lomo_phones(line: Line | None = None, log=print) -> pl.DataFrame:
     return out
 
 
-def install_honest(frame, honest: pl.DataFrame) -> None:
-    """Serve the frame's ledger with the rebuilt counter (other families as cached)."""
-    from ringtrace import store
+def half_split(units: np.ndarray, draw: int, month: int) -> np.ndarray:
+    """Which rows of a month fall in its first half: whole units, kept with October's keep
+    rate (seeded by draw and month); the rest form the second half."""
+    from ringtrace import octlike
 
-    store.use_frame(frame.led, key=store._KEY, fixed={"phones": honest})
+    return octlike.thin(units, 1000 * (draw + 1) + month)
+
+
+def half_phones(draw: int, line: Line | None = None, log=print) -> pl.DataFrame:
+    """The ledger's counter family with every train month at October's density: the month's
+    protected units are split into two halves, each half is a pass of its own (renumbered,
+    its own split), and every row takes the counter of its half. October keeps production's."""
+    from ringtrace import octlike, store
+    from ringtrace.evidence import anchors
+
+    path = _cache_dir() / f"half-d{draw}.parquet"
+    if path.exists():
+        return pl.read_parquet(path)
+    line = line or _production_line()
+    store.use_frame(None)
+    led = store.ledger()
+    held = store.family("phones")
+    anchor = anchors.row_anchor(led)
+    period = led["period"].to_numpy()
+    train = ~led["is_test"].to_numpy()
+    device = led["device"].fill_null(-1).to_numpy()
+    events = [
+        store.family(f)[c].fill_null(-1).to_numpy().astype(np.int64)
+        for f, c in zip(octlike.EVENT_FAMILIES, octlike.EVENT_COLUMNS, strict=True)
+    ]
+    out = held
+    for m in (7, 8, 9):
+        rows = np.flatnonzero(train & (period == m))
+        others = np.flatnonzero(train & (period != m))
+        first = half_split(octlike.september_units(led, events, rows), draw, m)
+        for half in (first, ~first):
+            idx = np.concatenate([others, rows[half]])
+            cols = alone(line, device[idx], period[idx], train[idx], anchor[idx], m)
+            out = replace_rows(out, rows[half], cols)
+        log(
+            f"[density] half-density counter d{draw}, month {m}: halves {first.sum()} / "
+            f"{(~first).sum()} rows"
+        )
+    tmp = path.with_suffix(".tmp")
+    out.write_parquet(tmp)
+    tmp.replace(path)
+    return out
+
+
+def training_counter(kind: str, line: Line | None = None, log=print) -> pl.DataFrame | None:
+    """The counter family the fit rows read: None (production), "alone" (each train month
+    its own pass) or "half<d>" (each month at October's density, draw d)."""
+    if kind in ("", "production"):
+        return None
+    if kind == "alone":
+        return lomo_phones(line, log)
+    if kind.startswith("half"):
+        return half_phones(int(kind[4:]), line, log)
+    raise ValueError(f"unknown training counter {kind!r}")
 
 
 def _counts(a: np.ndarray) -> dict[int, int]:
@@ -301,20 +355,24 @@ def fit_cells(
     cells: list[tuple[str, list[int]]],
     recipes_dir: Path,
     tag: str = "",
+    train_counter: str = "",
     log=print,
 ) -> dict:
     """Fit each recipe on July + August of every frame once; write September's probabilities
     with the held counter to ``density/cells-held`` and with the rebuilt one to
-    ``density/cells-honest`` (cell name ``<recipe><tag>_s<seed>_r<r>.npz``)."""
+    ``density/cells-honest`` (cell name ``<recipe><tag>_s<seed>_r<r>.npz``). ``train_counter``
+    (see ``training_counter``) replaces the fit rows' counter columns."""
     from ringtrace import eventclean, octlike, store
     from ringtrace import run as runner
     from ringtrace.scoring import macro_f1
 
     t0 = time.time()
     out_held, out_honest = _out_dir("cells-held"), _out_dir("cells-honest")
-    summary_path = _out_dir("cells") / f"summary{tag}.json"
+    first = cells[0][0] if cells else "none"
+    summary_path = _out_dir("cells") / f"summary-{first}{tag}.json"
     summary = json.loads(summary_path.read_text()) if summary_path.exists() else {}
     line = _production_line()
+    train_ph = training_counter(train_counter, line, log)
     for seed in seeds:
         honest = honest_phones(seed, line, log)
         frame = octlike.Frame(seed)
@@ -332,6 +390,11 @@ def fit_cells(
             use(held)
             X, cols = runner.feature_matrix(recipe)
             Xh = swap_counter(X, cols, hold, honest)
+            Xf = X[fit_rows]
+            if train_ph is not None:
+                # the fit months are whole in every frame: their stacked rows index the ledger
+                fit_idx = np.flatnonzero(fit_rows)
+                Xf = swap_counter(X, cols, fit_idx, _rows_of(train_ph, frame.stacked))
             target = octlike.train_target(
                 recipe, y, fit_rows, _no_cleaned, eventclean.ledger_events
             )
@@ -344,14 +407,18 @@ def fit_cells(
                 t1 = time.time()
                 spec.seeds = (3 * r, 3 * r + 1, 3 * r + 2)
                 p_held, p_honest = fit_predict(
-                    X[fit_rows],
+                    Xf,
                     target[fit_rows],
                     frame.period[fit_rows],
                     [X[hold], Xh],
                     spec,
                     log=lambda *_: None,
                 )
-                res: dict = {"seeds": list(spec.seeds), "features": len(cols)}
+                res: dict = {
+                    "seeds": list(spec.seeds),
+                    "features": len(cols),
+                    "train_counter": train_counter or "production",
+                }
                 for kind, p, d, ph in (
                     ("held", p_held, out_held, held),
                     ("honest", p_honest, out_honest, honest),
@@ -378,14 +445,20 @@ def fit_cells(
     return summary
 
 
+def _rows_of(ph: pl.DataFrame, stacked: np.ndarray) -> pl.DataFrame:
+    """A ledger-wide counter family taken at a frame's stacked rows."""
+    return ph[stacked]
+
+
 def _no_cleaned():
     raise ValueError("train_on 'cleaned' is not supported here")
 
 
-def lomo(recipe_path: Path, name: str, log=print) -> dict:
+def lomo(recipe_path: Path, name: str, train_counter: str = "", log=print) -> dict:
     """Month folds of a recipe; each held-out month predicted with the production counter
     (``oof.npy``) and with its standalone counter (``oof_alone.npy``), October from the fold
-    mean (``test.npy``). Written to ``$RINGTRACE_OUT/runs/<name>/``."""
+    mean (``test.npy``). Written to ``$RINGTRACE_OUT/runs/<name>/``. ``train_counter`` (see
+    ``training_counter``) replaces the fit rows' counter columns."""
     from ringtrace import eventclean, store
     from ringtrace import run as runner
 
@@ -394,6 +467,7 @@ def lomo(recipe_path: Path, name: str, log=print) -> dict:
     out = paths.out_dir() / "runs" / name
     out.mkdir(parents=True, exist_ok=True)
     alone_ph = lomo_phones(log=log)
+    train_ph = training_counter(train_counter, log=log)
     store.use_frame(None)
     led = store.ledger()
     X, cols = runner.feature_matrix(recipe)
@@ -419,7 +493,7 @@ def lomo(recipe_path: Path, name: str, log=print) -> dict:
             target = eventclean.clean_labels(y, events, mode, mask=mask)
         t1 = time.time()
         a, b, c = fit_fn(
-            X[fit],
+            X[fit] if train_ph is None else swap_counter(X, cols, fit, train_ph),
             target[fit],
             period[fit],
             [X[hold], swap_counter(X, cols, hold, alone_ph), X[te]],
@@ -432,7 +506,12 @@ def lomo(recipe_path: Path, name: str, log=print) -> dict:
     np.save(out / "oof.npy", oof[tr].astype(np.float32))
     np.save(out / "oof_alone.npy", oof_alone[tr].astype(np.float32))
     np.save(out / "test.npy", test.astype(np.float32))
-    summary = {"recipe": recipe, "features": cols, "runtime_s": time.time() - t0}
+    summary = {
+        "recipe": recipe,
+        "features": cols,
+        "train_counter": train_counter or "production",
+        "runtime_s": time.time() - t0,
+    }
     (out / "summary.json").write_text(json.dumps(summary, indent=1, default=str))
     log(f"[density] {name} done in {time.time() - t0:.0f}s")
     return summary
@@ -645,9 +724,11 @@ def main(argv=None):
     f.add_argument("--seeds", default="13,14,15")
     f.add_argument("--recipes", default="recipes")
     f.add_argument("--tag", default="")
+    f.add_argument("--train-counter", default="", help="production, alone or half<d>")
     lo = sub.add_parser("lomo")
     lo.add_argument("recipe")
     lo.add_argument("--name", required=True)
+    lo.add_argument("--train-counter", default="", help="production, alone or half<d>")
     g = sub.add_parser("cellgate", help="side b against side a on the October-like cells")
     g.add_argument("a", help="recipe.json:cells_dir:held|honest")
     g.add_argument("b", help="recipe.json:cells_dir:held|honest")
@@ -667,9 +748,9 @@ def main(argv=None):
         for spec in args.cells:
             name, _, sets = spec.partition(":")
             cells.append((name, _ints(sets) if sets else [0]))
-        return fit_cells(_ints(args.seeds), cells, Path(args.recipes), args.tag)
+        return fit_cells(_ints(args.seeds), cells, Path(args.recipes), args.tag, args.train_counter)
     if args.cmd == "lomo":
-        return lomo(Path(args.recipe), args.name)
+        return lomo(Path(args.recipe), args.name, args.train_counter)
     from ringtrace import final
 
     if args.cmd == "cellgate":

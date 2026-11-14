@@ -148,3 +148,13 @@ def test_paired_draws_is_zero_for_equal_calls_and_signs_a_gain():
     better[:40] = truth[:40]
     point, draws = density.paired_draws(units, truth, pred, better, 200, 0)
     assert point > 0 and np.mean(draws > 0) > 0.95
+
+
+def test_half_split_keeps_units_whole_and_differs_by_draw():
+    units = np.repeat(np.arange(400), 3)
+    a = density.half_split(units, 0, 7)
+    b = density.half_split(units, 1, 7)
+    assert (a.reshape(-1, 3) == a.reshape(-1, 3)[:, :1]).all()
+    assert 0.35 < a.mean() < 0.65
+    assert (a != b).any()
+    assert np.array_equal(a, density.half_split(units, 0, 7))
