@@ -35,7 +35,7 @@ done
 cellgate() { python -m ringtrace.density cellgate "$@"; }
 lomo() { python -m ringtrace.final table "$@" --cells "$E"; }
 alone() { python -m ringtrace.density table "$@"; }
-half() { python -m ringtrace.density table --counter half0 --suffix -at-half0 "$@"; }
+half() { python -m ringtrace.density table --counter half0 --suffix=-at-half0 "$@"; }
 both() {
   # cellgate <a> <b> <report stem> under the rebuilt counter and under the held one
   cellgate "$1:$N:honest" "$2:$N:honest" --report "$G/$3-cells-honest.json"
