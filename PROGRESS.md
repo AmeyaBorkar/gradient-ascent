@@ -43,3 +43,8 @@ counter-anchored template rule.
 - [x] velocity_bot and layering_chain in October (`analysis/velocity.py`,
       `docs/findings/velocity-october.md`): fewer bot bursts (7 against 14 expected) and a
       chain-mix change, every marked row already called; no candidate.
+- [x] Device-order class repair (`ringtrace.repair`, `analysis/repair.py`,
+      `docs/findings/repair-device-order.md`): calls already fit the device order away from the
+      mule/bot and sim/takeover look-alike edges; at the edges the repair is a coin flip
+      (dense months 0 / 6 right; October-like with the counter rebuilt 0 / 24 right, cleaned
+      lower bound -0.00082). Rejected; no candidate.

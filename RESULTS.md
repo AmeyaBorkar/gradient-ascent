@@ -677,3 +677,38 @@ on 10 single-row zone devices at 0.164 to 0.188. Mule-template anchored devices 
 the band 0.156 to 0.196: October 4 / 12, train 4 / 85. Anchored rows follow the HMM in both splits
 (1 disagreement each).
 
+
+## Repair: device-order class repair (`python analysis/repair.py lomo alone octlike build`, commit f394559, 4 threads)
+
+Calls of the best file (`blend-tabmF-bq`): out-of-fold on the train months, October as counts.
+`ringtrace.repair` retypes a fraud call whose class lies outside the classes that the kept
+counter and template anchors on either side of its phone allow, intersected with its rows' shape
+sets. Finding: `docs/findings/repair-device-order.md`. Both variants made identical moves on every
+test, because each excluding set held exactly one class. No anchor was ever dropped.
+
+| test | rows | given Jul / Aug / Sep [boot] | cleaned Jul / Aug / Sep [boot] | gen-only | cleaned precision | wall |
+|---|---:|---|---|---|---|---|
+| dense, stored counter | 1 / 2 / 3 | -0.00004 / -0.00008 / -0.00012 [-0.00015, -0.00002] | -0.00003 / -0.00008 / -0.00012 [-0.00015, -0.00002] | +0.0000005 / +0.00001 / +0.00001 | 0 / 6 | 289 s |
+| dense, each month's phones as their own phase | 14 / 2 / 24 | -0.00046 / -0.00008 / +0.00076 [-0.00047, +0.00076] | -0.00052 / -0.00008 / +0.00092 [-0.00052, +0.00093] | -0.00091 / +0.00001 / +0.00161 | 24 / 40 | 598 s |
+
+October-like (9 cells, counter rebuilt on the thinned frame: block from the number line, segments
+and anchors from the kept September phones as their own phase; agreement with the held segments
+0.93 / 0.90 / 0.90; 2,000 draws, lower bound pooled; 821 s):
+
+| base (anchored rule reads) | rows | given mean (s13 / s14 / s15) lb | cleaned mean (s13 / s14 / s15) lb | gen-only mean | moves, cleaned right / moved |
+|---|---:|---|---|---|---|
+| rebuilt counter | 24 | -0.00038 (-0.00039 / 0 / -0.00074) -0.00064 | -0.00049 (-0.00038 / 0 / -0.00109) -0.00082 | -0.00083 | takeover -> sim 0 / 24 |
+| held counter | 114 | -0.00017 (-0.00078 / +0.00139 / -0.00111) -0.00073 | -0.00029 (-0.00094 / +0.00171 / -0.00163) -0.00101 | -0.00034 | mule -> bot 72 / 72, takeover -> sim 0 / 42 |
+
+Single-class anchors only (`--strict`): 0 / 0 / 0 dense rows, 1 month-alone row (wrong, full
+variant), 0 October-like rows, 1 October row.
+
+| candidate | October rows vs best | moves | sha256 | verdict |
+|---|---:|---|---|---|
+| repair-conservative | 11 | velocity_bot -> mule_account 10, qr_swap -> merchant_collusion 1 | `523eeb968727291a92630703acb8983d648aac156c951b1f04e1bdae44c7f395` | rejected: dense months negative, October-like lower bound below 0 |
+| repair-full | 11 | same as conservative (identical file) | `523eeb968727291a92630703acb8983d648aac156c951b1f04e1bdae44c7f395` | rejected |
+
+The 10 velocity_bot -> mule_account rows are the rows of `velocity-muleedge`, and the file differs
+from that probe on 1 row. The device order adds nothing the counter features have not already
+given the model. The repair acts only at the mule/bot and sim/takeover look-alike edges, where it
+is a coin flip.
