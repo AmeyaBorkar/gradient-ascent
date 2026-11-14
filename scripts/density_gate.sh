@@ -107,6 +107,8 @@ if [[ "$what" == half3 || "$what" == all ]]; then
       --report "$G/half3-blend-cells-$c.json"
   done
   lomo "$R/final-half-cpu3.json" "$R/final-half-chalf3.json" --report "$G/half3-blend-lomo.json"
+  # the same changes over the best file's member arrays (the October candidates)
+  lomo recipes/final-half.json "$R/final-half-chalf0b.json" "$R/final-half-chalf3b.json"     --report "$G/half-best-lomo.json"
   alone "$R/final-half-cpu3-alone.json" "$R/final-half-chalf3-alone.json" \
     --report "$G/half3-blend-lomo-alone.json"
   half "$R/final-half-cpu3.json" "$R/final-half-chalf3.json" \
