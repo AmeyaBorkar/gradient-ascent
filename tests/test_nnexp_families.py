@@ -194,3 +194,18 @@ def test_run_model_builds_the_tabr_member_from_its_recipe():
     spec, fit_fn = run.model(recipe)
     assert isinstance(spec, tabr.TabRSpec) and fit_fn is tabr.fit_predict
     assert spec.seeds == (0, 1, 2) and spec.epochs == 10
+
+
+def test_mean_of_averages_variants_cell_by_cell(tmp_path, monkeypatch):
+    monkeypatch.setattr(nnexp, "_dir", lambda: tmp_path)
+    rows = np.array([3, 5, 9])
+    np.savez(tmp_path / "a_s13.npz", rows=rows, prob=np.full((3, 12), 0.1, dtype=np.float32))
+    np.savez(tmp_path / "b_s13.npz", rows=rows, prob=np.full((3, 12), 0.3, dtype=np.float32))
+    nnexp.mean_of("ab", ["a", "b"], ["s13"], log=lambda *_: None)
+    z = np.load(tmp_path / "ab_s13.npz")
+    assert np.array_equal(z["rows"], rows) and np.allclose(z["prob"], 0.2)
+    np.savez(tmp_path / "c_s13.npz", rows=rows[::-1], prob=np.zeros((3, 12), dtype=np.float32))
+    import pytest
+
+    with pytest.raises(ValueError):
+        nnexp.mean_of("ac", ["a", "c"], ["s13"], log=lambda *_: None)

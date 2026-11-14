@@ -4,6 +4,8 @@
     python -m ringtrace.nnexp fit <variant> [--cells sep,s13,s14,s15] [--seeds 0,1,2]
     python -m ringtrace.nnexp score <variant> [--base base] [--cells ...]
     python -m ringtrace.nnexp table <variant> [--base base]
+    python -m ringtrace.nnexp mean <name> --of a,b,c [--cells ...]
+    python -m ringtrace.nnexp member <name> --of <run> [--cells ...]
 
 Cells: ``sep`` is the normal ledger with September held out (the leave-one-month-out fold 9);
 ``s13``..``s15`` are the October-like frames (``ringtrace.octlike``). Every variant is
@@ -522,6 +524,36 @@ def score(variant: str, base: str, cells: list[str], draws: int = 1000, log=prin
     return report
 
 
+def mean_of(name: str, members: list[str], cells: list[str], log=print) -> None:
+    """Save the equal-weight mean of fitted variants as variant ``name``, cell by cell."""
+    for c in cells:
+        zs = [np.load(_dir() / f"{m}_{c}.npz") for m in members]
+        rows = zs[0]["rows"]
+        for m, z in zip(members, zs, strict=True):
+            if not np.array_equal(z["rows"], rows):
+                raise ValueError(f"cell {c}: rows of {m} differ")
+        prob = np.mean([z["prob"].astype(np.float64) for z in zs], axis=0)
+        np.savez(_dir() / f"{name}_{c}.npz", rows=rows, prob=prob.astype(np.float32))
+        log(f"[nnexp] {name} {c}: mean of {len(members)}")
+
+
+def member_cells(run_name: str, name: str, cells: list[str], log=print) -> None:
+    """A full member as a screen variant: its leave-one-month-out September rows on ``sep``
+    (fit on July + August, like the screen's fits) and its r0 October-like cells."""
+    for c in cells:
+        if c == "sep":
+            cell = SepCell()
+            tr = np.flatnonzero(~cell.led["is_test"].to_numpy())
+            oof = np.load(paths.out_dir() / "runs" / run_name / "oof.npy")
+            rows = cell.stacked[cell.hold]
+            prob = oof[np.isin(tr, np.flatnonzero(cell.hold))]
+        else:
+            z = np.load(paths.out_dir() / "octlike" / f"{run_name}_{c}_r0.npz")
+            rows, prob = z["rows"], z["prob"]
+        np.savez(_dir() / f"{name}_{c}.npz", rows=rows, prob=np.asarray(prob, dtype=np.float32))
+        log(f"[nnexp] {name} {c}: {len(rows)} rows from {run_name}")
+
+
 def table_rows(report: dict, name: str | None = None) -> list[str]:
     """Markdown rows of a ``score`` report: per role, each cell's change x 1e-4 on the targets
     in order (given / cleaned / gen-only), the calls changed, and whether no target loses."""
@@ -546,12 +578,13 @@ def main(argv=None) -> None:
 
     threads.pin()
     ap = argparse.ArgumentParser(prog="python -m ringtrace.nnexp")
-    ap.add_argument("cmd", choices=["teacher", "fit", "score", "table"])
+    ap.add_argument("cmd", choices=["teacher", "fit", "score", "table", "mean", "member"])
     ap.add_argument("variant", nargs="?", default="base")
     ap.add_argument("--cells", default="sep,s13,s14,s15")
     ap.add_argument("--seeds", default="0,1,2")
     ap.add_argument("--base", default="base")
     ap.add_argument("--job", default="", help="prefix of the fit's output name")
+    ap.add_argument("--of", default="", help="mean: comma list of variants; member: the run")
     args = ap.parse_args(argv)
     cells = [c for c in args.cells.split(",") if c]
     if args.cmd == "teacher":
@@ -559,6 +592,10 @@ def main(argv=None) -> None:
     elif args.cmd == "fit":
         for v in args.variant.split(","):
             fit(v, cells, tuple(int(s) for s in args.seeds.split(",")), job=args.job)
+    elif args.cmd == "mean":
+        mean_of(args.variant, [m for m in args.of.split(",") if m], cells)
+    elif args.cmd == "member":
+        member_cells(args.of, args.variant, cells)
     elif args.cmd == "table":
         for v in args.variant.split(","):
             report = json.loads((_dir() / f"score_{v}_vs_{args.base}.json").read_text())
