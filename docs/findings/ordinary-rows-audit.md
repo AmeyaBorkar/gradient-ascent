@@ -72,7 +72,13 @@ calls (`ceiling --front-shares`, TabM fraud-only file):
 | 45 % | 0.6357 | 0.4967 |
 | 50 % | 0.6572 | 0.4761 |
 
-This is a hypothesis about the platform, not about the data. The order probe tests it with one
+**Outcome: rejected.** The order probe of the TabM fraud-only file scored the same public score as
+its source, so the public part is fixed by id and row order plays no part. A follow-up check also
+finds no re-use of past fraud transactions: September rows that repeat a July-August ordinary
+fraud row on (sender, amount) are 2.8 % fraud against 2.2 % for other repeats (106 rows), and no
+October row repeats a past ordinary fraud row on (sender, receiver, amount).
+
+The hypothesis was about the platform, not about the data. The order probe tested it with one
 upload: `shuffle` keeps every call and permutes the rows. An identical public score means the
 public part is fixed by id (the hypothesis is false); a different score means it moves with row
 order. The probe's calls are the source's, so its expected private score is the same in either
