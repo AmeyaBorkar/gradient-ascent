@@ -10,7 +10,7 @@ from ringtrace.classes import N_CLASSES
 from ringtrace.decode import decode_by_period
 from ringtrace.scoring import macro_f1
 
-pytest.importorskip("xgboost")
+xgb = pytest.importorskip("xgboost")
 
 
 def _problem(n: int, seed: int):
@@ -100,9 +100,10 @@ def test_lgbm_recipe_keeps_the_champion_screen_and_features():
     assert p["deterministic"] and p["force_row_wise"]
 
 
-def test_catboost_recipe_parses():
+def test_catboost_recipe_parses(monkeypatch):
     from ringtrace.run import cascade_spec, load_recipe
 
+    monkeypatch.delenv("RINGTRACE_DEVICE", raising=False)
     spec = cascade_spec(load_recipe("recipes/catboost.json"))
     assert spec.stages == "catboost"
     assert spec.seeds == (0, 1, 2)
@@ -149,7 +150,12 @@ def test_cpu_switch_leaves_a_cpu_cascade_byte_equal(monkeypatch):
         booster=BoosterSpec(rounds=15, depth=3, device="cpu"), seeds=(0, 1), screen_rounds=10
     )
     monkeypatch.delenv("RINGTRACE_DEVICE", raising=False)
-    (a,) = fit_predict(X, y, period, [X[:300]], spec, log=lambda *_: None)
+    try:
+        (a,) = fit_predict(X, y, period, [X[:300]], spec, log=lambda *_: None)
+    except xgb.core.XGBoostError as e:  # the very failure the switch avoids (no GPU visible)
+        if "cudaErrorNoDevice" not in str(e):
+            raise
+        pytest.skip("CUDA build of XGBoost without a visible GPU: no baseline arm")
     monkeypatch.setenv("RINGTRACE_DEVICE", "cpu")
     (b,) = fit_predict(X, y, period, [X[:300]], spec, log=lambda *_: None)
     np.testing.assert_array_equal(a, b)
