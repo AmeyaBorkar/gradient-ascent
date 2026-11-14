@@ -642,3 +642,25 @@ augmentation never loses there, but it has no full run, so it has no arrays to g
 - 2026-11-14 03:20 IST: every arrived component judged; `recipes/final.json` unchanged since
   02:15 (`final.csv` sha256 `39cb4952...4db3`).
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+## Gap scan (`analysis/gapscan.py`, 70 s on the laptop)
+
+What would a 0.63 public score need? Calls and evidence of the best file (`blend-tabmF-bq`);
+truth = cleaned labels with each class's ordinary rows scaled by `r`. Finding:
+`docs/findings/gap-scan.md`.
+
+| quantity | value |
+|---|---|
+| `r` at which our out-of-fold calls score our public 0.5499 | 1.091 (ordinary 2.53 % of rows; the all-legit upload implies 2.54 %) |
+| perfect typist of generator-made rows at r = 1.0 / 1.091 / 1.14 / 1.24 | 0.5980 / 0.5783 / 0.5684 / 0.5492 |
+| our calls at r = 1.0 / 1.14 / 1.24 | 0.5683 / 0.5407 / 0.5228 |
+| structure-only typist (template majority) at r = 1.14 | 0.5305 |
+| ordinary rows to catch for 0.6311 (r = 1.091), from our calls, precision 1.0 / 0.6 | 13.8 % (about 910 rows) / 19.3 % (about 1,270) |
+| same from a perfect typist | 8.9 % (about 590) / 12.4 % (about 820) |
+| ordinary against legit, boosting on 48 features, AUC held-out Sep / Jul | 0.509 / 0.500 (per class 0.48 to 0.53) |
+| rows dated after their filing month: train (dated October) / October (dated November) | 147, all generator-made, all called fraud / 46, all anchored, all called fraud |
+| type AUC inside drain shape 3 (new phone), Jul / Aug / Sep | 0.999 / 0.994 / 0.995; counter zone matches the label on 99.5 % |
+| festival amount ratio of October ordinary-row proxies to legit-block rows | 1.17 (95 % 0.96 to 1.41); unscaled would be 0.86 |
+
+Verdict: no candidate. Every route to ordinary-looking rows is closed, and month-boundary filing is
+already used. The look-alike minority is a real generator type.

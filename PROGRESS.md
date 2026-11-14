@@ -40,3 +40,11 @@ counter-anchored template rule.
 - [ ] The blind-spot rule: a label-free rule that calls generator-made rows the champion calls
       legit, adopted only if it never loses on leave-one-month-out and the October-like cells.
 - [ ] Finish the leave-one-family-out ablations left over in run 14.
+
+## Gap scan (14 Nov)
+- What a 0.63 public score would need: `analysis/gapscan.py`, finding `docs/findings/gap-scan.md`.
+- Our public 0.5499 is exactly the train-picture forecast at 1.09 times the train ordinary rate.
+  A perfect typist of generator-made rows gets 0.578 there. Reaching 0.6311 needs about 900
+  ordinary-looking rows caught with the right type, and no tested feature, link, artefact or
+  boundary effect separates those rows (AUC 0.50 to 0.51).
+- No candidate. The current best idea is still the gated best file.
