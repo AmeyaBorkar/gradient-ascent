@@ -57,8 +57,8 @@ event-bootstrap 95 % interval of the fraud-only given change follows.
   Upweighting July and August rows that look like a half-density month is positive for the fraud
   mass in every October-like cell, with every interval across or at 0. But the weights only
   reshuffle which training rows count, and the fraud mass moves on 1-5 rows.
-- **Alone it trades given for gen-only** (s15: given -0.00053, gen-only +0.00116). The weights
-  favour rows that look sparse, which is where generator-made fraud sits.
+- **Alone it trades given for gen-only in s14-15** (s15: given -0.00053, gen-only +0.00116).
+  Which reweighted rows cause this was not measured.
 - **Real October has more shift than the frames** (amounts x1.166 on legit rows, dead columns),
   and a classifier pointed at October would weight harder. Nothing measured here says that would
   help, and the screen never uses October.
