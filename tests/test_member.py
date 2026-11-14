@@ -107,3 +107,13 @@ def test_cpu_forced_fits_are_stored_apart(monkeypatch, tmp_path):
     assert member.store_root("member-x5", "lomo") == tmp_path / "member" / "member-x5" / "lomo"
     monkeypatch.setenv("RINGTRACE_DEVICE", "cpu")
     assert member.store_root("member-x5", "s13") == tmp_path / "member" / "member-x5-cpu" / "s13"
+
+
+def test_cli_refuses_unfitted_seeds_unless_shared(monkeypatch):
+    called = {}
+    monkeypatch.setattr(member, "cells", lambda *a: called.setdefault("cells", a))
+    argv = ["cells", "r.json", "--frames", "13", "--seeds", "5-9", "--cells", "c"]
+    with pytest.raises(SystemExit):
+        member.main([*argv, "--as", "m=0-4/5-9"])
+    member.main([*argv, "--as", "m=0-4/5-9", "--shared"])
+    assert called["cells"][3] == {"m": [(0, 1, 2, 3, 4), (5, 6, 7, 8, 9)]}

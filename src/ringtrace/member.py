@@ -15,7 +15,9 @@ they agree byte for byte (the screening score is seeded on its own and shared by
 ``ringtrace.octlike.fit`` does: ``--as name=g0/g1/g2`` writes cell set r from the r-th seed group
 as ``<cells>/<name>_s<frame>_r<r>.npz`` (``rows``, ``prob``), the format the gate reads.
 
-Seeds already stored are not refitted, so a stopped job resumes where it stopped. Under
+Seeds already stored are not refitted, so a stopped job resumes where it stopped. Several jobs
+can share one store with disjoint ``--seeds`` (``--shared``): an output may then name seeds
+another job fits, and it is written by whichever job finds all of its seeds stored. Under
 ``RINGTRACE_DEVICE=cpu`` the seeds are stored apart (``member/<recipe>-cpu/``), so CPU and GPU
 fits of a seed never mix in one output; the run summary records the device.
 """
@@ -332,11 +334,17 @@ def main(argv=None):
     ce.add_argument("--seeds", required=True)
     ce.add_argument("--as", dest="outputs", action="append", default=[], required=True)
     ce.add_argument("--cells", required=True, help="directory of the cell files")
+    for p in (lo, ce):
+        p.add_argument(
+            "--shared",
+            action="store_true",
+            help="outputs may use seeds that another job fits into the same store",
+        )
     a = ap.parse_args(argv)
     seeds = parse_seeds(a.seeds)
     outputs = parse_outputs(a.outputs, groups=a.cmd == "cells")
     missing = {s for gs in outputs.values() for g in gs for s in g} - set(seeds)
-    if missing:
+    if missing and not a.shared:
         raise SystemExit(f"outputs use seeds that are not fitted: {sorted(missing)}")
     if a.cmd == "lomo":
         folds = parse_seeds(a.folds)
