@@ -20,17 +20,67 @@ from __future__ import annotations
 import numpy as np
 
 
+def clean_posterior(
+    proba: np.ndarray,
+    unreported: float | list[float] = 0.121,
+    legit_flip: float = 0.0007,
+    type_flip: float = 0.0,
+) -> np.ndarray:
+    """Invert the train label noise, so that rows carry probabilities of the clean labels.
+
+    The noise model, measured on the train months: a fraud row of class k is filed legit with
+    chance ``u_k`` (``unreported``, one value or one per class with index 0 ignored), a legit row
+    is filed as a fraud class with chance ``legit_flip`` (spread evenly over the 11 types), and a
+    reported fraud row carries another fraud type, uniformly, with chance ``type_flip``. A model
+    fitted on the given labels estimates
+
+        q_k = (1 - u_k) t_k + legit_flip / 11 * t_0       (types before the flip)
+
+    so the clean posterior is t_k = (q_k - legit_flip / 11 * t_0) / (1 - u_k), with t_0 = 1 - sum
+    t_k solved jointly; the type flip is undone on the fraud types' split (T^-1 of the uniform
+    flip). Negative values are clipped and rows renormalised."""
+    p = np.asarray(proba, dtype=np.float64)
+    k = p.shape[1]
+    u = np.full(k, float(unreported)) if np.isscalar(unreported) else np.asarray(unreported, float)
+    if u.shape != (k,):
+        raise ValueError(f"unreported needs one value or {k}, got {u.shape}")
+    r = float(legit_flip) / (k - 1)
+    keep = 1.0 - u[1:]
+    # q_k = keep_k t_k + r t_0 with t_0 = 1 - sum t_k gives
+    # t_0 = (1 - sum q_k / keep_k) / (1 - r sum 1 / keep_k)
+    t0 = (1.0 - (p[:, 1:] / keep).sum(axis=1)) / (1.0 - r * (1.0 / keep).sum())
+    t0 = np.clip(t0, 0.0, 1.0)
+    t = np.clip((p[:, 1:] - r * t0[:, None]) / keep, 0.0, None)
+    if type_flip > 0:
+        f = t.sum(axis=1, keepdims=True)
+        split = t / np.maximum(f, 1e-12)
+        e, m = float(type_flip), k - 1
+        split = np.clip((split - e / (m - 1)) / (1.0 - e - e / (m - 1)), 0.0, None)
+        split /= np.maximum(split.sum(axis=1, keepdims=True), 1e-12)
+        t = split * f
+    out = np.empty_like(p)
+    out[:, 1:] = t
+    out[:, 0] = np.clip(1.0 - t.sum(axis=1), 0.0, None)
+    return out / out.sum(axis=1, keepdims=True)
+
+
 def fixed_point(
     proba: np.ndarray,
     fraud_scale: float = 0.875,
     max_iter: int = 50,
     damping: float = 0.5,
     hidden_factor: float = 1.0,
+    clean: dict | None = None,
 ) -> np.ndarray:
     """``hidden_factor`` multiplies each fraud class's expected true count: the model is trained
     to give the ordinary-looking fraud rows a legit score, yet they still count as fraud in the
-    labels, so the true class sizes are larger than the probabilities say (1.0 = trust them)."""
+    labels, so the true class sizes are larger than the probabilities say (1.0 = trust them).
+
+    ``clean`` (the keyword arguments of :func:`clean_posterior`) first maps the probabilities to
+    the clean labels by inverting the measured noise; use it with ``fraud_scale`` 1.0."""
     p = np.asarray(proba, dtype=np.float64).copy()
+    if clean is not None:
+        p = clean_posterior(p, **clean)
     p[:, 1:] /= fraud_scale
     p /= p.sum(axis=1, keepdims=True)
     k = p.shape[1]
