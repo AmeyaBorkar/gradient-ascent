@@ -104,3 +104,12 @@ Short records of design choices.
     held-out labels into training. The events are the six event-id modules in the teacher's order
     (bursts, drains, flows, requests, merchant, repeats). The `l2` minority flip uses the same
     chosen event (highest fraud share) and needs no fraud-share threshold of its own.
+16. **Audits come before runs** (`python -m ringtrace.audit`, `docs/findings/ordinary-rows-audit.md`).
+    A claim that a feature or rule reaches ordinary-looking fraud is checked on the counter's
+    label-free groups before a cascade run is spent on it: one-row fraud-phase phones without
+    template evidence (ordinary fraud-pass rows) against legit-block rows, in train *and* in
+    October. The claim goes forward only if the `ordinary` AUC rises clearly above 0.5 in both
+    splits and the `shift` audit (September against October, density-free columns) stays at
+    chance, so the signal is neither absent nor an October-only artefact. `ceiling --submission`
+    is run on every candidate file: it gives the file's expected public score from its call
+    counts and the October composition, and how far the reachable ceiling lies above it.

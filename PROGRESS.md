@@ -32,6 +32,10 @@ counter-anchored template rule.
       paired-bootstrap gate (`docs/decisions.md` item 13).
 - [x] Knowledge base in `docs/knowledge/` (data, modeling, experiments, leaderboard) and
       `docs/onboarding.md`.
+- [x] Signal audits (`python -m ringtrace.audit`, `docs/decisions.md` item 16): ordinary-looking
+      fraud carries no signal in train (AUC 0.490) or October (0.490); October's reachable ceiling is
+      about 0.556; the blend's expected public score from its call counts is 0.5475 (public 0.5474)
+      (`docs/findings/ordinary-rows-audit.md`).
 
 ## Next steps (under way)
 - [ ] The October-like gate of each member and of the equal five-way blend against the champion

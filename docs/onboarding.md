@@ -83,6 +83,7 @@ uploads and most of the ensemble and rule experiments; see the knowledge base be
 | `src/ringtrace/rescore.py` | re-decode saved probabilities without refitting |
 | `src/ringtrace/compare.py` | paired event bootstrap between two finished runs |
 | `src/ringtrace/octlike.py` | native October-like validator: thinned September frames (`build`), fits (`fit`), paired gate (`score`) |
+| `src/ringtrace/audit/` | signal audits before a run (`python -m ringtrace.audit <command>`): `probes` (label-free row groups from the counter), `stats` (CV AUC, per-feature tests, entity links, adversarial periods), `ceiling` (month composition, reachable ceiling, expected score of a file), `lookalike` (sibling separability per template), `shuffle` (order probe of a submission) |
 | `recipes/*.json` | JSON recipes: families, dropped columns, cascade seeds and booster, decoder scale, rules. `champion` is the XGBoost champion; `lgbm`, `catboost`, `clean-event`, `clean-l2` are members 2-5; `blend` is the submission; `champion-cleantrain` trains on cleaned labels; `context-only`, `context-hygiene`, `evidence`, `evidence-nophones` are earlier stages and ablations |
 | `scripts/` | compute-box helpers: `ship.sh`, `sync_to.sh`, `launch.sh`, `box.sh`, `box_in.sh`, `ablate.sh`, `retry_gpu.sh`; `build_submission.sh` (the one command); `refit_october.sh`, `refit_tables.py`; `catboost_repro.py` |
 | `tests/` | one test module per component, on synthetic data |
@@ -109,6 +110,7 @@ root on the commit recorded in the table. Runs are named after their recipe; `re
 | the blend and its submission | `python -m ringtrace.blend recipes/blend.json` on the saved members, or from scratch `bash scripts/build_submission.sh recipes/blend.json` |
 | findings | `python analysis/findings.py`; refit: `python -m ringtrace.refit curve <recipe>` or `october <recipe>`, tables `python scripts/refit_tables.py` |
 | October-like tables | `python -m ringtrace.octlike build`, then `fit <recipe>:0,1,2`, then `score <base> <challenger>` |
+| ordinary-rows audit (`docs/findings/ordinary-rows-audit.md`) | `python -m ringtrace.audit ordinary`, `links`, `shift`, `ceiling --submission <file> --target <score>`, `lookalike`, `shuffle <file>`; aggregates in `$RINGTRACE_OUT/audit/` |
 
 Wall times in `RESULTS.md` are for one GPU shared by up to three jobs (about 6 minutes alone for the
 champion's folds). The October-like frames are built in this repository (`octlike build`).
