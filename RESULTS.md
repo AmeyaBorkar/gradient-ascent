@@ -709,3 +709,16 @@ row fields; train months out of fold, October from a fit on all three months. Ag
 October-like cells cannot fit the stage (no aligned labels on a thinned frame), so it is skipped
 there. It fails the bar on the given target in August and September: a tie worth about one
 October row. Not used.
+
+## The mule/bot counter edge as a rule (`mule_edge`), on top of the bait rules
+
+`recipes/bait-edge.json` = `bait-combo` plus the base-rate rule `mule_edge`: zone rows (a counter
+segment on a fraud-phase phone, no template, no row anchor) that the counter puts in the mule
+segment but that are called velocity_bot take mule_account. `python -m ringtrace.final build
+recipes/bait-edge.json` writes the file with sha256 `b571af3e...2f9dfc`: 10 October rows
+velocity_bot -> mule_account against `bait-combo`, 6 train rows. The train months share one fraud
+phase, so they cannot test this edge (they lose -0.00004 / -0.00008 / -0.00012, all six rows at
+train's exact edge); the October evidence is the per-split counter zones (October's mule zone 1.21
+times wider, matching mule volume) and the anchored-device density in the disputed band (about 40
+to 1 for mule). A judgement call with about +0.0006 expected, uploaded as a file that becomes the
+final pick only if its public score beats `bait-combo`'s.

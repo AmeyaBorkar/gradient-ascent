@@ -200,6 +200,25 @@ def blank_merchant_qr(pred, proba, led, log=print) -> np.ndarray:
     return out
 
 
+def mule_edge(pred, proba, led, log=print, mule: int = 1, bot: int = 2) -> np.ndarray:
+    """Zone rows (a counter segment on a fraud-phase phone, no template, no row anchor) that the
+    counter puts in the mule segment but that are called velocity_bot take mule_account.
+
+    The counter's zones are decoded per split, and October's mule zone is about 1.2 times wider
+    than train's, matching its mule volume; the train months share one fraud phase, so out-of-fold
+    scoring cannot test this edge (``docs/findings/velocity-october.md``)."""
+    c = _counter(led)
+    tmpl, _ = anchors.templates(led)
+    anchor = np.asarray(anchors.row_anchor(led), dtype=np.int64)
+    zone = (c["seg_class"] > 0) & (np.asarray(tmpl) == 0) & (anchor == 0)
+    pred = np.asarray(pred, dtype=np.int64)
+    hit = zone & (c["seg_class"] == mule) & (pred == bot)
+    out = pred.copy()
+    out[hit] = mule
+    log(f"  mule edge: {_split_counts(hit, led['is_test'].to_numpy())}")
+    return out
+
+
 def recovery_rule(pred, proba, led, log=print, **params) -> np.ndarray:
     """The operator-role recovery stage on legit calls (``ringtrace.recovery``)."""
     from ringtrace.recovery import recovery
@@ -210,6 +229,7 @@ def recovery_rule(pred, proba, led, log=print, **params) -> np.ndarray:
 RULES = {
     "blank_merchant_qr": blank_merchant_qr,
     "recovery": recovery_rule,
+    "mule_edge": mule_edge,
     "counter": counter_rule,
     "legit_block": legit_block_rule,
     "plain_templates": plain_templates,
