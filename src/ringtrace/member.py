@@ -15,7 +15,9 @@ they agree byte for byte (the screening score is seeded on its own and shared by
 ``ringtrace.octlike.fit`` does: ``--as name=g0/g1/g2`` writes cell set r from the r-th seed group
 as ``<cells>/<name>_s<frame>_r<r>.npz`` (``rows``, ``prob``), the format the gate reads.
 
-Seeds already stored are not refitted, so a stopped job resumes where it stopped. Several jobs
+Seeds already stored are not refitted, so a stopped job resumes where it stopped, and a job whose
+seeds are all stored only assembles its outputs (the feature matrix is not even loaded, so that
+step fits in a few hundred MB). Several jobs
 can share one store with disjoint ``--seeds`` (``--shared``): an output may then name seeds
 another job fits, and it is written by whichever job finds all of its seeds stored. Under
 ``RINGTRACE_DEVICE=cpu`` the seeds are stored apart (``member/<recipe>-cpu/``), so CPU and GPU
@@ -106,6 +108,11 @@ class SeedStore:
         return mean_of([self.load(key, s) for s in seeds])
 
 
+def unfitted(store: SeedStore, keys, seeds) -> tuple[int, ...]:
+    """The seeds of ``seeds`` with at least one of the outputs ``keys`` not stored."""
+    return tuple(s for s in seeds if not all(store.has(k, s) for k in keys))
+
+
 def fit_seeds(store: SeedStore, keys, X_tr, y_tr, period_tr, X_out, spec, seeds, log=print):
     """Fit the seeds whose outputs are not all stored; ``keys[i]`` names the outputs on
     ``X_out[i]``. Returns the seeds fitted."""
@@ -115,7 +122,7 @@ def fit_seeds(store: SeedStore, keys, X_tr, y_tr, period_tr, X_out, spec, seeds,
         raise TypeError("seed-by-seed fits need a cascade recipe")
     if len(keys) != len(X_out):
         raise ValueError("one key per output matrix")
-    todo = tuple(s for s in seeds if not all(store.has(k, s) for k in keys))
+    todo = unfitted(store, keys, seeds)
     if not todo:
         return ()
     t0 = time.time()
@@ -209,15 +216,18 @@ def lomo(recipe_path: str, seeds, outputs: dict, folds=TRAIN_MONTHS, log=print) 
     _given_only(recipe)
     store.use_frame(None)
     led = store.ledger()
-    X, cols = runner.feature_matrix(recipe)
-    spec, _ = runner.model(recipe)
     is_test = led["is_test"].to_numpy()
     period = led["period"].to_numpy()
     y = led["y"].to_numpy().astype(np.int64)
     tr_idx, te_idx = np.flatnonzero(~is_test), np.flatnonzero(is_test)
     st = SeedStore(store_root(recipe["name"], "lomo"))
-    log(f"[member] {recipe['name']}: {len(cols)} features, seeds {list(seeds)}")
-    for m in folds:
+    pending = [m for m in folds if unfitted(st, [f"hold{m}", f"oct{m}"], seeds)]
+    X = None
+    if pending:
+        X, cols = runner.feature_matrix(recipe)
+        spec, _ = runner.model(recipe)
+        log(f"[member] {recipe['name']}: {len(cols)} features, seeds {list(seeds)}")
+    for m in pending:
         fit = tr_idx[period[tr_idx] != m]
         hold = tr_idx[period[tr_idx] == m]
         log(f"fold {m}: train {len(fit)} rows, hold {len(hold)} ({time.time() - t0:.0f}s)")
@@ -274,25 +284,26 @@ def cells(recipe_path: str, frames, seeds, outputs: dict, cells_dir: Path, log=p
             frame = ol.Frame(fs)
             y = frame.led["y"].to_numpy().astype(np.int64)
             fit_rows = frame.fit & np.isin(frame.period, ol.FIT_PERIODS)
-            X, _ = runner.feature_matrix(recipe)
-            spec, _ = runner.model(recipe)
             st = SeedStore(store_root(recipe["name"], f"s{fs}"))
             log(
                 f"[member] frame s{fs}: fit {int(fit_rows.sum())}, September "
                 f"{int(frame.hold.sum())} ({time.time() - t0:.0f}s)"
             )
-            fit_seeds(
-                st,
-                ["sept"],
-                X[fit_rows],
-                y[fit_rows],
-                frame.period[fit_rows],
-                [X[frame.hold]],
-                spec,
-                seeds,
-                log,
-            )
-            del X
+            if unfitted(st, ["sept"], seeds):
+                X, _ = runner.feature_matrix(recipe)
+                spec, _ = runner.model(recipe)
+                fit_seeds(
+                    st,
+                    ["sept"],
+                    X[fit_rows],
+                    y[fit_rows],
+                    frame.period[fit_rows],
+                    [X[frame.hold]],
+                    spec,
+                    seeds,
+                    log,
+                )
+                del X
             rows = frame.stacked[frame.hold]
             for name, groups in outputs.items():
                 for r, g in enumerate(groups):

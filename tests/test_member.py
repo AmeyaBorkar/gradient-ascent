@@ -117,3 +117,15 @@ def test_cli_refuses_unfitted_seeds_unless_shared(monkeypatch):
         member.main([*argv, "--as", "m=0-4/5-9"])
     member.main([*argv, "--as", "m=0-4/5-9", "--shared"])
     assert called["cells"][3] == {"m": [(0, 1, 2, 3, 4), (5, 6, 7, 8, 9)]}
+
+
+def test_unfitted_names_the_seeds_missing_an_output(tmp_path):
+    st = member.SeedStore(tmp_path)
+    a = np.zeros((3, N_CLASSES))
+    st.save("hold7", 0, a)
+    st.save("oct7", 0, a)
+    st.save("hold7", 1, a)  # seed 1 lacks its October output
+    assert member.unfitted(st, ["hold7", "oct7"], (0, 1, 2)) == (1, 2)
+    assert member.unfitted(st, ["hold7"], (0, 1)) == ()
+    # nothing left to fit: fit_seeds returns before touching its (absent) inputs
+    assert member.fit_seeds(st, ["hold7"], None, None, None, [None], _spec(), (0, 1)) == ()
