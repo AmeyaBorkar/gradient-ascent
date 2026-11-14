@@ -806,6 +806,19 @@ def check(seeds: list[int], log=print) -> dict:
     return report
 
 
+def prep_frame(seed: int, log=print) -> None:
+    """Build a frame's feature families and its rebuilt counter once, before parallel fits."""
+    from ringtrace import octlike, store
+
+    honest_phones(seed, log=log)
+    octlike.Frame(seed)
+    for name in store.FAMILIES:
+        if name != octlike.HELD_FAMILY:
+            store.family(name)
+    store.use_frame(None)
+    log(f"[density] frame s{seed} ready")
+
+
 def _ints(s: str) -> list[int]:
     return [int(x) for x in s.split(",") if x]
 
@@ -820,6 +833,8 @@ def main(argv=None):
     c.add_argument("--seeds", default="13,14,15")
     mx = sub.add_parser("mixframes", help="October-mix frames (new thinning seeds)")
     mx.add_argument("--seeds", default="23,24,25")
+    pf = sub.add_parser("prepframes", help="build every family and the rebuilt counter")
+    pf.add_argument("--seeds", default="23,24,25")
     f = sub.add_parser("cells")
     f.add_argument("cells", nargs="+", help="recipe:seedset,seedset ...")
     f.add_argument("--seeds", default="13,14,15")
@@ -844,6 +859,8 @@ def main(argv=None):
     args = ap.parse_args(argv)
     if args.cmd == "check":
         return check(_ints(args.seeds))
+    if args.cmd == "prepframes":
+        return [prep_frame(sd) for sd in _ints(args.seeds)]
     if args.cmd == "mixframes":
         if set(_ints(args.seeds)) & {13, 14, 15}:
             raise ValueError("seeds 13-15 are the October-like frames; pick others")
