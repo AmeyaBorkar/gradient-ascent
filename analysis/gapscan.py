@@ -6,6 +6,7 @@ near 0.57 to 0.60? Train labels are used row by row; October only through counts
     python analysis/gapscan.py boundary  [--calls NPZ]
     python analysis/gapscan.py lookalike [--calls NPZ]
     python analysis/gapscan.py festival  [--calls NPZ]
+    python analysis/gapscan.py octlink   [--calls NPZ]
     python analysis/gapscan.py all       [--calls NPZ]
 
 ``--calls`` is an npz in ledger order with ``calls`` (out-of-fold calls on the train months and the
@@ -429,12 +430,69 @@ def festival(d: dict) -> dict:
     return res
 
 
+# --------------------------------------------------------------------------------------- octlink
+def octlink(d: dict) -> dict:
+    """Share of legit-called rows whose sender, P2P receiver or device appears in a fraud-called row
+    within 24 h, per month. A month written at half volume (half the events, half the legit rows per
+    account) halves this share; thinning legit rows alone (September, p = 0.494, fraud-called rows
+    whole) leaves it unchanged. If October's ordinary fraud were tied to its events, October's share
+    would sit above half of the train share."""
+    led = d["led"].select("row", "sender", "receiver", "device", "ts", "to_person")
+    df = led.with_columns(
+        pl.Series("call", d["calls"]),
+        pl.Series("period", d["period"]),
+        pl.Series("y", d["y"]),
+        pl.Series("gen", d["gen"]),
+    )
+
+    def rates(f: pl.DataFrame) -> dict:
+        fr = f.filter(pl.col("call") > 0)
+        accts = pl.concat(
+            [
+                fr.select(pl.col("sender").alias("e"), pl.col("ts").alias("tf")),
+                fr.filter(pl.col("to_person")).select(
+                    pl.col("receiver").alias("e"), pl.col("ts").alias("tf")
+                ),
+            ]
+        ).sort("tf")
+        devs = fr.select(pl.col("device").alias("e"), pl.col("ts").alias("tf")).sort("tf")
+        lg = f.filter(pl.col("call") == 0)
+        out = {}
+        for nm, col, tab in [
+            ("sender", "sender", accts),
+            ("p2p_receiver", "receiver", accts),
+            ("device", "device", devs),
+        ]:
+            q = lg.select(pl.col(col).alias("e"), "ts", "y", "gen", "to_person")
+            if nm == "p2p_receiver":
+                q = q.filter(pl.col("to_person"))
+            j = q.sort("ts").join_asof(tab, left_on="ts", right_on="tf", by="e", strategy="nearest")
+            hit = ((pl.col("ts") - pl.col("tf")).abs() <= 86400).fill_null(False)
+            r = j.select(
+                hit.mean().alias("all"),
+                hit.filter((pl.col("y") > 0) & (pl.col("gen") == 0)).mean().alias("ordinary"),
+            ).row(0, named=True)
+            out[nm] = {k: None if v is None else 100 * float(v) for k, v in r.items()}
+        return out
+
+    res: dict = {}
+    for p in (*MONTHS, 10):
+        res[str(p)] = rates(df.filter(pl.col("period") == p))
+    sep = df.filter(pl.col("period") == 9)
+    keep = (sep["call"].to_numpy() > 0) | (np.random.default_rng(0).random(sep.height) < 0.494)
+    res["9_thinned"] = rates(sep.filter(pl.Series(keep)))
+    for k, v in res.items():
+        print(k, {nm: round(x["all"], 3) for nm, x in v.items()})
+    return res
+
+
 COMMANDS = {
     "ceiling": ceiling,
     "omnibus": omnibus,
     "boundary": boundary,
     "lookalike": lookalike,
     "festival": festival,
+    "octlink": octlink,
 }
 
 
