@@ -29,12 +29,13 @@ on the laptop RTX 5070 Ti, the same as the plain TabM.
 ## What it means
 
 - **A score-function estimate of batch macro-F1 is mostly noise at this batch size.** A 2,048-row
-  batch holds about 75 fraud rows (3.7 % of the fit rows) across eleven classes, so the sampled batch macro-F1 swings
-  widely between draws. Centred by its baseline, the term averages to about zero, and the
+  batch holds about 75 fraud rows (3.7 % of the fit rows) across eleven classes, so the sampled
+  batch macro-F1 swings widely between draws. Centred by its baseline, the term averages to about zero, and the
   training loss ends where the plain loss ends.
 - **The calls that move come from noise, not from the metric.** The sampling draws from the GPU
   generator that also drives dropout, so from the first batch on, the variant's dropout masks
   differ from the base's. That is a seed change, and the 0-8 moved calls with mixed signs look
   like one.
 - **The decoder already optimises macro-F1 on calibrated probabilities.** A training-time metric
-  term can only help by changing the ranking inside a class, and this one does not change it.
+  term can only help by changing the ranking inside a class, and nothing here shows that this one
+  does.
