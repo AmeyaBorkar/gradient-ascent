@@ -661,11 +661,15 @@ same way on the same GPU):
 | fold 9, scaled without the balance ceiling (`augment-fest9nocap-fold-9`) | -0.00259 | -0.00288 | -0.00707 | 506 s |
 | fold 8 unscaled (`augment-base-fold-8`) | 0.50897 | 0.56389 | 0.89960 | 293 s |
 | fold 8, August scaled (`augment-fest8-fold-8`) | -0.00016 | -0.00009 | +0.00011 | 536 s |
+| fold 7 unscaled (`augment-base-fold-7`) | 0.51295 | 0.56447 | 0.90198 | 1194 s (shared GPU) |
+| fold 7, July scaled (`augment-fest7-fold-7`) | +0.00017 | +0.00017 | +0.00024 | 1185 s (shared GPU) |
+| TabM, fold 9 unscaled (`augment-tabm-base-fold-9`) | 0.51495 | 0.57169 | 0.90176 | 2673 s |
+| TabM, fold 9, September scaled (`augment-tabm-fest9-fold-9`) | -0.00017 | -0.00018 | -0.00037 | 2326 s |
 
 - The loss without the ceiling comes from 718 ordinary rows pushed past their balance (refund
   calls 606 -> 690, phishing 950 -> 992 on September). October has no such rows.
-- With the ceiling, the cost is under 0.0005 in both folds: the festival line stops, and training
-  on scaled months is not run.
+- With the ceiling, the champion's cost is under 0.0005 in all three folds and TabM's on fold 9:
+  the festival line stops, and training on scaled months is not run.
 
 Prior correction of the best file's out-of-fold probabilities (`analysis/augment_em.py --draws 8`,
 226 s on the laptop; months also resampled by unit to October's estimated mix). Change against no
@@ -681,4 +685,4 @@ correction, Jul / Aug / Sep:
 - EM's prior estimate is noise: 0.51-2.28 times the reference on months whose true ratio is 1.
 - Even the exact mix moves about 8 rows per resampled month and 6 October rows, so class-mix
   training weights (bounded by the same shift, through one member) were not run.
-- 2026-11-14 16:10 IST: no candidate from this line; the best file stands.
+- 2026-11-14 17:45 IST: no candidate from this line; the best file stands.

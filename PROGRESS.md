@@ -44,10 +44,9 @@ counter-anchored template rule.
 ## October's amounts and class mix (14 Nov)
 - [x] Festival scaling (`ringtrace.festival`) that keeps round classes, equal amounts and the
       balance ceiling; its months match October's aggregates (`analysis/festival_check.py`).
-- [x] Shift test, champion, folds 9 and 8: the festival amounts cost under 0.0005 on given and
-      cleaned, so training on scaled months is not needed.
+- [x] Shift test, champion folds 7 to 9 and TabM fold 9: the festival amounts cost under 0.0005
+      on given and cleaned, so training on scaled months is not needed.
 - [x] Prior correction on the best file's out-of-fold probabilities (`analysis/augment_em.py`):
       EM loses on July; the exact October mix moves 6 October rows. Rejected; class-mix weights
       not run.
-- [ ] Shift test of the TabM fraud member, fold 9 (running).
 - Current best idea: none from this line; the best file stands.

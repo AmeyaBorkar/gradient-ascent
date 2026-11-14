@@ -10,9 +10,11 @@ model anything, and does making training look like October win it back?
 
 **Answer.** No on both counts.
 
-- **Amounts (known).** A September rescaled to October's amounts costs the champion nothing:
-  +0.00003 / -0.00006 / -0.00010 on fold 9 (given / cleaned / gen-only) and -0.00016 / -0.00009 /
-  +0.00011 on fold 8, against a stop line of 0.0005. Training on rescaled months has nothing to
+- **Amounts (known).** A held-out month rescaled to October's amounts costs the champion
+  nothing. The change (given / cleaned / gen-only) is +0.00003 / -0.00006 / -0.00010 on fold 9,
+  -0.00016 / -0.00009 / +0.00011 on fold 8 and +0.00017 / +0.00017 / +0.00024 on fold 7, against
+  a stop line of 0.0005. The TabM member, half of the best file's fraud mass, loses -0.00017 /
+  -0.00018 / -0.00037 on fold 9, also under the line. Training on rescaled months has nothing to
   recover, so it was not run.
 - **Class mix (known).** Correcting the decoded probabilities with an EM prior estimate loses on
   July (-0.0006 given, -0.0009 cleaned). The EM estimate of each month's prior is noise, at 0.5 to
@@ -58,10 +60,9 @@ The scaling had to keep three properties, and two early versions broke them:
 
 ## 2. What the festival shift costs the champion
 
-Fold 9 is fitted on July + August and scores September; fold 8 is fitted on July + September and
-scores August. The baseline and the challenger are refitted on the same GPU from the same commit.
-They differ only in the held-out month's money columns, plus the cross-month window features they
-feed. Macro-F1 after the fixed point and the template rule:
+Each fold is fitted on the other two months and scores the held-out month. The baseline and the
+challenger are refitted on the same GPU with the same model code. They differ only in the
+held-out month's money columns, plus the cross-month window features those columns feed. Macro-F1 after the fixed point and the template rule:
 
 | run | given | cleaned | gen-only |
 |---|---|---|---|
@@ -70,13 +71,20 @@ feed. Macro-F1 after the fixed point and the template rule:
 | fold 9, scaled without the balance ceiling | 0.51196 (-0.00259) | 0.56832 (-0.00288) | 0.89437 (-0.00707) |
 | fold 8, unscaled | 0.50897 | 0.56389 | 0.89960 |
 | fold 8, August scaled | 0.50881 (-0.00016) | 0.56379 (-0.00009) | 0.89971 (+0.00011) |
+| fold 7, unscaled | 0.51295 | 0.56447 | 0.90198 |
+| fold 7, July scaled | 0.51313 (+0.00017) | 0.56464 (+0.00017) | 0.90221 (+0.00024) |
+| TabM (`recipes/tabm.json`, 3 seeds), fold 9, unscaled | 0.51495 | 0.57169 | 0.90176 |
+| TabM, fold 9, September scaled | 0.51478 (-0.00017) | 0.57151 (-0.00018) | 0.90139 (-0.00037) |
 
 The run without the balance ceiling is the one to learn from. Its whole loss is on rows October
 does not have: the champion calls ordinary rows that were pushed past their balance fraud. In that
 frame, September's refund_abuse calls rise from 606 to 690 (refund F1 -0.026 given, -0.063
 gen-only) and phishing_collect calls from 950 to 992 (F1 -0.006 given). With the ceiling kept,
-refund calls stay at 606 and phishing calls move by 3. The cost is then inside the run-to-run
-noise in both months, well under the 0.0005 stop line. The festival line stops here: training on scaled months
+refund calls stay at 606 and phishing calls move by 3. The champion's cost is then inside the
+run-to-run noise in all three months, well under the 0.0005 stop line. TabM loses a little more,
+and the loss is the same before the decoder (argmax -0.00032 given), but it is still under the
+line. Training it on scaled months could win back at most that much, about 0.0001 in a blend
+where TabM carries half the fraud mass. The festival line stops here: training on scaled months
 (step 3) has no loss to recover.
 
 ## 3. Prior correction of the best file's probabilities
@@ -122,7 +130,7 @@ October is bounded by the 6 rows above.
 
 | component | bar | verdict |
 |---|---|---|
-| festival-scaled training (steps 2-3) | cost of the shift < 0.0005 on given and cleaned in both folds | stopped: nothing to recover |
+| festival-scaled training (steps 2-3) | cost of the shift < 0.0005 on given and cleaned in all three folds | stopped: nothing to recover |
 | EM prior correction (`em`, `em_types`) | loses on plain July | rejected |
 | known-mix prior shift (`known`, `known_types`) | -0.00004 / -0.00003 on plain July; 6-7 October rows | rejected (too small, and not non-negative) |
 | class-mix weights | bounded by the known-mix shift | not run |
