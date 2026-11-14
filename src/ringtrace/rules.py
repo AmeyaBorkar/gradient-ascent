@@ -28,6 +28,9 @@
 * ``far_segment``: a fraud-phase row whose confident counter segment is far from its fraud call
   (neither the segment, a neighbour in label-list order, nor a class the segment's zone is written
   with) takes the segment's class.
+* ``counter_news``: a fraud-phase row whose call equals the previous counter's class takes the
+  refined class when the two differ by exactly one class and the refined posterior is at least
+  ``min_post``. A call that already differs from the previous segment stays.
 * ``legit_topup``: a row called legit by the rules and by the plain decode whose most likely fraud
   class is one of ``classes`` with a scaled probability at or above its threshold takes that class.
 
@@ -40,7 +43,7 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
-from ringtrace import baitroles
+from ringtrace import baitroles, counternews
 from ringtrace.classes import CODE, N_CLASSES
 from ringtrace.evidence import anchors, phones
 from ringtrace.evidence.anchors import TEMPLATE_CLASS, TEMPLATE_NAMES, TEMPLATE_PAIR
@@ -356,6 +359,7 @@ RULES = {
     "recovery": recovery_rule,
     "mule_edge": mule_edge,
     "far_segment": far_segment,
+    "counter_news": counternews.counter_news,
     "legit_topup": legit_topup,
     "just_under_pay": baitroles.just_under_pay,
     "counter": counter_rule,
