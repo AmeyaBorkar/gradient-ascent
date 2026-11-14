@@ -1,0 +1,21 @@
+{
+ "name": "m-champion-half1",
+ "members": [
+  {
+   "name": "champion",
+   "run": "density-champion-half1",
+   "variant": "fold",
+   "cells": "champion-half1"
+  }
+ ],
+ "weights": {
+  "mode": "equal"
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ],
+ "base_rate_rules": []
+}
