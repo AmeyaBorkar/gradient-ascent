@@ -52,5 +52,14 @@ counter-anchored template rule.
   byte-equal to `fit_predict`), the `type` blend role in `ringtrace.final.mix`, recipes
   `member-x5` (0.04 cut, seeds 0-4) and `member-cut04` (0.04 cut, seeds 0-2), five blend
   candidates in `recipes/cand/member-*.json` and the gate `analysis/member_gate.py`.
-- Running on the box GPU: leave-one-month-out seeds 0-4 and October-like frames s13-15 with seeds
-  0-14; a champion control on frame s14 checks that the cells reproduce.
+- 14:00 IST: the box GPU runs were stopped unfinished (leave-one-month-out had fold 7 complete
+  and seeds 0-1 of folds 8 and 9; the cells seeds 0-6). They are not used: every fit is redone on
+  the CPU so that no member mixes devices.
+- `RINGTRACE_DEVICE=cpu` forces XGBoost `device` cpu and CatBoost `task_type` CPU; fits made
+  under it are stored in `member/<recipe>-cpu/`. With no GPU visible, the CUDA build of XGBoost
+  3.4 fails in its default multiclass metric, so the switch also disables that metric (no fit is
+  evaluated; the trees are byte-equal).
+- 14:20 IST, box CPU only (`CUDA_VISIBLE_DEVICES=` empty, 16 threads per job): the 0.04-cut
+  member (`member-x5-cpu` = seeds 0-4, `member-cut04-cpu` = seeds 0-2) on the three month folds
+  and the cells s13-15, and a CPU-built champion (`champion-cpu`, seeds 0-2) as the like-for-like
+  base of the swaps and of the cut alone.
