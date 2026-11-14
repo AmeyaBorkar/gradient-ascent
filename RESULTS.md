@@ -447,3 +447,28 @@ the 3-seed plain TabM gets the same alone gains (+2.1 given on `sep`) from seed 
 Against the 3-seed TabM, the comparison that matters for the blend, each average loses a cell:
 avg7 on s15 and avg3 on s14. The fraud mass moves on 0-2 rows per cell. An October file would
 differ from the current one on a handful of rows, so no full bar was run and no file was written.
+
+### Seeds 1 and 2 of shift (box) and SWA (laptop), each against the base of the same seed on the same GPU
+
+`nnexp fit base,shift --seeds <s> --job wildrun-box` on the box, and `nnexp fit base,swa --seeds <s>
+--job wildrun` on the laptop, for s = 1, 2. The shift weights are the same at every seed: the
+classifier is seeded 0, and only the TabM seed changes. Seed 0 is in the tables above (SWA seed 0
+is the first screen's).
+
+| variant | seed | role | sep | s13 | s14 | s15 | never loses |
+|---|---|---|---|---|---|---|---|
+| shift | 1 | fraud-only | -0.2 / -0.2 / -1.1 (4) | -0.6 / -0.5 / -0.2 (2) | -0.8 / -0.8 / -1.0 (1) | +0.0 / +0.0 / +0.0 (0) | no |
+| shift | 1 | alone | +0.4 / +0.4 / -1.0 (14) | -10.0 / -9.4 / +5.5 (17) | -6.8 / -6.5 / +3.4 (10) | -1.8 / -1.8 / -2.7 (11) | no |
+| shift | 2 | fraud-only | +0.8 / -0.1 / +0.7 (5) | -0.3 / -0.3 / -0.8 (1) | +0.0 / +3.7 / +5.4 (2) | +0.6 / +0.5 / +0.2 (2) | no |
+| shift | 2 | alone | -1.4 / -1.3 / -1.0 (10) | -3.1 / -4.7 / -10.1 (18) | +0.4 / +0.3 / -1.8 (5) | -3.9 / -4.1 / -1.6 (9) | no |
+| swa | 1 | fraud-only | +0.0 / +0.0 / +0.0 (0) | +0.0 / +0.0 / +0.0 (0) | +0.0 / +0.0 / +0.0 (0) | +0.0 / +0.0 / +0.0 (0) | yes |
+| swa | 1 | alone | -0.5 / -0.5 / -0.9 (3) | +1.3 / +0.4 / +2.0 (5) | +0.3 / +0.3 / +0.7 (1) | +0.2 / +0.3 / +0.8 (1) | no |
+| swa | 2 | fraud-only | +0.0 / +0.0 / +0.0 (0) | +0.0 / +0.0 / +0.0 (0) | +0.0 / +0.0 / +0.0 (0) | +0.0 / +0.0 / +0.0 (0) | yes |
+| swa | 2 | alone | -0.3 / -0.2 / -0.1 (2) | +0.5 / +0.6 / +1.6 (2) | +0.4 / +0.6 / +4.2 (3) | -0.8 / -0.7 / -1.0 (1) | no |
+
+**shift:** the seed-0 pattern (positive in s13-15) does not repeat. Across seeds 0-2 the fraud-only
+given change is positive in 5 of 12 cell-seeds, negative in 5 and 0 in 2, on 0-5 calls; it is
+seed noise. **SWA:** in the fraud-mass role it changes no call in any cell at seeds 1 and 2 (0-1
+at seed 0). Alone, seeds 1-2 are mixed and smaller than at seed 0 (+0.5 to +4.2 there). Both stay
+rejected; nothing went to the full bar. Wall time 5.0-5.7 min per fit on either GPU; 16 fits per
+machine.
