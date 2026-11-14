@@ -1,0 +1,46 @@
+{
+ "name": "catboost-nopos",
+ "families": [
+  "context",
+  "marks",
+  "bursts",
+  "drains",
+  "flows",
+  "requests",
+  "merchant",
+  "repeats",
+  "phones"
+ ],
+ "drop": [
+  "ctr_dev_rows",
+  "ctr_dev_single",
+  "ctr_pos"
+ ],
+ "cascade": {
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "booster": {
+   "rounds": 300,
+   "eta": 0.08,
+   "depth": 8,
+   "device": "cpu"
+  },
+  "stages": "catboost",
+  "catboost": {
+   "iterations": 300,
+   "depth": 8,
+   "learning_rate": 0.08,
+   "border_count": 254,
+   "task_type": "CPU"
+  }
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ]
+}
