@@ -36,7 +36,7 @@ from ringtrace.classes import N_CLASSES
 
 BASE = "recipes/final-half.json"
 C = "recipes/cand/"
-SWAPS = (C + "member-swap.json", C + "member-cut04-swap.json")
+SWAPS = (C + "member-swap.json",)
 GROUPS = (
     (
         "blend",
@@ -53,7 +53,7 @@ GROUPS = (
     (
         "solo",
         C + "member-solo-champion-cpu.json",
-        (C + "member-solo-cut04.json", C + "member-solo-x5.json"),
+        (C + "member-solo-cut04.json",),
     ),
     ("device", C + "member-solo-champion.json", (C + "member-solo-champion-cpu.json",)),
 )

@@ -59,5 +59,5 @@ def test_gate_groups_load_and_read_the_cpu_built_members():
                 m["cells"] == m["run"] or m["run"] in ("blend-champion-m1", "final-tabm")
                 for m in r["members"]
             )
-    assert {"member-x5-cpu", "member-cut04-cpu", "champion-cpu"} <= runs
-    assert not runs & {"member-x5", "member-cut04"}
+    assert {"member-cut04-cpu", "champion-cpu"} <= runs
+    assert not runs & {"member-x5", "member-cut04", "member-x5-cpu"}

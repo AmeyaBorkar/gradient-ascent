@@ -40,9 +40,9 @@
   },
   {
    "name": "member",
-   "run": "member-x5-cpu",
+   "run": "member-cut04-cpu",
    "variant": "fold",
-   "cells": "member-x5-cpu",
+   "cells": "member-cut04-cpu",
    "role": "fraud"
   }
  ],
