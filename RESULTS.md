@@ -663,3 +663,28 @@ event with a fraud-block phone sits in the zone of its label (10 takeover, 36 si
 new-phone drains (356 / 156) and the collect rows (col7 14 / 9, col1 44 / 1). So the clean October
 labels keep them, and retyping by template (the rejected `tmpl-simato`) should lose in October as
 it does in train.
+
+## Unanswered baits and operator roles (`analysis/bait.py`; finding `docs/findings/bait-operator-roles.md`)
+
+Commit 8bdbb3d (rules in `ringtrace.baitroles`, 94a2b67). Base: the best file's out-of-fold calls
+(`blend-tabmF-bq`, `prep.npz`). Per held-out month Jul / Aug / Sep; event bootstrap of the mean
+change, 2,000 draws, 95 %; precision = moved rows that are phishing_collect on the cleaned labels
+against the break-even (half of phishing's F1: 0.286 / 0.275 / 0.268). Laptop, 4 threads:
+`validate` 4.8 min, `octlike` 8 min (nine cells), `thinned` 15 min (20 seeds), `build` 10 s.
+
+| change | given | cleaned | gen-only | cleaned precision | rows train / Oct | October-like cells, cleaned mean (pooled lb) | fresh seeds, cleaned mean (lb) | verdict |
+|---|---|---|---|---|---|---|---|---|
+| `roles`: lone unanswered Rs 10, sender an operator in another month -> phishing_collect | +0.00011 / +0.00001 / +0.00010; [+0.00000, +0.00015] | +0.00009 / +0.00000 / +0.00008; [-0.00001, +0.00014] | +0.00007 / -0.00017 / -0.00001 | 4/7, 2/7, 3/5 | 19 / 4 | +0.00011 (+0.00001); s13 -0.00005 | +0.00008 (+0.00004), 14 of 20 | passes, narrowly |
+| `roles-band` (Rs 1 to 10, any amount) | same as `roles` | same | same | same | 19 / 4 | | | no extra row |
+| `pay`: first-time P2P PAY >= Rs 1,000, whole, not a multiple of ten | +0.00025 / +0.00007 / +0.00001 | +0.00020 / +0.00004 / -0.00002 | -0.00007 / -0.00019 / -0.00025 | 12/27, 6/19, 4/16 | 62 / 7 | -0.00001 (-0.00015) | -0.00001 (-0.00007) | fails |
+| `pay-roles`: `pay` with the receiver an operator in another month | +0.00022 / +0.00018 / +0.00008; [+0.00008, +0.00026] | +0.00020 / +0.00016 / +0.00007; [+0.00007, +0.00024] | +0.00018 / +0.00019 / +0.00010 | 6/6, 5/6, 2/2 | 14 / 3 | +0.00007 (-0.000006), every cell positive | +0.00008 (+0.00005), 18 of 20 | passes the months; cell bound misses by 0.000006 |
+| **`combo`**: `roles` + `pay-roles` | +0.00033 / +0.00019 / +0.00018; [+0.00012, +0.00037] | +0.00029 / +0.00017 / +0.00016; [+0.00010, +0.00033] | +0.00024 / +0.00002 / +0.00008 | 10/13, 7/13, 5/7 | 33 / 7 | +0.00018 (+0.00005); seeds +0.00003 / +0.00030 / +0.00022 | +0.00016 (+0.00011), 19 of 20 | **passes** |
+| `roles-all4` (every month sees July to October, own month too) | +0.00015 / +0.00012 / +0.00014 | +0.00013 / +0.00010 / +0.00012 | +0.00003 / -0.00007 / +0.00003 | 5/8, 5/11, 4/6 | 25 / 4 (same rows) | +0.00014 (+0.00002) | | passes; same October file |
+| `pay-roles-all4` | +0.00029 / +0.00018 / +0.00012 | +0.00027 / +0.00016 / +0.00011 | +0.00026 / +0.00019 / +0.00015 | 8/8, 5/6, 3/3 | 17 / 3 (same rows) | +0.00009 (+0.000002) | | passes; same October file |
+| control `history`: sender sent a fraud-labelled row in another train month | -0.00090 / -0.00063 / -0.00064 | -0.00101 / -0.00065 / -0.00072 | -0.00277 / -0.00196 / -0.00222 | 6/98, 4/64, 4/68 | 230 / 29 | | | fails |
+
+Candidates on top of `blend-tabmF-bq.csv` (all legit -> phishing_collect): `bait-combo.csv` 7 rows,
+sha256 `3b25869e1cd7ac3e390dd33568033d25d3b765b23f0e1f35dbbf3f2dff5e1974` (passes);
+`bait-roles.csv` 4 rows, `a6b55dd09914a2f18f098bd7644942959ddeaf574609de844ee790d54a7a8954`;
+`bait-pay-roles.csv` 3 rows, `6171470da676dec2f009913120f4aa038c66dd9c6f438aa4f35ea3fe1d13f2ee`.
+Expected October change of `bait-combo`: about +0.0003.

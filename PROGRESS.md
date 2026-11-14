@@ -49,3 +49,14 @@ counter-anchored template rule.
       Leave-one-month-out given +0.0007 / +0.0002 / +0.0007, cleaned +0.0007 / +0.0002 / +0.0006;
       6 October rows. Small; fold into a combined upload.
 - [x] phishing_collect / fake_cashback (col7, col1) and loan_app_extortion in col1: at chance.
+
+## Unanswered baits and operator roles (14 Nov)
+- [x] The best file calls every unanswered Rs 1 / 2 / 5 bait; the only bait rows left are lone
+      unanswered Rs 10s (31 cleaned phishing rows called legit in train, 142 legit calls in
+      October).
+- [x] Label-free operator roles (QR and just-under collect receivers, bait senders, answer
+      receivers, bot-pool senders, round merchant payers) in another month: 61 % of recognised
+      bait senders against 1.2 % of legit Rs 10 senders. The label-history control fails (6 %).
+- [x] Current best idea: `bait-combo` (lone Rs 10 from an operator; first-time whole-rupee PAY
+      of Rs 1,000 or more to an operator): cleaned +0.00029 / +0.00017 / +0.00016, nine cells
+      +0.00018 (lb +0.00005), 7 October rows legit -> phishing_collect. The plain PAY rule fails.
