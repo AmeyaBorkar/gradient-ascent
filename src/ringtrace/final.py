@@ -13,6 +13,7 @@ A recipe::
                                             # or {"mode": "nested", "combine": "prob", "steps": 10}
      "decoder": {"fraud_scale": 0.875},
      "rules": ["anchored_templates"],
+     "rule_counter": "champion",        # or "refined"; absent means champion
      "base_rate_rules": [{"name": "blank_merchant_qr", "max_october_rows": 40}]}
 
 ``variant`` picks the October probabilities of a member: ``fold`` (the mean of the three month
@@ -30,6 +31,13 @@ October-like cells (fitted on July + August) use the September fold's weights.
 training months cannot measure (their October case never occurs in train) and enter on a
 documented base-rate argument; each carries a cap on the October rows it may change, and the
 build stops if the cap is exceeded.
+
+``rule_counter`` chooses the ``ctr_*`` columns those rules read. Absent, or ``champion``, they
+read the columns already on the ledger (the ``phones`` family the members trained on).
+``refined`` rebuilds those columns with ``evidence.refined`` once for the bench and once for
+each October-like frame, and every rule and base-rate rule of that recipe reads that ledger.
+The members, the mix and the decoder stay on the champion features. Any other value is a
+``RecipeError``.
 
 The harness (``score``, ``table``) never refits: it reads ``oof.npy`` / ``test.npy`` and the cells,
 and reports per-month scores on the given, cleaned and gen-only targets, the paired event bootstrap
@@ -53,6 +61,7 @@ from ringtrace.classes import CLASSES, N_CLASSES
 TRAIN_MONTHS = (7, 8, 9)
 VARIANTS = {"fold": "", "refit": "-refit", "hedge": "-hedge"}
 WEIGHT_MODES = ("equal", "fixed", "nested")
+RULE_COUNTERS = ("champion", "refined")
 DEFAULT_DECODER = {"fraud_scale": 0.875}
 
 
@@ -100,12 +109,16 @@ def check_recipe(recipe: dict) -> dict:
     for r in recipe.setdefault("base_rate_rules", []):
         if "name" not in r or int(r.get("max_october_rows", -1)) < 0:
             raise RecipeError(f"a base-rate rule needs a name and max_october_rows: {r}")
+    rc = recipe.get("rule_counter", "champion")
+    if rc not in RULE_COUNTERS:
+        raise RecipeError(f"unknown rule_counter {rc!r}; known {RULE_COUNTERS}")
     return recipe
 
 
 def recipe_key(recipe: dict) -> str:
     """A digest of everything that changes the calls (not the name)."""
     keep = {k: recipe[k] for k in ("members", "weights", "decoder", "rules", "base_rate_rules")}
+    keep["rule_counter"] = recipe.get("rule_counter", "champion")
     return hashlib.sha256(json.dumps(keep, sort_keys=True).encode()).hexdigest()[:16]
 
 
@@ -246,6 +259,7 @@ class Bench:
         self._calls: dict = {}
         self._weights: dict = {}
         self._boots: dict = {}
+        self._refined_leds: dict = {}
 
     @classmethod
     def from_store(cls, runs_dir: Path, cells_dir: Path | None = None, log=print) -> Bench:
@@ -286,6 +300,23 @@ class Bench:
 
     # decoding -----------------------------------------------------------------------------
 
+    def _rules_led(self, recipe: dict, led: pl.DataFrame, cache_key: str | tuple) -> pl.DataFrame:
+        """The ledger ``recipe``'s rules read.
+
+        ``champion`` (the default when ``rule_counter`` is absent) is ``led`` itself. ``refined``
+        is ``led`` with every ``ctr_*`` column overwritten by ``evidence.refined.build``, cached
+        under ``cache_key``: one entry for the bench ledger and one per October-like frame.
+        """
+        if recipe.get("rule_counter", "champion") != "refined":
+            return led
+        slot = self._refined_leds.get(cache_key)
+        if slot is None or slot[0] is not led:
+            from ringtrace.evidence import refined
+
+            slot = (led, led.with_columns(refined.build(led)))
+            self._refined_leds[cache_key] = slot
+        return slot[1]
+
     def decode_rows(self, rows: np.ndarray, proba_rows: np.ndarray, recipe: dict) -> np.ndarray:
         """One month's (or October's) rows decoded on their own, then the model rules."""
         from ringtrace import rules as rulebook
@@ -296,7 +327,13 @@ class Bench:
         if recipe["rules"]:
             full = np.zeros((self.led.height, N_CLASSES))
             full[rows] = proba_rows
-            pred = rulebook.apply(recipe["rules"], pred, full, self.led, log=lambda *_: None)
+            pred = rulebook.apply(
+                recipe["rules"],
+                pred,
+                full,
+                self._rules_led(recipe, self.led, "bench"),
+                log=lambda *_: None,
+            )
         return pred[rows]
 
     def weights(self, recipe: dict) -> dict:
@@ -365,13 +402,18 @@ class Bench:
         for k in (*TRAIN_MONTHS, "october"):
             rows = self.te if k == "october" else self.tr[self.period[self.tr] == k]
             pred[rows] = fixed_point(proba[rows], **recipe["decoder"])
+        rule_led = (
+            self._rules_led(recipe, self.led, "bench")
+            if recipe["rules"] or recipe["base_rate_rules"]
+            else self.led
+        )
         if recipe["rules"]:
-            pred = rulebook.apply(recipe["rules"], pred, proba, self.led, log=_quiet)
+            pred = rulebook.apply(recipe["rules"], pred, proba, rule_led, log=_quiet)
         changed = {}
         for r in recipe["base_rate_rules"]:
             params = {k: v for k, v in r.items() if k not in ("name", "max_october_rows")}
             after = rulebook.apply(
-                [{"name": r["name"], **params}], pred, proba, self.led, log=lambda *_: None
+                [{"name": r["name"], **params}], pred, proba, rule_led, log=lambda *_: None
             )
             changed[r["name"]] = {
                 "october": capped(r["name"], pred, after, self.is_test, int(r["max_october_rows"])),
@@ -474,7 +516,8 @@ class Bench:
                     if not np.array_equal(rows, frame.stacked[frame.hold]):
                         raise ValueError(f"cells s{seed} r{r} do not match the current frame")
                     p = mix(probs, wsep[recipe_key(rec)], [m["role"] for m in rec["members"]])
-                    pred = ol.decode(frame, p, rec["decoder"], rec["rules"])
+                    led = self._rules_led(rec, frame.led, ("frame", seed))
+                    pred = ol.decode(frame, p, rec["decoder"], rec["rules"], led)
                     if rec["base_rate_rules"]:
                         full_pred = np.zeros(frame.led.height, dtype=np.int64)
                         full_pred[hold] = pred
@@ -484,7 +527,7 @@ class Bench:
                             {k: v for k, v in x.items() if k != "max_october_rows"}
                             for x in rec["base_rate_rules"]
                         ]
-                        pred = rulebook.apply(names, full_pred, full_p, frame.led, log=_quiet)[hold]
+                        pred = rulebook.apply(names, full_pred, full_p, led, log=_quiet)[hold]
                     return pred
 
                 for r in sets:

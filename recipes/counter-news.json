@@ -53,6 +53,7 @@
  "decoder": {
   "fraud_scale": 0.875
  },
+ "rule_counter": "refined",
  "rules": [
   "anchored_templates",
   "bait_roles",

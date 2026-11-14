@@ -1,21 +1,20 @@
-"""Rows the refined device counter moves by one class relative to the previous counter.
+"""Rows the refined device counter moves by one class relative to the champion counter.
 
-The phone feature module's source is hashed into its cache key, so the previous fraud-phase
-segmentation lives here and ``phones.py`` stays as it is. ``legacy_decode`` is that segmentation:
-anchors-only Viterbi, then the sim_swap / account_takeover change point, ``snap_cut`` and
-``SIDE_PENALTY``, then Viterbi again. ``news`` runs it beside the current ``phones.decode_phase``
-on the same per-split tables the counter builds.
+``phones.py`` is the champion counter: its source is hashed into the feature cache, so the
+members keep the segmentation they trained on. ``legacy_decode`` is that segmentation
+(``phones.decode_phase(...).seg``). ``news`` runs it beside ``refined.decode_phase`` on the same
+per-split tables the counter builds.
 
-``counter_news`` moves a fraud-phase row whose call still equals the previous class when the
+``counter_news`` moves a fraud-phase row whose call still equals the champion class when the
 refined posterior mode is exactly one class away and at least ``min_post``. A call that already
-differs from the previous segment is left alone.
+differs from the champion segment is left alone.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-from ringtrace.evidence import anchors, phones
+from ringtrace.evidence import anchors, phones, refined
 
 
 def _split_counts(mask: np.ndarray, is_test: np.ndarray) -> str:
@@ -25,34 +24,19 @@ def _split_counts(mask: np.ndarray, is_test: np.ndarray) -> str:
 def legacy_decode(
     nums: np.ndarray, counts: np.ndarray, blocks: phones.Blocks, lo: int, hi: int
 ) -> np.ndarray:
-    """Segment one fraud phase the way ``decode_phase`` did before allocation geometry.
+    """Segment one fraud phase the way the champion counter does.
 
     ``counts[i, c]`` is the rows of phone ``i`` with anchor ``c`` (0 = none). Returns the segment
-    index of each phone (0..10), the path the previous counter published. The old decoder also
-    returned posteriors and the snapped cut; this returns the path only.
+    index of each phone (0..10), the path ``phones.decode_phase`` publishes.
     """
-    loge = phones.emission_table()
-    ll = counts @ loge.T
-    path = phones.viterbi(ll)
-    zone = np.isin(path, (phones.SIM, phones.ATO))
-    if zone.sum() >= 2 * phones.CUT_MIN_SIDE:
-        idx = np.flatnonzero(zone)
-        j = phones.change_point(nums[idx])
-        if j is not None:
-            peak = int(nums[idx[j - 1]]) + 1
-            cut = phones.snap_cut(peak, blocks, lo, hi)
-            ll = ll.copy()
-            ll[nums < cut, phones.ATO] -= phones.SIDE_PENALTY
-            ll[nums >= cut, phones.SIM] -= phones.SIDE_PENALTY
-            path = phones.viterbi(ll)
-    return path
+    return phones.decode_phase(nums, counts, blocks, lo, hi).seg
 
 
 def news(led) -> dict[str, np.ndarray]:
-    """Row-level previous class, refined class and refined posterior.
+    """Row-level champion class, refined class and refined posterior.
 
-    Off the fraud phase every value is 0. On it, ``old_class`` is the legacy segment plus one,
-    ``new_class`` is the mode of the current phase posterior plus one (the earliest segment when
+    Off the fraud phase every value is 0. On it, ``old_class`` is the champion segment plus one,
+    ``new_class`` is the mode of the refined phase posterior plus one (the earliest segment when
     the mode ties), and ``new_post`` is that probability. The per-split phone tables are built as
     ``phones.counter`` builds them.
     """
@@ -73,7 +57,7 @@ def news(led) -> dict[str, np.ndarray]:
         counts = np.zeros((len(nums), phones.K + 1))
         np.add.at(counts, (pinv, anchor[rows]), 1.0)
         old_seg = legacy_decode(nums, counts, blocks, lo, hi)
-        post = phones.decode_phase(nums, counts, blocks, lo, hi).post
+        post = refined.decode_phase(nums, counts, blocks, lo, hi).post
         choice = post.argmax(axis=1)
         old_class[rows] = old_seg[pinv] + 1
         new_class[rows] = choice[pinv] + 1
@@ -82,7 +66,7 @@ def news(led) -> dict[str, np.ndarray]:
 
 
 def counter_news(pred, proba, led, log=print, min_post: float = 0.7) -> np.ndarray:
-    """A fraud-phase row whose call equals the previous counter class takes the refined class
+    """A fraud-phase row whose call equals the champion counter class takes the refined class
     when that class is one away and its posterior is at least ``min_post``."""
     got = news(led)
     pred = np.asarray(pred, dtype=np.int64)

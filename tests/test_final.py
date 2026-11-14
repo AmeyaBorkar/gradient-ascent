@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import numpy as np
 import polars as pl
@@ -163,6 +164,113 @@ def test_fraud_role_with_zero_full_weight_keeps_the_trees_types():
     out = final.mix([a, b], [0.0, 1.0], ["full", "fraud"])
     assert out[0, 0] == pytest.approx(0.2)
     assert out[0, 1] / out[0, 2] == pytest.approx(3.0)
+
+
+def test_recipe_key_records_the_rule_counter():
+    assert final.recipe_key(_recipe()) == final.recipe_key(_recipe(rule_counter="champion"))
+    assert final.recipe_key(_recipe()) != final.recipe_key(_recipe(rule_counter="refined"))
+
+
+def test_unknown_rule_counter_raises(tmp_path):
+    assert "rule_counter" not in _recipe()
+    assert _recipe(rule_counter="refined")["rule_counter"] == "refined"
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps({"members": [{"name": "a", "run": "a"}], "rule_counter": "new"}))
+    with pytest.raises(final.RecipeError, match="rule_counter"):
+        final.load_recipe(path)
+
+
+def test_counter_news_recipe_selects_the_refined_counter():
+    recipe = final.load_recipe(Path(__file__).parents[1] / "recipes" / "counter-news.json")
+    assert recipe["rule_counter"] == "refined"
+
+
+def _ledger_rules_can_read(led: pl.DataFrame) -> pl.DataFrame:
+    """Shape and mark columns, so a refined rebuild does not touch the feature store."""
+    from ringtrace.evidence.anchors import MARK_CLASS, SHAPE_CLASS
+
+    n = led.height
+    return led.with_columns(
+        pl.Series("device", np.arange(1, n + 1, dtype=np.int64)),
+        pl.Series("ctr_seg", np.full(n, -3.0)),
+        *[pl.Series(f"{p}_shape", np.zeros(n, dtype=np.int8)) for p in SHAPE_CLASS],
+        *[pl.Series(name, np.zeros(n, dtype=np.int8)) for name, _ in MARK_CLASS],
+    )
+
+
+def test_rule_counter_refined_passes_refined_columns(bench, monkeypatch):
+    from ringtrace import rules as rulebook
+    from ringtrace.evidence import refined
+
+    led = _ledger_rules_can_read(bench.led)
+    b = final.Bench(led, bench.targets, bench.groups, bench.runs_dir, log=lambda *_: None)
+    seen: list[pl.DataFrame] = []
+
+    def capture(pred, proba, got, log=print, **kwargs):
+        seen.append(got)
+        return np.asarray(pred, dtype=np.int64)
+
+    monkeypatch.setitem(rulebook.RULES, "counter", capture)
+    spec = {
+        "rules": ["counter"],
+        "base_rate_rules": [{"name": "counter", "max_october_rows": 0}],
+    }
+    b.calls(_recipe(**spec))
+    assert seen and all(x is led for x in seen)
+
+    b._calls.clear()
+    seen.clear()
+    b.calls(_recipe(**spec, rule_counter="champion"))
+    assert seen and all(x is led for x in seen)
+
+    b._calls.clear()
+    seen.clear()
+    refined_recipe = _recipe(**spec, rule_counter="refined")
+    b.calls(refined_recipe)
+    assert len(seen) == 2 and seen[0] is seen[1] and seen[0] is not led
+    overlay = seen[0]
+    built = refined.build(led)
+    assert overlay.select(built.columns).schema == built.schema
+    for col in built.columns:
+        assert np.allclose(overlay[col].to_numpy(), built[col].to_numpy(), equal_nan=True), col
+    assert not np.allclose(overlay["ctr_seg"].to_numpy(), led["ctr_seg"].to_numpy(), equal_nan=True)
+
+    seen.clear()
+    rows = np.flatnonzero(b.period == 7)
+    b.decode_rows(rows, np.full((len(rows), N_CLASSES), 1.0 / N_CLASSES), refined_recipe)
+    assert seen == [overlay]
+
+    frame = led.with_columns(pl.Series("frame_mark", np.arange(led.height, dtype=np.int64)))
+    one = b._rules_led(refined_recipe, frame, ("frame", 13))
+    two = b._rules_led(refined_recipe, frame, ("frame", 13))
+    other = b._rules_led(refined_recipe, frame, ("frame", 14))
+    assert one is two and one is not overlay and other is not one
+    assert np.array_equal(one["frame_mark"].to_numpy(), np.arange(led.height))
+    frame_cols = refined.build(frame)
+    assert np.allclose(one["ctr_seg"].to_numpy(), frame_cols["ctr_seg"].to_numpy(), equal_nan=True)
+
+
+def test_octlike_decode_rules_read_the_passed_ledger(monkeypatch):
+    from types import SimpleNamespace
+
+    from ringtrace import octlike as ol
+    from ringtrace import rules as rulebook
+
+    seen: list[pl.DataFrame] = []
+
+    def capture(pred, proba, got, log=print, **kwargs):
+        seen.append(got)
+        return np.asarray(pred, dtype=np.int64)
+
+    monkeypatch.setitem(rulebook.RULES, "counter", capture)
+    frame_led = pl.DataFrame({"is_test": [False, False, False, False]})
+    other = frame_led.with_columns(pl.Series("ctr_seg", [1.0, 2.0, 3.0, 4.0]))
+    frame = SimpleNamespace(led=frame_led, hold=np.array([False, True, True, False]))
+    prob = np.full((2, N_CLASSES), 1.0 / N_CLASSES)
+    ol.decode(frame, prob, {"fraud_scale": 0.875}, ["counter"], other)
+    ol.decode(frame, prob, {"fraud_scale": 0.875}, ["counter"])
+    assert seen[0] is other
+    assert seen[1] is frame_led
 
 
 def test_two_fraud_members_differ_from_one(bench):

@@ -13,10 +13,10 @@ occupancy of the stacked frame's number line:
 Inside a fraud phase the phones, sorted by number, run through the 11 fraud types in order. An
 11-state left-to-right HMM with flat transitions (uniform prior over monotone paths that start in
 the first segment) reads each row's label-free anchor (``anchors.row_anchor``) through a hard-anchor
-emission table with zone-specific unmarked shares. Each phone also carries its allocation
-geometry: the run of unused numbers just below it (geometric per segment) and its row count.
-sim_swap and account_takeover phones look the same to every family, so this is what separates
-them (sim phones dense, takeover phones sparse). Fitted separately on each split's fraud phase.
+emission table with zone-specific unmarked shares. sim_swap and account_takeover phones look the
+same to every family, so the cut between them is placed by the occupancy drop (sim phones are
+dense, takeover phones sparse) and snapped onto the longest run of unused numbers near it; a
+second pass of the HMM then respects that cut. Fitted separately on each split's fraud phase.
 
 Columns (prefix ``ctr``): block (0 none, 1 bot, 2 fraud phase, 3 legit block), pos (rank of the
 phone in its fraud phase, 0..1), seg (Viterbi segment 0..10), conf (posterior of the Viterbi
@@ -46,29 +46,6 @@ CUT_MIN_SIDE = 5  # phones on each side of the sim/ato change point
 SNAP_RADIUS = 10  # numbers around the change point searched for a run of unused numbers
 SIDE_PENALTY = 6.0  # log-weight against the wrong side of the snapped sim/ato cut
 TEMPER = 1.0  # scale of the log-emission for the posteriors (Viterbi unchanged)
-
-# Allocation evidence per segment, fitted once on the train months' fraud phase (phones placed by
-# a monotone fit to the cleaned labels) and fixed here, so the counter stays label-free when it
-# runs: the mean run of unused numbers just below a phone (a geometric law per segment: sim_swap
-# phones are dense, account_takeover phones sparse) and the share of phones with 1, 2, 3, 4 and
-# 5+ rows (only the drain segments carry phones with more than one row).
-GAP_MU = np.array([0.8771, 1.8352, 1.215, 0.4138, 2.8066, 0.7797, 1.9609, 1.0455, 0.8, 1.0, 1.169])
-ROW_PMF = np.array(
-    [
-        [0.9987, 0.0005, 0.0004, 0.0004, 0.0],
-        [0.9974, 0.001, 0.0009, 0.0007, 0.0],
-        [0.9978, 0.0008, 0.0007, 0.0006, 0.0],
-        [0.4417, 0.2377, 0.2308, 0.0898, 0.0],
-        [0.2073, 0.2921, 0.2328, 0.2678, 0.0],
-        [0.998, 0.0008, 0.0007, 0.0006, 0.0],
-        [0.998, 0.0008, 0.0007, 0.0006, 0.0],
-        [0.9958, 0.0016, 0.0014, 0.0012, 0.0],
-        [0.9939, 0.0024, 0.002, 0.0017, 0.0],
-        [0.9912, 0.0034, 0.0029, 0.0025, 0.0],
-        [0.9935, 0.0025, 0.0021, 0.0018, 0.0],
-    ]
-)
-ROW_FLOOR = 1e-4  # an unseen row count (5+ rows) costs every segment the same, never -inf
 
 # P(row carries no anchor | zone): the learned shape-tag table (spec-counter 2c)
 UNMARKED = np.array([0.641, 0.948, 0.557, 0.150, 0.067, 0.551, 0.671, 0.597, 0.641, 0.730, 0.704])
@@ -258,24 +235,6 @@ def snap_cut(peak: int, blocks: Blocks, lo: int, hi: int) -> int:
     return int(starts[best])
 
 
-def allocation_ll(nums: np.ndarray, counts: np.ndarray) -> np.ndarray:
-    """Per-phone log-likelihood of each segment from the allocation geometry: the unused numbers
-    just below the phone (none for the first phone) and the phone's row count."""
-    n = len(nums)
-    ll = np.zeros((n, K))
-    gap = np.full(n, -1, dtype=np.int64)
-    gap[1:] = np.diff(np.asarray(nums, dtype=np.int64)) - 1
-    m = gap >= 0
-    if m.any():
-        g = gap[m][:, None].astype(np.float64)
-        ll[m] = g * np.log(GAP_MU / (1.0 + GAP_MU)) - np.log1p(GAP_MU)
-    pmf = np.maximum(ROW_PMF, ROW_FLOOR)
-    pmf = pmf / pmf.sum(axis=1, keepdims=True)
-    rows = np.asarray(counts, dtype=np.float64).sum(axis=1).round().astype(np.int64)
-    rb = np.clip(rows, 1, pmf.shape[1]) - 1
-    return ll + np.log(pmf[:, rb].T)
-
-
 @dataclass
 class Phase:
     nums: np.ndarray  # phone numbers, sorted
@@ -287,20 +246,28 @@ class Phase:
 
 
 def decode_phase(nums: np.ndarray, counts: np.ndarray, blocks: Blocks, lo: int, hi: int) -> Phase:
-    """Segment one fraud phase. ``counts[i, c]`` = rows of phone i with anchor c (0 = none). The
-    anchors and the allocation geometry (gaps and rows per phone) are read together, so the
-    sim_swap / account_takeover cut falls where the dense sim phones give way to sparse takeover
-    phones without a separate change-point step."""
+    """Segment one fraud phase. ``counts[i, c]`` = rows of phone i with anchor c (0 = none)."""
     loge = emission_table()
-    ll = counts @ loge.T + allocation_ll(nums, counts)
+    ll = counts @ loge.T
     path = viterbi(ll)
+    zone = np.isin(path, (SIM, ATO))
+    cut = None
+    if zone.sum() >= 2 * CUT_MIN_SIDE:
+        idx = np.flatnonzero(zone)
+        j = change_point(nums[idx])
+        if j is not None:
+            peak = int(nums[idx[j - 1]]) + 1
+            cut = snap_cut(peak, blocks, lo, hi)
+            ll = ll.copy()
+            ll[nums < cut, ATO] -= SIDE_PENALTY
+            ll[nums >= cut, SIM] -= SIDE_PENALTY
+            path = viterbi(ll)
     post = forward_backward(ll * TEMPER)
     conf = post[np.arange(len(path)), path]
-    zone = np.isin(path, (SIM, ATO))
     side = np.full(len(nums), np.nan)
-    side[zone] = (path[zone] == ATO).astype(np.float64)
-    takeover = np.flatnonzero(path == ATO)
-    cut = int(nums[takeover[0]]) if len(takeover) else None
+    if cut is not None:
+        zone |= np.isin(path, (SIM, ATO))
+        side[zone] = (nums[zone] >= cut).astype(np.float64)
     return Phase(nums=nums, post=post, seg=path, conf=conf, side=side, cut=cut)
 
 

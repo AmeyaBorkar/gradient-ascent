@@ -298,12 +298,21 @@ class Frame:
 
 
 def decode(
-    frame: Frame, prob: np.ndarray, decoder: dict | None = None, rules: list | None = None
+    frame: Frame,
+    prob: np.ndarray,
+    decoder: dict | None = None,
+    rules: list | None = None,
+    led: pl.DataFrame | None = None,
 ) -> np.ndarray:
-    """September decoded on its own: the fixed point, then the rules (label-free)."""
+    """September decoded on its own: the fixed point, then the rules (label-free).
+
+    ``led`` is the ledger the rules read, one row per frame row. It defaults to ``frame.led``.
+    The fixed point does not use it.
+    """
     from ringtrace import rules as rulebook
     from ringtrace.decode import fixed_point
 
+    ledger = frame.led if led is None else led
     hold = np.flatnonzero(frame.hold)
     pred = np.zeros(frame.led.height, dtype=np.int64)
     pred[hold] = fixed_point(prob, **(DEFAULT_DECODER if decoder is None else decoder))
@@ -311,7 +320,7 @@ def decode(
     if rules:
         full = np.zeros((frame.led.height, prob.shape[1]))
         full[hold] = prob
-        pred = rulebook.apply(rules, pred, full, frame.led, log=lambda *_: None)
+        pred = rulebook.apply(rules, pred, full, ledger, log=lambda *_: None)
     return pred[hold]
 
 
