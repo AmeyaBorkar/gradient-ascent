@@ -655,7 +655,7 @@ columns (and in what the template rule reads). Cells: frames s13-s15, seed set r
 Month folds: `python -m ringtrace.final table` (production counter) and
 `python -m ringtrace.density table --counter alone|half0` (held-out month as a pass of its own at
 full density, or in two halves at October's density). Box: one RTX 4060 (8 GB), 32 threads, at
-most 2 GPU fits and 10 threads for these jobs; commits 25edb86-731a07d.
+most 2 GPU fits and 10 threads for these jobs; commits 25edb86 to 540a082.
 
 Devices: XGBoost and CatBoost cells are GPU fits on this box (`RINGTRACE_DEVICE=cuda`); their held
 cells reproduce the earlier GPU cells to the fourth decimal (champion s13 0.5240 / 0.5822 / 0.9054,
@@ -681,7 +681,7 @@ arms of a cell share their devices.
 | clean-l2, half0 | 0.5224 / 0.5809 / 0.9069 -> 0.5213 / 0.5796 / 0.9049 | 0.5077 / 0.5652 / 0.8909 -> 0.5089 / 0.5661 / 0.8928 | 0.5127 / 0.5701 / 0.8994 -> 0.5124 / 0.5693 / 0.8978 | 227-234 s |
 
 Every member loses 0.002 to 0.006 per cell when September's counter is rebuilt at October's
-density. Trained on a counter at October's density, the XGBoost members lose 0.0001 to 0.0019
+density. Trained on a counter at October's density, the XGBoost members lose 0.0004 to 0.0019
 under the held counter but gain under the honest one on every seed: given +0.0008 to +0.0041 per
 member and seed against the same member trained on the production counter (each decoded alone).
 
@@ -789,8 +789,12 @@ part of the run), month folds 15 to 60 min, a cell gate 3 to 5 min and a month-f
 Not run (time): no-position variants of clean-event, clean-l2, LightGBM and CatBoost; the
 champion's no-position month folds (stopped by GPU memory while TabM trained); LightGBM and
 CatBoost at October's density; draw 1 for clean-event and clean-l2 and all draw-1 month folds;
-the October-mix frames. Still running on the box after this entry (one job at a time, ends about
-01:00 IST): TabM at October's density on s14 and s15, TabM refitted on this GPU for s14 and s15,
-then the month folds `density-tabm-half0` and `density-tabm`; then
-`bash scripts/density_gate.sh tabm` and `tabm-lomo`, and the file of
-`recipes/density/final-half-chalf3t.json`.
+the October-mix frames. TabM trained at October's density also has its s14 cell (rebuilt
+counter: given 0.5079, cleaned 0.5655, gen-only 0.8903), but its same-GPU baseline for s14 failed
+for GPU memory (another job took 3.6 GB). Still queued on the box after this entry, one job at a
+time, each waiting for 4.2 GB of free GPU memory and retried on failure: TabM refitted on the RTX
+4060 for s14 and s15, TabM at October's density for s15, then the month folds
+`density-tabm-half0` and `density-tabm`. A waiting gate then scores TabM at October's density on
+s13-s14 (`gates/half0-tabm-cells-honest-s1314.json`, `half3t-blend-cells-honest-s1314.json`);
+after the month folds: `bash scripts/density_gate.sh tabm` and `tabm-lomo`, and the October file
+of `recipes/density/final-half-chalf3t.json`.

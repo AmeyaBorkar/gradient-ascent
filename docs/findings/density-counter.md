@@ -77,5 +77,6 @@ one. Rejected; the other members' variants and its month folds were not run.
   folds (the run failed for GPU memory while TabM was training).
 - LightGBM and CatBoost at October's density; the second training draw beyond the champion's
   cells; the October-mix frames.
-- TabM at October's density beyond one like-for-like seed: its other cells, its baseline cells on
-  this GPU and its month folds are queued on the box after this report.
+- TabM at October's density beyond one like-for-like seed: its s15 cell, its baseline cells on
+  this GPU for s14 and s15 and its month folds are queued on the box after this report (the s14
+  baseline failed for GPU memory once).

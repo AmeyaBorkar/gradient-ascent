@@ -65,7 +65,8 @@ counter-anchored template rule.
 - Not run for time: the no-position variants of clean-event, clean-l2, LightGBM and CatBoost and
   the champion's no-position month folds; LightGBM and CatBoost at October's density; the second
   draw beyond the champion's cells; the October-mix frames.
-- [ ] TabM at October's density: one like-for-like frame gains +0.0044 given. Queued on the box:
-      TabM half0 cells s14 and s15, TabM refitted on the same GPU for s14 and s15, month folds
-      `density-tabm-half0` and `density-tabm`; then `bash scripts/density_gate.sh tabm` and
-      `tabm-lomo`, and build `recipes/density/final-half-chalf3t.json`.
+- [ ] TabM at October's density: one like-for-like frame (s13) gains +0.0044 given; the s14 cell
+      is in. Queued on the box (queue `~/work/dqueue/q1.txt`, logs `~/logs/density/q1/`): TabM
+      refitted on the same GPU for s14 and s15, TabM half0 s15, month folds `density-tabm-half0`
+      and `density-tabm`; then `bash scripts/density_gate.sh tabm` and `tabm-lomo`, and build
+      `recipes/density/final-half-chalf3t.json` (outputs under `~/outputs/dlane`).
