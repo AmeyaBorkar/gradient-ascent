@@ -562,11 +562,18 @@ def _no_cleaned():
     raise ValueError("train_on 'cleaned' is not supported here")
 
 
-def lomo(recipe_path: Path, name: str, train_counter: str = "", log=print) -> dict:
+def lomo(
+    recipe_path: Path,
+    name: str,
+    train_counter: str = "",
+    half_draws: tuple[int, ...] = (0,),
+    log=print,
+) -> dict:
     """Month folds of a recipe; each held-out month predicted with the production counter
-    (``oof.npy``) and with its standalone counter (``oof_alone.npy``), October from the fold
-    mean (``test.npy``). Written to ``$RINGTRACE_OUT/runs/<name>/``. ``train_counter`` (see
-    ``training_counter``) replaces the fit rows' counter columns."""
+    (``oof.npy``), with its standalone counter (``oof_alone.npy``) and with its counter at
+    October's density (``oof_half<d>.npy``, two halves of its own, ``half_phones(d)``), October
+    from the fold mean (``test.npy``). Written to ``$RINGTRACE_OUT/runs/<name>/``.
+    ``train_counter`` (see ``training_counter``) replaces the fit rows' counter columns."""
     from ringtrace import eventclean, store
     from ringtrace import run as runner
 
@@ -575,6 +582,7 @@ def lomo(recipe_path: Path, name: str, train_counter: str = "", log=print) -> di
     out = paths.out_dir() / "runs" / name
     out.mkdir(parents=True, exist_ok=True)
     alone_ph = lomo_phones(log=log)
+    half_ph = {d: half_phones(d, log=log) for d in half_draws}
     train_ph = training_counter(train_counter, log=log)
     store.use_frame(None)
     led = store.ledger()
@@ -590,6 +598,7 @@ def lomo(recipe_path: Path, name: str, train_counter: str = "", log=print) -> di
     n_cls = 12
     oof = np.zeros((len(y), n_cls))
     oof_alone = np.zeros((len(y), n_cls))
+    oof_half = {d: np.zeros((len(y), n_cls)) for d in half_draws}
     test = np.zeros((len(te), n_cls))
     for m in runner.TRAIN_MONTHS:
         fit = tr[period[tr] != m]
@@ -600,19 +609,24 @@ def lomo(recipe_path: Path, name: str, train_counter: str = "", log=print) -> di
             mask[fit] = True
             target = eventclean.clean_labels(y, events, mode, mask=mask)
         t1 = time.time()
-        a, b, c = fit_fn(
+        a, b, c, *h = fit_fn(
             X[fit] if train_ph is None else swap_counter(X, cols, fit, train_ph),
             target[fit],
             period[fit],
-            [X[hold], swap_counter(X, cols, hold, alone_ph), X[te]],
+            [X[hold], swap_counter(X, cols, hold, alone_ph), X[te]]
+            + [swap_counter(X, cols, hold, half_ph[d]) for d in half_draws],
             spec,
             log=lambda *_: None,
         )
         oof[hold], oof_alone[hold] = a, b
+        for d, ph in zip(half_draws, h, strict=True):
+            oof_half[d][hold] = ph
         test += c / len(runner.TRAIN_MONTHS)
         log(f"[density] {name} fold {m}: {time.time() - t1:.0f}s")
     np.save(out / "oof.npy", oof[tr].astype(np.float32))
     np.save(out / "oof_alone.npy", oof_alone[tr].astype(np.float32))
+    for d in half_draws:
+        np.save(out / f"oof_half{d}.npy", oof_half[d][tr].astype(np.float32))
     np.save(out / "test.npy", test.astype(np.float32))
     summary = {
         "recipe": recipe,
@@ -751,16 +765,30 @@ def cell_gate(
     return rep
 
 
-def standalone_bench(runs_dir: Path, log=print):
-    """A ``final.Bench`` whose rules read every train month's standalone counter (point its
-    recipes at runs that hold the standalone predictions)."""
+def standalone_bench(runs_dir: Path, counter: str = "alone", log=print):
+    """A ``final.Bench`` whose rules read every train month's counter as a pass of its own:
+    ``alone`` (full density) or ``half<d>`` (October's density, ``half_phones(d)``). Point its
+    recipes at runs that hold the matching predictions."""
     from ringtrace import final
 
     bench = final.Bench.from_store(runs_dir, None, log=log)
-    alone_ph = lomo_phones(log=log)
+    ph = training_counter(counter, log=log)
+    if ph is None:
+        raise ValueError(f"counter must be alone or half<d>, got {counter!r}")
     cols = [c for c in bench.led.columns if c.startswith(CTR)]
-    bench.led = bench.led.with_columns([alone_ph[c] for c in cols])
+    bench.led = bench.led.with_columns([ph[c] for c in cols])
     return bench
+
+
+def with_suffix(recipe: dict, runs_dir: Path, suffix: str) -> dict:
+    """A final recipe whose members read ``<run><suffix>`` wherever that run exists."""
+    if not suffix:
+        return recipe
+    out = json.loads(json.dumps(recipe))
+    for m in out["members"]:
+        if (Path(runs_dir) / (m["run"] + suffix)).is_dir():
+            m["run"] = m["run"] + suffix
+    return out
 
 
 # ---------------------------------------------------------------------------------------------
@@ -855,6 +883,7 @@ def main(argv=None):
     lo.add_argument("recipe")
     lo.add_argument("--name", required=True)
     lo.add_argument("--train-counter", default="", help="production, alone or half<d>")
+    lo.add_argument("--half-draws", default="0", help="held-out months at October's density")
     g = sub.add_parser("cellgate", help="side b against side a on the October-like cells")
     g.add_argument("a", help="recipe.json:cells_dir:held|honest")
     g.add_argument("b", help="recipe.json:cells_dir:held|honest")
@@ -864,6 +893,8 @@ def main(argv=None):
     g.add_argument("--report", required=True)
     t = sub.add_parser("table", help="final.table on the month folds, standalone counter rules")
     t.add_argument("recipes", nargs="+")
+    t.add_argument("--counter", default="alone", help="the rules' counter: alone or half<d>")
+    t.add_argument("--suffix", default="", help="members read <run><suffix> where it exists")
     t.add_argument("--draws", type=int, default=2000)
     t.add_argument("--report", required=True)
     args = ap.parse_args(argv)
@@ -882,7 +913,7 @@ def main(argv=None):
             cells.append((name, _ints(sets) if sets else [0]))
         return fit_cells(_ints(args.seeds), cells, Path(args.recipes), args.tag, args.train_counter)
     if args.cmd == "lomo":
-        return lomo(Path(args.recipe), args.name, args.train_counter)
+        return lomo(Path(args.recipe), args.name, args.train_counter, tuple(_ints(args.half_draws)))
     from ringtrace import final
 
     if args.cmd == "cellgate":
@@ -896,8 +927,9 @@ def main(argv=None):
         Path(args.report).parent.mkdir(parents=True, exist_ok=True)
         Path(args.report).write_text(json.dumps(rep, indent=1))
         return rep
-    bench = standalone_bench(paths.out_dir() / "runs")
-    recipes = [final.load_recipe(p) for p in args.recipes]
+    runs = paths.out_dir() / "runs"
+    bench = standalone_bench(runs, args.counter)
+    recipes = [with_suffix(final.load_recipe(p), runs, args.suffix) for p in args.recipes]
     rep = final.table(bench, recipes[0], recipes[1:], args.draws, 1000)
     Path(args.report).parent.mkdir(parents=True, exist_ok=True)
     Path(args.report).write_text(json.dumps(rep, indent=1, default=final._json_default))

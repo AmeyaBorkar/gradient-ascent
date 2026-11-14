@@ -182,3 +182,14 @@ def test_mix_keep_moves_class_shares_and_keeps_units_whole():
     two = np.repeat(np.arange(100), 2)
     k2 = density.mix_keep(two, np.zeros(200, dtype=np.int64), np.zeros(200, bool), 1, 0.5)
     assert (k2[::2] == k2[1::2]).all()
+
+
+def test_with_suffix_points_members_at_existing_runs_only(tmp_path):
+    from ringtrace.density import with_suffix
+
+    (tmp_path / "density-champion-half0").mkdir()
+    recipe = {"name": "r", "members": [{"run": "density-champion"}, {"run": "lgbm"}]}
+    out = with_suffix(recipe, tmp_path, "-half0")
+    assert [m["run"] for m in out["members"]] == ["density-champion-half0", "lgbm"]
+    assert recipe["members"][0]["run"] == "density-champion"  # the input is left alone
+    assert with_suffix(recipe, tmp_path, "") is recipe
