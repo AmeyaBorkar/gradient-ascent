@@ -65,7 +65,16 @@ agrees with the given label event by event), calls col1 phishing_collect and col
   PIN): AUC 0.49 to 0.57, nothing. cashback's col7 baits are Rs 5 on 42 % of events against
   25 % for phishing, but "col7 bait other than Rs 5 -> phishing_collect" gives
   -0.0002 / -0.0005 / -0.0006 on cleaned (+0.0020 to +0.0023 on gen-only): rejected;
-- generic event aggregates on all six templates: only the own-phone drain shows anything.
+- generic event aggregates on all six templates: only the own-phone drain shows anything;
+- account attributes inside the own-phone drain (sender bank, OS, app, KYC), target-encoded out of
+  fold: AUC 0.46 to 0.55. The bank-by-bank agreement of our calls in the new-phone drain comes
+  from the counter, not the bank (bank AUC 0.50 to 0.52 there);
+- chain / mule hops (mf1): the zone agrees with the label again (chain 59 of 59 events, mule 8 of
+  8); mule-labelled chains are faster but have the same sizes, so nothing to flip.
+
+**Does the October mix differ?** Not where the counter can see it: in the new-phone drain, 31.1 %
+of October rows are called sim_swap by the zone (76 of 244) against 28.9 % of train rows
+labelled sim_swap (431 of 1,492).
 
 **The flip (`pairs-tmplA-flip`).** In the own-phone drain, the sim_swap calls of an event whose
 takeover score is at least 0.57 (C = 1.0) become account_takeover, unless the event has a phone
