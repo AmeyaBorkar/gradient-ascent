@@ -1,0 +1,72 @@
+{
+ "name": "final-half-chalf",
+ "members": [
+  {
+   "name": "champion-d0",
+   "run": "density-champion-half0",
+   "variant": "fold",
+   "cells": "champion-half0"
+  },
+  {
+   "name": "champion-d1",
+   "run": "density-champion-half1",
+   "variant": "fold",
+   "cells": "champion-half1"
+  },
+  {
+   "name": "lgbm",
+   "run": "lgbm",
+   "variant": "fold",
+   "cells": "lgbm"
+  },
+  {
+   "name": "catboost",
+   "run": "catboost",
+   "variant": "fold",
+   "cells": "catboost"
+  },
+  {
+   "name": "clean-event",
+   "run": "density-clean-event",
+   "variant": "fold",
+   "cells": "clean-event"
+  },
+  {
+   "name": "clean-l2",
+   "run": "density-clean-l2",
+   "variant": "fold",
+   "cells": "clean-l2"
+  },
+  {
+   "name": "tabm",
+   "run": "final-tabm",
+   "variant": "fold",
+   "cells": "tabm",
+   "role": "fraud"
+  }
+ ],
+ "weights": {
+  "mode": "fixed",
+  "values": {
+   "lgbm": 0.1,
+   "catboost": 0.1,
+   "clean-event": 0.1,
+   "clean-l2": 0.1,
+   "tabm": 0.5,
+   "champion-d0": 0.05,
+   "champion-d1": 0.05
+  }
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ],
+ "base_rate_rules": [
+  {
+   "name": "blank_merchant_qr",
+   "max_october_rows": 40
+  }
+ ]
+}

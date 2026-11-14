@@ -1,0 +1,65 @@
+{
+ "name": "final-third-cpu",
+ "members": [
+  {
+   "name": "champion",
+   "run": "density-champion",
+   "variant": "fold",
+   "cells": "champion"
+  },
+  {
+   "name": "lgbm",
+   "run": "density-lgbm",
+   "variant": "fold",
+   "cells": "lgbm"
+  },
+  {
+   "name": "catboost",
+   "run": "density-catboost",
+   "variant": "fold",
+   "cells": "catboost"
+  },
+  {
+   "name": "clean-event",
+   "run": "density-clean-event",
+   "variant": "fold",
+   "cells": "clean-event"
+  },
+  {
+   "name": "clean-l2",
+   "run": "density-clean-l2",
+   "variant": "fold",
+   "cells": "clean-l2"
+  },
+  {
+   "name": "tabm",
+   "run": "final-tabm",
+   "variant": "fold",
+   "cells": "tabm",
+   "role": "fraud"
+  }
+ ],
+ "weights": {
+  "mode": "fixed",
+  "values": {
+   "champion": 0.13333333333333333,
+   "lgbm": 0.13333333333333333,
+   "catboost": 0.13333333333333333,
+   "clean-event": 0.13333333333333333,
+   "clean-l2": 0.13333333333333333,
+   "tabm": 0.3333333333333333
+  }
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ],
+ "base_rate_rules": [
+  {
+   "name": "blank_merchant_qr",
+   "max_october_rows": 40
+  }
+ ]
+}

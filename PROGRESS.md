@@ -64,3 +64,33 @@ counter-anchored template rule.
 - [x] Current best idea: `bait-combo` (lone Rs 10 from an operator; first-time whole-rupee PAY
       of Rs 1,000 or more to an operator): cleaned +0.00029 / +0.00017 / +0.00016, nine cells
       +0.00018 (lb +0.00005), 7 October rows legit -> phishing_collect. The plain PAY rule fails.
+
+## Density: the device counter at October's density (14 Nov)
+- October's counter is computed on October alone (its own pass, half density). The October-like
+  frames held September's counter at its value on the shared three-month, full-density pass.
+- `ringtrace.density` rebuilds a held-out month's counter as its own pass (renumbered phones,
+  own gaps kept, dropped units' phones removed): block assignment unchanged (100 %), segment
+  agreement with the held counter 0.92 to 0.96 on the thinned frames, mean segment confidence
+  0.971 to 0.975 (held 0.993 to 0.997; October's own 0.975).
+- `--train-counter half<d>` trains on every train month split into two halves by protected units,
+  each half its own pass (October's density). Month folds also predict every held-out month with
+  its standalone counter (`oof_alone.npy`) and at October's density (`oof_half0.npy`).
+- `RINGTRACE_DEVICE=cpu|cuda` forces every XGBoost and CatBoost booster onto one device; cells and
+  month folds record it. The September cells of the XGBoost members and CatBoost are GPU fits on
+  one RTX 4060 (they reproduce the earlier GPU cells under the held counter to four decimals);
+  LightGBM cells s14 and s15 are CPU fits (s13 is the earlier CPU fit); TabM cells came from an L4.
+- Jobs: `scripts/density_queue.sh <queue> 2 <logs> cuda`, gates `scripts/density_gate.sh <step>`.
+- Results and verdicts: RESULTS.md, "Density: the counter at October's density";
+  `docs/findings/density-counter.md`.
+- Verdicts (14 Nov): the held counter overstated the best recipe by 0.0035 given per cell;
+  (a) dropping `ctr_pos` rejected; (b) the three XGBoost members trained at October's density pass
+  the October-density cells and month folds and fail the production-counter month folds
+  (candidate `candidates/density-half3.csv`, 11 October rows).
+- Not run for time: the no-position variants of clean-event, clean-l2, LightGBM and CatBoost and
+  the champion's no-position month folds; LightGBM and CatBoost at October's density; the second
+  draw beyond the champion's cells; the October-mix frames.
+- [ ] TabM at October's density: one like-for-like frame (s13) gains +0.0044 given; the s14 cell
+      is in. Queued on the box (queue `~/work/dqueue/q1.txt`, logs `~/logs/density/q1/`): TabM
+      refitted on the same GPU for s14 and s15, TabM half0 s15, month folds `density-tabm-half0`
+      and `density-tabm`; then `bash scripts/density_gate.sh tabm` and `tabm-lomo`, and build
+      `recipes/density/final-half-chalf3t.json` (outputs under `~/outputs/dlane`).

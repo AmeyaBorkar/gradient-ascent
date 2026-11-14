@@ -1,0 +1,33 @@
+{
+ "name": "tabm",
+ "model": "tabm",
+ "families": [
+  "context",
+  "marks",
+  "bursts",
+  "drains",
+  "flows",
+  "requests",
+  "merchant",
+  "repeats",
+  "phones"
+ ],
+ "drop": [
+  "ctr_dev_rows",
+  "ctr_dev_single"
+ ],
+ "tabm": {
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "epochs": 10
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ]
+}

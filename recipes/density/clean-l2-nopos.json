@@ -1,0 +1,39 @@
+{
+ "name": "clean-l2-nopos",
+ "families": [
+  "context",
+  "marks",
+  "bursts",
+  "drains",
+  "flows",
+  "requests",
+  "merchant",
+  "repeats",
+  "phones"
+ ],
+ "drop": [
+  "ctr_dev_rows",
+  "ctr_dev_single",
+  "ctr_pos"
+ ],
+ "cascade": {
+  "seeds": [
+   0,
+   1,
+   2
+  ],
+  "booster": {
+   "rounds": 300,
+   "eta": 0.08,
+   "depth": 8,
+   "device": "cpu"
+  }
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ],
+ "train_on": "event_l2"
+}
