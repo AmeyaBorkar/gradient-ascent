@@ -10,7 +10,8 @@ A blend recipe names member runs (directories under ``$RINGTRACE_OUT/runs``) and
 
 Each member run holds ``oof.npy`` (train rows, ledger order) and ``test.npy`` (October rows). The
 blend is the weighted mean of the members' probabilities, decoded per month (October on its own)
-with the fixed point, then the recipe's rules. Every member is decoded the same way on its own, so
+with the recipe's decoder (the fixed point unless ``method`` is ``local_search``), then the
+recipe's rules. Every member is decoded the same way on its own, so
 the report holds the blend's and each member's scores on the given / cleaned / gen-only targets
 per held-out month, plus the October rows on which the blend's call differs from each member's.
 

@@ -722,3 +722,12 @@ train's exact edge); the October evidence is the per-split counter zones (Octobe
 times wider, matching mule volume) and the anchored-device density in the disputed band (about 40
 to 1 for mule). A judgement call with about +0.0006 expected, uploaded as a file that becomes the
 final pick only if its public score beats `bait-combo`'s.
+
+## An exact local search over expected macro-F1 as the decoder: no change
+
+`recipes/bait-edge-ls.json` is `bait-edge` with `"decoder": {"method": "local_search"}`: the fixed
+point's labelling refined by single-row moves that raise the plug-in expected macro-F1 exactly
+(`ringtrace.decode.local_search`). Against `bait-edge` (`python -m ringtrace.final table`, nine
+October-like cells): 0 train rows and 0 October rows change, so every score change is 0.00000. On
+this data the probabilities are sharp and the fixed point already sits at the local optimum. Kept
+as an opt-in decoder; not used.

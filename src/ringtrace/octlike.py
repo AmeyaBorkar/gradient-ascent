@@ -24,7 +24,8 @@ the unthinned build (thinning breaks its block finder). The recipe is fitted on 
 only (the cascade's screening score is cross-fitted between those two months); seed set r uses
 cascade seeds 3r, 3r + 1, 3r + 2. September's pre-decoder probabilities go to
 ``$RINGTRACE_OUT/octlike/<recipe>_s<seed>_r<r>.npz`` (``rows`` = stacked row, ``prob`` = n x 12).
-September is decoded on its own, like a test month: fixed point, then the recipe's rules.
+September is decoded on its own, like a test month: the recipe's decoder (the fixed point unless
+the recipe selects another), then the recipe's rules.
 
 ``score`` is the gate: the challenger (a recipe, or a blend ``a+b`` / ``a*0.6+b*0.4`` of recipes'
 cells) against the base in every cell, on the given, cleaned and gen-only targets, with a paired
@@ -300,13 +301,13 @@ class Frame:
 def decode(
     frame: Frame, prob: np.ndarray, decoder: dict | None = None, rules: list | None = None
 ) -> np.ndarray:
-    """September decoded on its own: the fixed point, then the rules (label-free)."""
+    """September decoded on its own: the recipe's decoder, then the rules (label-free)."""
     from ringtrace import rules as rulebook
-    from ringtrace.decode import fixed_point
+    from ringtrace.decode import decode_block
 
     hold = np.flatnonzero(frame.hold)
     pred = np.zeros(frame.led.height, dtype=np.int64)
-    pred[hold] = fixed_point(prob, **(DEFAULT_DECODER if decoder is None else decoder))
+    pred[hold] = decode_block(prob, **(DEFAULT_DECODER if decoder is None else decoder))
     rules = DEFAULT_RULES if rules is None else rules
     if rules:
         full = np.zeros((frame.led.height, prob.shape[1]))

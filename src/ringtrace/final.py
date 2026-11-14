@@ -11,7 +11,7 @@ A recipe::
                   "cells": "champion"}, ...],
      "weights": {"mode": "equal"},          # or {"mode": "fixed", "values": {name: w}}
                                             # or {"mode": "nested", "combine": "prob", "steps": 10}
-     "decoder": {"fraud_scale": 0.875},
+     "decoder": {"fraud_scale": 0.875},  # or {"method": "local_search", "fraud_scale": 0.875}
      "rules": ["anchored_templates"],
      "base_rate_rules": [{"name": "blank_merchant_qr", "max_october_rows": 40}]}
 
@@ -26,10 +26,11 @@ Nested weights are learned per held-out month on the other two months (given lab
 the recipe decodes) and applied to the held-out month; October uses all three months, and the
 October-like cells (fitted on July + August) use the September fold's weights.
 
-``rules`` run after the fixed point; ``base_rate_rules`` run last. They are components that the
-training months cannot measure (their October case never occurs in train) and enter on a
-documented base-rate argument; each carries a cap on the October rows it may change, and the
-build stops if the cap is exceeded.
+``rules`` run after the decoder; ``base_rate_rules`` run last. ``decoder.method`` defaults to
+``fixed_point``. ``local_search`` starts from that fixed point and applies the single-row moves
+that raise expected macro-F1 exactly. Base-rate rules are components the training months cannot
+measure (their October case never occurs in train) and enter on a documented base-rate argument;
+each carries a cap on the October rows it may change, and the build stops if the cap is exceeded.
 
 The harness (``score``, ``table``) never refits: it reads ``oof.npy`` / ``test.npy`` and the cells,
 and reports per-month scores on the given, cleaned and gen-only targets, the paired event bootstrap
@@ -289,10 +290,10 @@ class Bench:
     def decode_rows(self, rows: np.ndarray, proba_rows: np.ndarray, recipe: dict) -> np.ndarray:
         """One month's (or October's) rows decoded on their own, then the model rules."""
         from ringtrace import rules as rulebook
-        from ringtrace.decode import fixed_point
+        from ringtrace.decode import decode_block
 
         pred = np.zeros(self.led.height, dtype=np.int64)
-        pred[rows] = fixed_point(proba_rows, **recipe["decoder"])
+        pred[rows] = decode_block(proba_rows, **recipe["decoder"])
         if recipe["rules"]:
             full = np.zeros((self.led.height, N_CLASSES))
             full[rows] = proba_rows
@@ -359,12 +360,12 @@ class Bench:
         for k in (*TRAIN_MONTHS, "october"):
             rows = self.te if k == "october" else self.tr[self.period[self.tr] == k]
             proba[rows] = mix([a[rows] for a in arrays], w[k], roles)
-        # as ringtrace.blend decodes: the fixed point per month, then the rules over every row
-        from ringtrace.decode import fixed_point
+        # as ringtrace.blend decodes: the recipe's decoder per month, then the rules over every row
+        from ringtrace.decode import decode_block
 
         for k in (*TRAIN_MONTHS, "october"):
             rows = self.te if k == "october" else self.tr[self.period[self.tr] == k]
-            pred[rows] = fixed_point(proba[rows], **recipe["decoder"])
+            pred[rows] = decode_block(proba[rows], **recipe["decoder"])
         if recipe["rules"]:
             pred = rulebook.apply(recipe["rules"], pred, proba, self.led, log=_quiet)
         changed = {}
