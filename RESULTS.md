@@ -722,3 +722,102 @@ train's exact edge); the October evidence is the per-split counter zones (Octobe
 times wider, matching mule volume) and the anchored-device density in the disputed band (about 40
 to 1 for mule). A judgement call with about +0.0006 expected, uploaded as a file that becomes the
 final pick only if its public score beats `bait-combo`'s.
+
+## Three October rules on top of `bait-edge`: far segments, legit top-ups, just-under first payments
+
+`recipes/research-combo-1.json` and `recipes/research-combo-2.json` are `bait-edge` with three
+base-rate rules appended, in this order, each capped at the October rows it changes:
+
+* `far_segment`: a fraud-phase row whose counter segment is confident (`ctr_conf >= 0.9`) and
+  whose fraud call is neither the segment's class, a neighbour of it in label-list order, nor a
+  class the segment's zone is cross-written with (`phones.MARKED` weight >= 0.04) takes the
+  segment's class. All eleven segments count.
+* `legit_topup`: a row called legit after the rules and by the plain decode (the fixed point per
+  month, no rules) whose most likely fraud class under the decoder's scaling (fraud columns / 0.875,
+  renormalised) is qr_swap, and in combo-1 also phishing_collect, with a scaled probability of at
+  least 0.125 takes that class.
+* `just_under_pay`: a first-time P2P PAY of a just-under-limit multiple of ten (1,950 / 1,990 /
+  4,950 / 4,990 / 9,950 / 9,990 / 24,950 / 24,990), called legit, to a receiver that holds an
+  operator role (`ringtrace.baitroles`) in another month of all four (October's label-free acts
+  count), becomes phishing_collect. The other four just-under amounts (1,999 / 4,999 / 9,999 /
+  24,999) are `first_pay`'s; the analysis mask used all twelve, and here the four add no row.
+
+```bash
+python -m ringtrace.final build recipes/research-combo-1.json --out <dir> --against <dir>/bait-edge.csv
+python -m ringtrace.final build recipes/research-combo-2.json --out <dir> --against <dir>/bait-edge.csv
+```
+
+| | `research-combo-1` | `research-combo-2` |
+|---|---|---|
+| top-up classes (q >= 0.125) | qr_swap, phishing_collect | qr_swap |
+| caps: far / top-up / just-under | 1 / 6 / 1 | 1 / 2 / 1 |
+| October rows changed vs `bait-edge` | 8: legit -> phishing_collect 5, legit -> qr_swap 2, qr_swap -> merchant_collusion 1 | 4: legit -> qr_swap 2, legit -> phishing_collect 1, qr_swap -> merchant_collusion 1 |
+| train rows changed, Jul / Aug / Sep | 28 / 31 / 14 | 12 / 19 / 10 |
+| given, change Jul / Aug / Sep | +0.00033 / +0.00010 / +0.00013 | +0.00024 / +0.00010 / +0.00013 |
+| cleaned | +0.00032 / +0.00029 / +0.00015 | +0.00021 / +0.00026 / +0.00015 |
+| gen-only | +0.00017 / +0.00007 / +0.00005 | +0.00018 / +0.00017 / +0.00011 |
+| sha256 | `35e4a48466c61c1b5bc817634c1498b47c2345d845f4c4e66a36f350644d1169` | `214926a627984cbfd9a4f3b2b18ff6e2dca8b3a34e14a9b35dc3d0eb48986344` |
+
+Rows per rule, in recipe order: `far_segment` 0 train / 1 October; `legit_topup` 65 / 6 (combo-1)
+or 31 / 2 (combo-2); `just_under_pay` 8 / 1 (combo-1, where the phishing top-up takes 2 of its 10
+train rows first, to the same class) or 10 / 1 (combo-2). The train changes come from the build
+summary (out-of-fold calls against `bait-edge`); they include `just_under_pay`'s four-month view,
+which reads October's label-free acts.
+
+### `far_segment`: a judgement call
+
+The train months share one fraud phase and hold no row that meets the rule, so out-of-fold
+scoring cannot test it. The October case is one row.
+
+| evidence | value |
+|---|---|
+| train rows Jul / Aug / Sep | 0 / 0 / 0 (given and cleaned change 0) |
+| October rows | 1: qr_swap -> merchant_collusion |
+| at `ctr_conf >= 0.7` and `>= 0.5` | the same single row, 0 train |
+| expected October macro-F1 change, P(merchant_collusion) / P(qr_swap) = 0.95 / 0.03, 0.80 / 0.15, 0.50 / 0.50, 0.30 / 0.70 | +0.00036, +0.00028, +0.00011, -0.00001 (train class sizes); +0.00028, +0.00022, +0.00009, +0.00001 (sizes implied by the October F1 estimates) |
+
+It is positive whenever the row is merchant_collusion with probability above about 0.3; the case
+for it is that a confident last-segment phone called qr_swap fits none of the ways the collusion
+zone is written.
+
+### `legit_topup`: qr_swap measured, the phishing half a judgement call
+
+Change in macro-F1 against `bait-edge`, in units of 0.0001, per held-out month Jul / Aug / Sep;
+the interval is the paired event bootstrap (1,000 draws) of the mean change.
+
+| evidence | qr_swap (combo-2) | qr_swap + phishing_collect (combo-1) |
+|---|---|---|
+| train rows Jul / Aug / Sep | 8 / 15 / 8 | 25 / 28 / 12 |
+| October rows | 2 (legit -> qr_swap) | 6 (also legit -> phishing_collect 4) |
+| given | +1.40 / +0.51 / +0.98 | +2.69 / +0.41 / +1.00 |
+| cleaned | +1.22 / +1.16 / +1.30 | +2.66 / +1.84 / +1.26 |
+| bootstrap, given | +0.96 [+0.07, +1.91] | +1.37 [+0.03, +2.64] |
+| bootstrap, cleaned | +1.23 [+0.36, +2.20] | +1.92 [+0.64, +3.22] |
+| precision of the moved train rows (cleaned) | 0.55 | qr_swap 0.55, phishing_collect 0.41 |
+
+qr_swap is non-negative in every month and target at thresholds 0.10, 0.125 and 0.15. The
+phishing half alone is not: given +1.3 / -0.1 / +0.0, bootstrap given +0.41 [-0.45, +1.32] and
+cleaned +0.69 [-0.19, +1.59], though a leave-one-month-out threshold choice picks 0.125 in all
+three folds. It enters combo-1 on October's volume: on the calibrated October class sizes the best
+phishing_collect call count is 4 above the decoder's (about +0.00008 expected), and the top-up adds
+4. For qr_swap the same view prefers 11 fewer calls, so its 2 October rows rest on the train
+measurement alone.
+
+### `just_under_pay`: a judgement call on the role view
+
+Change in macro-F1 against `bait-edge`, in units of 0.0001, Jul / Aug / Sep. The rule uses the
+four-month role view; the train-month view (roles from July to September only) is the control.
+On October rows the two views are the same.
+
+| evidence | four-month view (the rule) | train-month view |
+|---|---|---|
+| train rows Jul / Aug / Sep (phishing_collect on the cleaned labels) | 4 / 4 / 2 (3 / 4 / 1) | 4 / 3 / 1 (3 / 3 / 0) |
+| October rows | 1 (legit -> phishing_collect) | 1 |
+| given | +0.97 / +0.51 / +0.28 | +0.97 / +0.13 / -0.13 |
+| cleaned | +0.86 / +1.40 / +0.24 | +0.86 / +1.05 / -0.14 |
+| gen-only | +0.91 / +1.80 / +0.11 | +0.91 / +1.35 / -0.38 |
+
+Eight of the ten train rows are phishing_collect on the cleaned labels, but two of the ten find
+their operator only through October's acts, and without them September loses. The case for the
+rule is the operator pool shared by all four months (`docs/findings/bait-operator-roles.md`); the
+October row's receiver holds a role in a train month under either view.
