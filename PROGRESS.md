@@ -94,3 +94,19 @@ counter-anchored template rule.
       refitted on the same GPU for s14 and s15, TabM half0 s15, month folds `density-tabm-half0`
       and `density-tabm`; then `bash scripts/density_gate.sh tabm` and `tabm-lomo`, and build
       `recipes/density/final-half-chalf3t.json` (outputs under `~/outputs/dlane`).
+
+## Final assembly (14 Nov evening)
+- [x] Components that passed, merged here: the bait rules (`recipes/bait-combo.json`) and the three
+      XGBoost members trained at October's density (`recipes/density/final-half-chalf3b.json`).
+      The 0.04-cut member, festival-scaled training and the prior corrections passed nothing.
+- [x] Joint recipe `recipes/final2.json` (`final2-bait-half3`): 18 October rows against the best
+      file, the disjoint union of the two components' rows. At October's density it passes: month
+      folds given +0.00058 / +0.00069 / +0.00110, cleaned +0.00054 / +0.00093 / +0.00143; cells
+      given +0.00173 (lb +0.00089), cleaned +0.00178 (lb +0.00092). The production-counter month
+      folds fail (-0.00027 / -0.00005 / -0.00010 given), all of it from the density members.
+- [x] The best file, the bait file and the density file rebuild to their recorded sha256 under the
+      merged code; `final2-bait-half3.csv` (sha256 `1010acd2...4191`) rebuilds byte for byte.
+      Ceiling audit: expected public 0.5497 against 0.5491 for the best file.
+- [ ] TabM trained at October's density on top of `final2` (`recipes/final2/bait-half3t.json`):
+      `bash scripts/final2_gate.sh tabm` once its runs and cells exist.
+- Upload ranking and the final pick: `docs/findings/final2-assembly.md`.

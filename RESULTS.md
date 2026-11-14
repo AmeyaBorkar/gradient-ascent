@@ -994,3 +994,71 @@ time, each waiting for 4.2 GB of free GPU memory and retried on failure: TabM re
 s13-s14 (`gates/half0-tabm-cells-honest-s1314.json`, `half3t-blend-cells-honest-s1314.json`);
 after the month folds: `bash scripts/density_gate.sh tabm` and `tabm-lomo`, and the October file
 of `recipes/density/final-half-chalf3t.json`.
+
+## Final assembly: the bait rules with the members trained at October's density (`final2`)
+
+`recipes/final2.json` (file name `final2-bait-half3`) is the best recipe (`final-half`) with the
+two components that passed: the bait rules of `recipes/bait-combo.json` (`bait_roles`,
+`first_pay` with an operator receiver) and the three XGBoost members trained on the device
+counter at October's density (`recipes/density/final-half-chalf3b.json`). LightGBM, CatBoost, the
+TabM fraud mass, the weights, the decoder, the anchored rule and `blank_merchant_qr` are the best
+recipe's. The 0.04-cut cascade member, festival-scaled training and the prior corrections passed
+nothing and are not in it. Gates: `bash scripts/final2_gate.sh prod|half0|cells|held|build`
+(commit 5337cc5), box (RTX 4060, 2 threads per job), from saved arrays and cells only; month-fold
+tables 9 to 10 min each, a cell gate about 5 min, the four builds twice in 2 min.
+
+Rows (October, against `blend-tabmF-bq.csv`): the bait rules change 7 (legit -> phishing_collect),
+the density members 11 (sim_swap -> account_takeover 8, velocity_bot -> mule_account 1, qr_swap ->
+phishing_collect 1, qr_swap -> refund_abuse 1). The two sets are disjoint, and `final2` changes
+exactly their union, 18 rows. The bait rules read no counter column, so they give the same rows
+and the same scores under every counter.
+
+Month folds, change Jul / Aug / Sep [95 % event bootstrap of the mean, 2,000 draws]:
+
+| comparison | production counter: given; cleaned; gen-only | at October's density (held-out month in two halves, each its own pass): given; cleaned; gen-only | train rows |
+|---|---|---|---|
+| bait rules vs best | +0.00033 / +0.00019 / +0.00018 [+0.00012, +0.00037]; +0.00029 / +0.00017 / +0.00016 [+0.00010, +0.00033]; +0.00024 / +0.00002 / +0.00008 | the same (against `final-half-cpu3`, the best recipe with the refitted XGBoost members) | 33 |
+| density members vs best | -0.00059 / -0.00028 / -0.00028 [-0.00069, -0.00014]; -0.00058 / -0.00027 / -0.00027; -0.00076 / -0.00017 / -0.00022 | +0.00025 / +0.00046 / +0.00092 [+0.00001, +0.00108]; +0.00025 / +0.00073 / +0.00127 [+0.00018, +0.00137]; -0.00063 / +0.00116 / +0.00199 | 30 / 98 |
+| density members on top of the bait rules | -0.00059 / -0.00024 / -0.00028 [-0.00068, -0.00012]; -0.00058 / -0.00023 / -0.00027; -0.00076 / -0.00012 / -0.00022 | +0.00025 / +0.00049 / +0.00092 [+0.00002, +0.00110]; +0.00025 / +0.00076 / +0.00127 [+0.00019, +0.00139]; -0.00063 / +0.00120 / +0.00199 | 29 / 97 |
+| **`final2` vs best (joint)** | -0.00027 / -0.00005 / -0.00010 [-0.00045, +0.00015]; -0.00029 / -0.00007 / -0.00011 [-0.00045, +0.00012]; -0.00052 / -0.00010 / -0.00013 | **+0.00058 / +0.00069 / +0.00110 [+0.00025, +0.00136]; +0.00054 / +0.00093 / +0.00143 [+0.00038, +0.00161]**; -0.00039 / +0.00123 / +0.00207 [+0.00008, +0.00202] | 62 / 130 |
+
+Base scores (given, Jul / Aug / Sep): best 0.51372 / 0.50935 / 0.51500 (production counter);
+`final-half-cpu3` 0.51143 / 0.50782 / 0.51283 at October's density.
+
+October-like cells (frames s13 / s14 / s15, seed set r0, 2,000 draws, pooled 95 % bounds), against
+`final-half-cpu3`:
+
+| comparison | rebuilt counter: given per seed, mean [95 %] | cleaned | gen-only | held counter, given | rows per cell (rebuilt) |
+|---|---|---|---|---|---|
+| bait rules | +0.00003 / +0.00030 / +0.00022, +0.00018 [+0.00004, +0.00035] | +0.00002 / +0.00027 / +0.00020, +0.00016 [+0.00003, +0.00031] | +0.00005 [-0.00015, +0.00025] | +0.00018 [+0.00004, +0.00035] (same rows) | 3 / 5 / 4 |
+| density members on top of the bait rules | +0.00191 / +0.00291 / -0.00019, +0.00155 [+0.00072, +0.00252] | +0.00225 / +0.00281 / -0.00020, +0.00162 [+0.00076, +0.00266] | +0.00139 [+0.00014, +0.00316] | not run | 29 / 28 / 14 |
+| **`final2` (joint)** | **+0.00195 / +0.00322 / +0.00003, +0.00173 [+0.00089, +0.00271]** | **+0.00227 / +0.00308 / -0.000004, +0.00178 [+0.00092, +0.00281]** | +0.00143 [+0.00021, +0.00321] | -0.00011 [-0.00053, +0.00031] | 32 / 33 / 18 |
+
+The two components add: the joint month-fold change at October's density is the sum of the parts
+to within 0.00004, and the density members gain the same on top of the bait rules as on the best
+recipe. The joint result holds on every reading measured at October's density: given and cleaned
+positive in every month and on the cells' pooled bound; the cleaned s15 cell is a tie
+(-0.000004). It fails the production-counter month folds in every month, all of it from the
+density members, which the density study showed share the held cells' flaw (the held-out month on
+the shared full-density pass, which October never is).
+
+Builds (box, two fresh processes into two directories; the merged code includes the decoder and
+blank-QR guards, which change no call):
+
+| file | sha256 | October rows vs `blend-tabmF-bq` | ceiling audit: expected public at precision 0.95 |
+|---|---|---|---|
+| `final-half.csv` (best) | `8a46142660cde2af1576736289f822c1b5c6226204445bce88d4dc311fb926eb` (as uploaded) | 0 | 0.5491 (ceiling 0.5557) |
+| `bait-combo.csv` = `final2-bait.csv` | `3b25869e1cd7ac3e390dd33568033d25d3b765b23f0e1f35dbbf3f2dff5e1974` | 7 | 0.5494 |
+| `final-half-chalf3b.csv` = `density-half3.csv` | `d34f9386508b66f1ade7ff382994b2ba32114a8188aef0b2db3b64cf35edea6f` | 11 | 0.5494 |
+| **`final2-bait-half3.csv`** | **`1010acd2586754da17a18fbe7863ea8a606fe49c6e8e93ab8eeea9f7acd44191`** | **18** | **0.5497** (ceiling 0.5563) |
+
+Every file rebuilds byte for byte in both runs and is valid against the sample submission.
+`final2-bait-half3` October calls: legit 256,602, mule 790, bot 317, chain 556, sim 363, takeover
+238, phishing 510, qr 528, refund 287, cashback 207, loan 100, collusion 84; `blank_merchant_qr`
+changes 10 October rows (cap 40). Production month folds of `final2`: given 0.51345 / 0.50930 /
+0.51490, cleaned 0.56507 / 0.56432 / 0.57168, gen-only 0.90258 / 0.89988 / 0.90172.
+
+Follow-up prepared, not run: TabM trained at October's density on top of `final2`
+(`recipes/final2/bait-half3t.json`) against the same recipe with TabM refitted on the same GPU
+(`recipes/final2/bait-half3-t4060.json`), `bash scripts/final2_gate.sh tabm`, once the runs
+`density-tabm`, `density-tabm-half0` and their cells exist.
