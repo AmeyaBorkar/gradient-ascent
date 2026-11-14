@@ -135,4 +135,12 @@ Short records of design choices.
     mean of per-cell bounds is far wider than the bound of the mean; under it no change of the
     size this project can still make (about +0.0003) could ever pass. The switch was made after
     the nine-cell TabM gate was read, so both numbers are reported for every candidate.
-
+18. **Audits come before runs** (`python -m ringtrace.audit`, `docs/findings/ordinary-rows-audit.md`).
+    A claim that a feature or rule reaches ordinary-looking fraud is checked on the counter's
+    label-free groups before a cascade run is spent on it: one-row fraud-phase phones without
+    template evidence (ordinary fraud-pass rows) against legit-block rows, in train *and* in
+    October. The claim goes forward only if the `ordinary` AUC rises clearly above 0.5 in both
+    splits and the `shift` audit (September against October, density-free columns) stays at
+    chance, so the signal is neither absent nor an October-only artefact. `ceiling --submission`
+    is run on every candidate file: it gives the file's expected public score from its call
+    counts and the October composition, and how far the reachable ceiling lies above it.

@@ -21,6 +21,10 @@ raised to 20; it resets at midnight IST. Uploads that fail validation do not cou
 | - | Five-member blend + blank-check merchant QR rule (sha256 `e7c59467...`) | **0.5486269** | +20 base-rate rows | 20 vs the five-member blend |
 | - | + TabM, full use (fraud and type) (sha256 `07aee8f5...`) | 0.5483 | never loses on LOMO | 7 vs the previous row |
 | - | + TabM for fraud only (sha256 `8a461426...`) | **0.5499354** | never loses on LOMO | 7 vs the blank-QR file, all legit -> fraud |
+| - | Blank-QR file with the `col7` template flipped to phishing (sha256 `91d1e767...`) | 0.5408 | probe of a near-tie template | 94 cashback -> phishing vs the blank-QR file |
+| - | TabM fraud-only with refit trees (sha256 `7ecd86f7...`) | 0.5482 | refit fails the October-like gate | 9 vs the 0.5499 file |
+| - | TabM fraud-only with hedge trees (sha256 `30192d71...`) | 0.5482 | refit fails the October-like gate | 6 vs the 0.5499 file |
+| - | TabM fraud-only + non-QR-check contradiction rule (sha256 `715138bd...`) | 0.5499 (unchanged) | never loses on LOMO | 1 legit -> phishing vs the 0.5499 file |
 
 ## Upload 1: the all-legit file
 
@@ -137,6 +141,19 @@ raised to 20; it resets at midnight IST. Uploads that fail validation do not cou
   +0.0003 / +0.0003, cleaned +0.0007 / +0.0003 / +0.0004 against the five-member blend). Its 7 October
   changes are all legit -> fraud, including rare classes where one correct call carries a large
   macro-F1 weight.
+
+## Late uploads of 13 Nov: what each one settled
+
+- **`col7` -> phishing** (0.5408, -0.0078 from 94 rows; about -0.0003 per public row): the template
+  rule's macro-F1 arithmetic holds in October. `col7` stays `fake_cashback`, the smaller class of
+  its pair, because those rows carry a large share of that class's correct calls.
+- **Refit and hedge trees inside the fraud-only design** (both 0.5482, -0.0017): both files share a
+  rare-class type change (loan_app_extortion -> fake_cashback) and a few refund/qr_swap swaps.
+  Together with the October-like refit test (a tie that fails the bar), the decision is to keep the
+  fold-mean trees for typing.
+- **Non-QR-check contradiction rule** (0.5499, unchanged): its single changed row lies outside the
+  public slice, so it counts only on the private part. The rule rests on the generator
+  contradiction (a QR-check value on a non-QR payment) and never loses on leave-one-month-out.
 
 ## Candidates built but not uploaded
 
