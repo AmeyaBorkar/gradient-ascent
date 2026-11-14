@@ -23,6 +23,7 @@ from ringtrace import paths, store
 from ringtrace.cascade import CascadeSpec, CatBoostSpec, booster_spec, fit_predict
 from ringtrace.classes import CLASSES
 from ringtrace.decode import decode_by_period
+from ringtrace.mix import class_mix_weights, em_priors, ratios_from_names
 from ringtrace.scoring import macro_f1, per_class_f1
 
 TRAIN_MONTHS = (7, 8, 9)
@@ -58,6 +59,111 @@ def model(recipe: dict):
             t["seeds"] = tuple(t["seeds"])
         return tabm.TabMSpec(**t), tabm.fit_predict
     return cascade_spec(recipe), fit_predict
+
+
+def class_mix_ratios(recipe: dict) -> dict[int, float] | None:
+    """Fraud-class code to ratio from ``class_mix``, or None when the key is absent.
+
+    The weights are applied inside the cascade's stage fits, so any other model is rejected.
+    An empty mapping is the unweighted fit.
+    """
+    if "class_mix" not in recipe or recipe["class_mix"] is None:
+        return None
+    if recipe.get("model") not in (None, "cascade"):
+        raise ValueError(
+            f"class_mix applies only to the cascade, not to model {recipe.get('model')!r}"
+        )
+    raw = recipe["class_mix"]
+    if not isinstance(raw, dict):
+        raise ValueError("class_mix must be a mapping of fraud class name to a positive ratio")
+    ratios = ratios_from_names(raw)
+    return ratios or None
+
+
+def sample_weight_for(
+    recipe: dict, y: np.ndarray, events: np.ndarray | None = None
+) -> np.ndarray | None:
+    """Per-row cascade weights for the training target ``y``.
+
+    None when the recipe has no class mix. Callers leave ``sample_weight`` off the fit
+    in that case, so a recipe without the key stays on today's fit path. ``events``, when
+    given, is one event id per row (negative for none); every row of an event then shares
+    the weight of the event's majority label.
+    """
+    ratios = class_mix_ratios(recipe)
+    if not ratios:
+        return None
+    return class_mix_weights(y, ratios, events)
+
+
+def label_shift_on(recipe: dict) -> bool:
+    """True when the recipe corrects each decoded block for label shift before decoding."""
+    if "label_shift_em" not in recipe:
+        return False
+    flag = recipe["label_shift_em"]
+    if not isinstance(flag, bool):
+        raise ValueError(f"label_shift_em must be true or false, got {flag!r}")
+    return flag
+
+
+def reference_priors(
+    oof_held: np.ndarray, period_held: np.ndarray, folds: tuple[int, ...]
+) -> tuple[dict[int, np.ndarray], np.ndarray]:
+    """Reference class shares for the prior correction, from out-of-fold probabilities.
+
+    Month m's reference is the mean out-of-fold probability of the other held-out months, so
+    it reflects what the cascade predicts on months it did not train on, with the training
+    class mix. With a single held-out month there is no other month: its own mean is used,
+    which makes the correction a no-op for it. The scored month's reference is the mean over
+    every held-out month.
+    """
+    oof_held = np.asarray(oof_held, dtype=np.float64)
+    period_held = np.asarray(period_held)
+    whole = oof_held.mean(axis=0)
+    out: dict[int, np.ndarray] = {}
+    for m in folds:
+        other = period_held != m
+        out[int(m)] = oof_held[other].mean(axis=0) if other.any() else oof_held[~other].mean(0)
+    return out, whole
+
+
+def apply_label_shift(
+    proba: np.ndarray,
+    period: np.ndarray,
+    train_priors: np.ndarray | dict[int, np.ndarray],
+) -> tuple[np.ndarray, dict[str, dict[str, list[float]]]]:
+    """EM-adjust each period block of ``proba``.
+
+    ``train_priors`` is the class shares of the training rows behind the block: one vector
+    shared by every block, or a mapping from period to that block's vector. Returns the
+    adjusted probabilities, in the same row order, and for each period the training prior
+    and the estimated prior. ``main`` writes that mapping to ``summary.json`` under
+    ``label_shift_priors``.
+    """
+    proba = np.asarray(proba, dtype=np.float64)
+    period = np.asarray(period)
+    if len(proba) != len(period):
+        raise ValueError(f"probabilities have {len(proba)} rows, periods have {len(period)}")
+    out = proba.copy()
+    recorded: dict[str, dict[str, list[float]]] = {}
+    shared = train_priors if isinstance(train_priors, np.ndarray) else None
+    for p in np.unique(period):
+        key = int(p)
+        if shared is None:
+            try:
+                prior = train_priors[key]
+            except KeyError as exc:
+                raise KeyError(f"no training prior for period {key}") from exc
+        else:
+            prior = shared
+        sel = period == p
+        q, adj = em_priors(out[sel], prior)
+        out[sel] = adj
+        recorded[str(key)] = {
+            "train": [float(v) for v in np.asarray(prior, dtype=np.float64)],
+            "estimated": [float(v) for v in q],
+        }
+    return out, recorded
 
 
 def feature_matrix(recipe: dict) -> tuple[np.ndarray, list[str]]:
@@ -134,6 +240,9 @@ def main(argv: list[str] | None = None) -> dict:
     folds = tuple(int(m) for m in args.folds.split(",") if m) or TRAIN_MONTHS
     if folds != TRAIN_MONTHS:
         recipe["name"] = f"{recipe['name']}-fold-{'-'.join(map(str, folds))}"
+    # Reject a bad class mix or label-shift flag before any run directory is created.
+    mix_ratios = class_mix_ratios(recipe)
+    shift_on = label_shift_on(recipe)
     t0 = time.time()
     out = paths.out_dir() / "runs" / recipe["name"]
     out.mkdir(parents=True, exist_ok=True)
@@ -146,6 +255,11 @@ def main(argv: list[str] | None = None) -> dict:
     led = store.ledger()
     X, cols = feature_matrix(recipe)
     log(f"[{recipe['name']}] {X.shape[1]} features, {X.shape[0]} rows ({time.time() - t0:.0f}s)")
+    if mix_ratios:
+        shown = ", ".join(
+            f"{CLASSES[code]}={ratio:g}" for code, ratio in sorted(mix_ratios.items())
+        )
+        log(f"class-mix weights: {shown}")
     is_test = led["is_test"].to_numpy()
     period = led["period"].to_numpy()
     y = led["y"].to_numpy().astype(np.int64)
@@ -160,6 +274,7 @@ def main(argv: list[str] | None = None) -> dict:
     if recipe.get("train_on") not in (None, "given", "cleaned") and event_mode is None:
         raise ValueError(f"unknown train_on {recipe['train_on']!r}")
     events = None
+    whole = None
     if event_mode is not None:
         from ringtrace import eventclean
 
@@ -169,6 +284,10 @@ def main(argv: list[str] | None = None) -> dict:
             f"[{event_mode}] all train months: {int((whole != y)[tr_idx].sum())} rows changed, "
             f"{int(((whole != y) & (y == 0))[tr_idx].sum())} legit -> fraud"
         )
+    # The prior correction needs the class shares the model is calibrated to. The cascade's
+    # stage one treats ordinary-looking fraud rows as legit, so the label shares overstate every
+    # fraud class. The reference is therefore the mean out-of-fold probability of the training
+    # months (see ``reference_priors``), taken after the fold loop.
 
     oof = np.zeros((len(y), len(CLASSES)), dtype=np.float64)
     test_sum = np.zeros((len(te_idx), len(CLASSES)), dtype=np.float64)
@@ -183,11 +302,39 @@ def main(argv: list[str] | None = None) -> dict:
             train_target = eventclean.clean_labels(y, events, event_mode, mask=fit_mask)
             log(f"  {event_mode} labels: {int((train_target[fit] != y[fit]).sum())} rows changed")
         outs = [X[hold]] + ([] if args.no_test else [X[te_idx]])
-        res = fit_fn(X[fit], train_target[fit], period[fit], outs, spec, log=log)
+        weight = sample_weight_for(recipe, train_target[fit])
+        if weight is None:
+            res = fit_fn(X[fit], train_target[fit], period[fit], outs, spec, log=log)
+        else:
+            res = fit_fn(
+                X[fit],
+                train_target[fit],
+                period[fit],
+                outs,
+                spec,
+                log=log,
+                sample_weight=weight,
+            )
         oof[hold] = res[0]
         if not args.no_test:
             test_sum += res[1]
     test_proba = test_sum / len(folds)
+    label_shift_priors = None
+    if shift_on:
+        # Held-out month m was scored by the model trained on the other months.
+        held_rows = np.flatnonzero(~is_test & np.isin(period, folds))
+        fold_priors, scored_prior = reference_priors(oof[held_rows], period[held_rows], folds)
+        held_adj, label_shift_priors = apply_label_shift(
+            oof[held_rows], period[held_rows], fold_priors
+        )
+        oof[held_rows] = held_adj
+        if not args.no_test:
+            te_adj, te_priors = apply_label_shift(test_proba, period[te_idx], scored_prior)
+            test_proba = te_adj
+            label_shift_priors.update(te_priors)
+        for key, rec in label_shift_priors.items():
+            est = " ".join(f"{v:.4f}" for v in rec["estimated"])
+            log(f"  label-shift period {key}: estimated prior {est}")
 
     targets = {"given": y[tr_idx]}
     from ringtrace import silver
@@ -197,6 +344,8 @@ def main(argv: list[str] | None = None) -> dict:
         if arr is not None:
             targets[tname] = arr[tr_idx]
     report: dict = {"recipe": recipe, "features": cols, "model": asdict(spec)}
+    if label_shift_priors is not None:
+        report["label_shift_priors"] = label_shift_priors
     per_tr = period[tr_idx]
     p_tr = oof[tr_idx]
     score_block("argmax", p_tr.argmax(1), targets, per_tr, report, log, folds)
