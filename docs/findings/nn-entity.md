@@ -34,7 +34,20 @@ event-bootstrap 95 % upper bound is also given (given / cleaned / gen-only).
 The training loss ends at 0.105, against about 0.17 for the plain TabM: the embeddings fit the
 fit months' labels of each id.
 
-ABLATION_PENDING
+**Which half does the damage.** Two ablations, each against the base of its own machine:
+
+| variant | role | sep | s13 | s14 | s15 |
+|---|---|---|---|---|---|
+| pooled history alone in the plain TabM (`entitypool`, box) | fraud-only | -0.8 / -0.8 / -0.9 (5) | +0.5 / +0.6 / +1.6 (2) | +0.0 / +3.7 / +5.4 (2) | +0.5 / +0.5 / +1.5 (2) |
+| pooled history alone in the plain TabM (`entitypool`, box) | alone | +1.7 / +1.7 / +3.0 (12) | +3.8 / +3.2 / +10.2 (15) | +1.3 / +0.8 / -3.7 (10) | +0.7 / +1.1 / +9.0 (11) |
+| embeddings alone (`entityemb`, laptop) | fraud-only | -16.7 / -18.0 / -48.0 (136) | -11.4 / -12.4 / -34.3 (48) | -8.0 / -12.4 / -30.6 (34) | -2.6 / -2.6 / -6.7 (18) |
+| embeddings alone (`entityemb`, laptop) | alone | -46.4 / -52.3 / -102.1 (161) | -46.2 / -56.6 / -117.4 (133) | -61.3 / -70.6 / -164.7 (142) | -38.4 / -44.3 / -96.5 (88) |
+
+The embeddings do all the damage. Without the pooled columns they cost more than with them
+(September fraud-only -0.0017 given over 136 calls, against -0.0004 over 46). The pooled history
+alone is a mild help to TabM by itself: given and cleaned are non-negative in every cell. In the
+fraud mass it moves only 2-5 calls per cell and loses on September (-0.8 over 5 calls), so it
+fails the bar too.
 
 ## Leakage checks
 

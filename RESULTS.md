@@ -372,7 +372,10 @@ own `champion_s1x_r0` cells hold different rows and were not used.
 | metric | laptop | alone | +2.0 / +1.9 / +2.0 (6) | -2.4 / -2.6 / -6.6 (8) | +1.4 / +2.2 / +1.7 (7) | +0.0 / +1.0 / +1.7 (4) | no |
 | gentarget | box | fraud-only | -20.3 / -18.5 / +29.5 (45) | -21.7 / -18.9 / +25.5 (22) | -11.9 / -10.8 / +15.2 (12) | -21.0 / -24.5 / -4.9 (61) | no |
 | gentarget | box | alone | -155.3 / -141.9 / +198.6 (404) | -156.6 / -146.1 / +195.2 (218) | -163.1 / -153.1 / +180.8 (216) | -523.2 / -553.1 / -283.3 (746) | no |
-ABLATION_ROWS
+| entity ablation: pooled history alone | box | fraud-only | -0.8 / -0.8 / -0.9 (5) | +0.5 / +0.6 / +1.6 (2) | +0.0 / +3.7 / +5.4 (2) | +0.5 / +0.5 / +1.5 (2) | no |
+| entity ablation: pooled history alone | box | alone | +1.7 / +1.7 / +3.0 (12) | +3.8 / +3.2 / +10.2 (15) | +1.3 / +0.8 / -3.7 (10) | +0.7 / +1.1 / +9.0 (11) | no |
+| entity ablation: embeddings alone | laptop | fraud-only | -16.7 / -18.0 / -48.0 (136) | -11.4 / -12.4 / -34.3 (48) | -8.0 / -12.4 / -30.6 (34) | -2.6 / -2.6 / -6.7 (18) | no |
+| entity ablation: embeddings alone | laptop | alone | -46.4 / -52.3 / -102.1 (161) | -46.2 / -56.6 / -117.4 (133) | -61.3 / -70.6 / -164.7 (142) | -38.4 / -44.3 / -96.5 (88) | no |
 
 **Nothing passes; nothing was promoted, and no October file was written.** The bar for
 promotion was a fraud-only change that is non-negative in every cell and target and moves more
