@@ -1,0 +1,20 @@
+{
+ "name": "member-solo-x5",
+ "members": [
+  {
+   "name": "champion",
+   "run": "member-x5",
+   "variant": "fold",
+   "cells": "member-x5"
+  }
+ ],
+ "weights": {
+  "mode": "equal"
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ]
+}

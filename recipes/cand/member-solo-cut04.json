@@ -1,0 +1,20 @@
+{
+ "name": "member-solo-cut04",
+ "members": [
+  {
+   "name": "champion",
+   "run": "member-cut04",
+   "variant": "fold",
+   "cells": "member-cut04"
+  }
+ ],
+ "weights": {
+  "mode": "equal"
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rules": [
+  "anchored_templates"
+ ]
+}
