@@ -40,3 +40,16 @@ counter-anchored template rule.
 - [ ] The blind-spot rule: a label-free rule that calls generator-made rows the champion calls
       legit, adopted only if it never loses on leave-one-month-out and the October-like cells.
 - [ ] Finish the leave-one-family-out ablations left over in run 14.
+
+## Density: the device counter at October's density (in progress, 14 Nov)
+- October's counter is computed on October alone (its own pass, half density). The October-like
+  frames held September's counter at its value on the shared three-month, full-density pass.
+- `ringtrace.density` rebuilds a held-out month's counter as its own pass (renumbered phones,
+  own gaps kept, dropped units' phones removed): block assignment unchanged (100 %), segment
+  agreement with the held counter 0.92 to 0.96 on the thinned frames, mean segment confidence
+  0.971 to 0.975 (held 0.993 to 0.997; October's own 0.975).
+- First cells (seed 13): the held counter overstates a tree member by about 0.004 macro-F1.
+- Under way on the box: the five trees refitted on CPU (held and rebuilt September from one fit),
+  the same without the absolute position column (`ctr_pos`), month folds of both, the champion
+  trained on a half-density counter (two draws), October-mix frames (seeds 23 to 25). TabM on
+  Colab.
