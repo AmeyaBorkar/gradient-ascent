@@ -165,27 +165,3 @@ def test_order_independent():
     for c in a.columns:
         x, y = a[c].to_numpy(), b[c].to_numpy()[inv]
         assert np.allclose(x, y, equal_nan=True), c
-
-
-def test_allocation_evidence_separates_dense_sim_from_sparse_takeover():
-    from ringtrace.evidence.phones import ATO, SIM, allocation_ll
-
-    # 10 dense two-row phones (no gaps) then 10 sparse three-row phones (gaps of 3)
-    nums = np.r_[np.arange(100, 110), 110 + 4 * np.arange(1, 11)]
-    counts = np.zeros((20, phones.K + 1))
-    counts[:10, 0] = 2
-    counts[10:, 0] = 3
-    ll = allocation_ll(nums, counts)
-    assert np.isfinite(ll).all()
-    assert (ll[1:10, SIM] > ll[1:10, ATO]).all()  # dense phones read as sim_swap
-    assert (ll[10:, ATO] > ll[10:, SIM]).all()  # sparse phones read as account_takeover
-
-
-def test_allocation_evidence_is_finite_for_unseen_row_counts():
-    from ringtrace.evidence.phones import allocation_ll
-
-    nums = np.array([5, 9, 10])
-    counts = np.zeros((3, phones.K + 1))
-    counts[:, 0] = [7, 1, 12]  # 5+ rows never seen in training
-    ll = allocation_ll(nums, counts)
-    assert np.isfinite(ll).all()

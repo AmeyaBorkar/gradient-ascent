@@ -1,4 +1,4 @@
-"""The counter-news rule, and the previous fraud-phase segmentation it reads."""
+"""The counter-news rule, and the champion fraud-phase segmentation it reads."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import numpy as np
 import polars as pl
 
 from ringtrace import counternews, rules
-from ringtrace.evidence import phones
+from ringtrace.evidence import phones, refined
 from ringtrace.tables import HOME_DEVICES
 
 # previous segment class, refined class, refined posterior, call, is_test
@@ -175,7 +175,7 @@ def test_news_labels_only_the_fraud_phase(monkeypatch):
     counts = np.zeros((len(nums), phones.K + 1))
     np.add.at(counts, (pinv, anchor[phase]), 1.0)
     old = counternews.legacy_decode(nums, counts, blocks, lo, hi)
-    post = phones.decode_phase(nums, counts, blocks, lo, hi).post
+    post = refined.decode_phase(nums, counts, blocks, lo, hi).post
     choice = post.argmax(axis=1)
 
     got = counternews.news(led)
