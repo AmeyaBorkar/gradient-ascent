@@ -114,3 +114,26 @@ def test_catboost_recipe_parses():
         254,
     )
     assert p["task_type"] == "GPU" and p["random_seed"] == 1 and p["verbose"] is False
+
+
+def test_device_switch_forces_cpu_and_refuses_unknown_values(monkeypatch):
+    from ringtrace.cascade import CatBoostSpec, device_override
+
+    monkeypatch.delenv("RINGTRACE_DEVICE", raising=False)
+    assert device_override() is None
+    assert BoosterSpec().params(0)["device"] == "cuda"
+    cb = CatBoostSpec(gpu_ram_part=0.3).params(0, "Logloss")
+    assert cb["task_type"] == "GPU" and cb["devices"] == "0"
+
+    monkeypatch.setenv("RINGTRACE_DEVICE", "cpu")
+    assert device_override() == "cpu"
+    assert BoosterSpec().params(0)["device"] == "cpu"
+    cb = CatBoostSpec(gpu_ram_part=0.3).params(0, "Logloss")
+    assert cb["task_type"] == "CPU"
+    assert "devices" not in cb and "gpu_ram_part" not in cb
+
+    monkeypatch.setenv("RINGTRACE_DEVICE", "cuda")
+    with pytest.raises(ValueError):
+        BoosterSpec().params(0)
+    monkeypatch.setenv("RINGTRACE_DEVICE", "")
+    assert BoosterSpec().params(0)["device"] == "cuda"

@@ -15,7 +15,9 @@ they agree byte for byte (the screening score is seeded on its own and shared by
 ``ringtrace.octlike.fit`` does: ``--as name=g0/g1/g2`` writes cell set r from the r-th seed group
 as ``<cells>/<name>_s<frame>_r<r>.npz`` (``rows``, ``prob``), the format the gate reads.
 
-Seeds already stored are not refitted, so a stopped job resumes where it stopped.
+Seeds already stored are not refitted, so a stopped job resumes where it stopped. Under
+``RINGTRACE_DEVICE=cpu`` the seeds are stored apart (``member/<recipe>-cpu/``), so CPU and GPU
+fits of a seed never mix in one output; the run summary records the device.
 """
 
 from __future__ import annotations
@@ -124,6 +126,14 @@ def fit_seeds(store: SeedStore, keys, X_tr, y_tr, period_tr, X_out, spec, seeds,
     return todo
 
 
+def store_root(recipe_name: str, part: str) -> Path:
+    """Where a recipe's per-seed fits live; CPU-forced fits get their own directory."""
+    from ringtrace.cascade import device_override
+
+    tag = f"-{device_override()}" if device_override() else ""
+    return paths.out_dir() / "member" / f"{recipe_name}{tag}" / part
+
+
 def _given_only(recipe: dict) -> None:
     if recipe.get("train_on") not in (None, "given"):
         raise ValueError("seed-by-seed fits train on the given labels only")
@@ -154,7 +164,9 @@ def write_run(name: str, recipe: dict, oof_tr, test, led, log=print) -> dict:
         arr = silver.load(led, which)
         if arr is not None:
             targets[tname] = arr[tr_idx]
-    report: dict = {"recipe": recipe}
+    from ringtrace.cascade import device_override
+
+    report: dict = {"recipe": recipe, "device": device_override() or "recipe"}
     per_tr = period[tr_idx]
     dec = recipe.get("decoder", {"fraud_scale": 0.875})
     pred = np.zeros(len(y), dtype=np.int64)
@@ -201,7 +213,7 @@ def lomo(recipe_path: str, seeds, outputs: dict, folds=TRAIN_MONTHS, log=print) 
     period = led["period"].to_numpy()
     y = led["y"].to_numpy().astype(np.int64)
     tr_idx, te_idx = np.flatnonzero(~is_test), np.flatnonzero(is_test)
-    st = SeedStore(paths.out_dir() / "member" / recipe["name"] / "lomo")
+    st = SeedStore(store_root(recipe["name"], "lomo"))
     log(f"[member] {recipe['name']}: {len(cols)} features, seeds {list(seeds)}")
     for m in folds:
         fit = tr_idx[period[tr_idx] != m]
@@ -262,7 +274,7 @@ def cells(recipe_path: str, frames, seeds, outputs: dict, cells_dir: Path, log=p
             fit_rows = frame.fit & np.isin(frame.period, ol.FIT_PERIODS)
             X, _ = runner.feature_matrix(recipe)
             spec, _ = runner.model(recipe)
-            st = SeedStore(paths.out_dir() / "member" / recipe["name"] / f"s{fs}")
+            st = SeedStore(store_root(recipe["name"], f"s{fs}"))
             log(
                 f"[member] frame s{fs}: fit {int(fit_rows.sum())}, September "
                 f"{int(frame.hold.sum())} ({time.time() - t0:.0f}s)"
@@ -282,6 +294,9 @@ def cells(recipe_path: str, frames, seeds, outputs: dict, cells_dir: Path, log=p
             rows = frame.stacked[frame.hold]
             for name, groups in outputs.items():
                 for r, g in enumerate(groups):
+                    if not all(st.has("sept", k) for k in g):
+                        log(f"[member] {name} s{fs} r{r}: seeds not all stored yet, not written")
+                        continue
                     prob = st.mean("sept", g)
                     path = cells_dir / f"{name}_s{fs}_r{r}.npz"
                     tmp = path.with_name(f".{path.stem}.tmp.npz")

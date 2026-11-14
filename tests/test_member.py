@@ -99,3 +99,11 @@ def test_member_recipes_parse():
         assert s.seeds == seeds and s.booster == c.booster
         assert (s.type_min_score, s.drop_legit_min_score) == (0.04, 0.70)
         assert c.type_min_score == 0.10
+
+
+def test_cpu_forced_fits_are_stored_apart(monkeypatch, tmp_path):
+    monkeypatch.setenv("RINGTRACE_OUT", str(tmp_path))
+    monkeypatch.delenv("RINGTRACE_DEVICE", raising=False)
+    assert member.store_root("member-x5", "lomo") == tmp_path / "member" / "member-x5" / "lomo"
+    monkeypatch.setenv("RINGTRACE_DEVICE", "cpu")
+    assert member.store_root("member-x5", "s13") == tmp_path / "member" / "member-x5-cpu" / "s13"

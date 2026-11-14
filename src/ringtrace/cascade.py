@@ -14,6 +14,9 @@ The two stages can use XGBoost (``BoosterSpec``) or LightGBM (``LgbmSpec``); the
 has its own spec, so a LightGBM cascade can keep the XGBoost screen of the champion. The two
 stages can also use CatBoost (``stages="catboost"``, ``CatBoostSpec``); the screening score then
 still comes from ``booster``, so every option trains on the same rows.
+
+``RINGTRACE_DEVICE=cpu`` runs every XGBoost and CatBoost fit on the CPU whatever the recipe says
+(unset: each spec's own device). CPU and GPU fits of the same seed differ numerically.
 """
 
 from __future__ import annotations
@@ -27,6 +30,17 @@ import xgboost as xgb
 
 from ringtrace import threads
 from ringtrace.classes import N_CLASSES
+
+
+def device_override() -> str | None:
+    """``"cpu"`` when ``RINGTRACE_DEVICE=cpu`` forces every booster fit onto the CPU; ``None`` when
+    the variable is unset or empty. Any other value is refused, so a typo cannot reach a GPU."""
+    v = os.environ.get("RINGTRACE_DEVICE", "").strip().lower()
+    if not v:
+        return None
+    if v != "cpu":
+        raise ValueError(f"RINGTRACE_DEVICE={v!r}: only 'cpu' (or unset) is understood")
+    return "cpu"
 
 
 @dataclass
@@ -44,7 +58,7 @@ class BoosterSpec:
     def params(self, seed: int, **extra) -> dict:
         p = {
             "tree_method": "hist",
-            "device": self.device,
+            "device": device_override() or self.device,
             "eta": self.eta,
             "max_depth": self.depth,
             "subsample": self.subsample,
@@ -110,19 +124,20 @@ class CatBoostSpec:
     gpu_ram_part: float | None = None  # share of GPU memory CatBoost may take (None: its default)
 
     def params(self, seed: int, loss: str) -> dict:
+        task_type = "CPU" if device_override() == "cpu" else self.task_type
         p = {
             "iterations": self.iterations,
             "depth": self.depth,
             "learning_rate": self.learning_rate,
             "border_count": self.border_count,
-            "task_type": self.task_type,
+            "task_type": task_type,
             "loss_function": loss,
             "random_seed": seed,
             "thread_count": threads.budget(),
             "verbose": False,
             "allow_writing_files": False,
         }
-        if self.task_type == "GPU":
+        if task_type == "GPU":
             p["devices"] = self.devices
             if self.gpu_ram_part is not None:
                 p["gpu_ram_part"] = self.gpu_ram_part
