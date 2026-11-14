@@ -518,6 +518,7 @@ def fit_cells(
                     "seeds": list(spec.seeds),
                     "features": len(cols),
                     "train_counter": train_counter or "production",
+                    "device": _device(),
                 }
                 for kind, p, d, ph in (
                     ("held", p_held, out_held, held),
@@ -543,6 +544,13 @@ def fit_cells(
                 summary_path.write_text(json.dumps(summary, indent=1))
     store.use_frame(None)
     return summary
+
+
+def _device() -> str:
+    """Where the boosters ran: the forced device (``RINGTRACE_DEVICE``) or each recipe's own."""
+    from ringtrace.cascade import forced_device
+
+    return forced_device() or "recipe"
 
 
 def _rows_of(ph: pl.DataFrame, stacked: np.ndarray) -> pl.DataFrame:
@@ -610,6 +618,7 @@ def lomo(recipe_path: Path, name: str, train_counter: str = "", log=print) -> di
         "recipe": recipe,
         "features": cols,
         "train_counter": train_counter or "production",
+        "device": _device(),
         "runtime_s": time.time() - t0,
     }
     (out / "summary.json").write_text(json.dumps(summary, indent=1, default=str))
