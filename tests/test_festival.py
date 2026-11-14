@@ -101,10 +101,17 @@ def test_scale_rows_scales_only_the_mask_and_keeps_the_input():
     got = out["amount"].to_numpy()
     assert got[~mask].tobytes() == snap_amt[~mask].tobytes()
     assert out["balance_before"].to_numpy()[~mask].tobytes() == snap_bal[~mask].tobytes()
-    # 200*1.166 -> 233.2 snaps to 200 (unit 100); 250 -> 290 (unit 10); 13 -> 15;
-    # 10.40 -> 12.13 (unit 0.01); 0.01 stays 0.01; 0 is a multiple of 100 and the floor is 100.
+    # 200*1.166 = 233.2 -> 200 or 300 (unit 100); 250 -> 291.5 -> 290, because 300 would be a
+    # multiple of 100; 13 -> 15 or 16; 10.40 -> 12.12 or 12.13; 0.01 -> 0.01 or 0.02;
+    # 0 is a multiple of 100 and the floor is 100.
     cents = np.rint(got * 100.0).astype(np.int64)
-    assert cents[mask].tolist() == [20000, 29000, 1500, 1213, 1, 10000]
+    allowed = [{20000, 30000}, {29000}, {1500, 1600}, {1212, 1213}, {1, 2}, {10000}]
+    assert all(c in a for c, a in zip(cents[mask].tolist(), allowed, strict=True))
+    other_seed = festival.scale_rows(led, mask, FACTOR, 1.02, seed=1)["amount"].to_numpy()
+    assert all(
+        c in a
+        for c, a in zip(np.rint(other_seed[mask] * 100).astype(int).tolist(), allowed, strict=True)
+    )
     bal_cents = np.rint(out["balance_before"].to_numpy() * 100.0).astype(np.int64)
     assert bal_cents[mask].tolist() == [102000, 1020, 102, 0, 510, 816]
 
@@ -124,6 +131,40 @@ def test_scale_rows_scales_only_the_mask_and_keeps_the_input():
         1234,
     ]
     assert np.rint(held["amount"].to_numpy() * 100.0).astype(np.int64).tolist() == [10000, 10000]
+
+
+def test_scale_rows_never_moves_a_row_into_a_rounder_class():
+    # 90 (unit 10) -> 104.94 lies between 100, a multiple of 100, and 110: always 110.
+    # 9 (unit 1) -> 10.494 lies between 10 and 11: always 11.
+    # 85.76 (paise) -> 99.996 lies between 99.99 and the whole rupee 100.00: always 99.99.
+    # 300 (unit 100) -> 349.8 goes to 300 or 400 and stays a multiple of 100.
+    amount = np.array([90.0, 9.0, 85.76, 300.0], dtype=np.float64)
+    led = pl.DataFrame({"amount": amount, "balance_before": np.ones(len(amount))})
+    for seed in range(5):
+        out = festival.scale_rows(led, np.ones(len(amount), dtype=bool), FACTOR, seed=seed)
+        cents = np.rint(out["amount"].to_numpy() * 100.0).astype(np.int64)
+        assert cents[:3].tolist() == [11000, 1100, 9999]
+        assert cents[3] in (30000, 40000)
+
+    # Small multiples of 100 scale on average too: 100, 200 and 300 do not stay where they are.
+    hundreds = np.repeat(np.array([100.0, 200.0, 300.0]), 4000)
+    frame = pl.DataFrame({"amount": hundreds, "balance_before": np.ones(len(hundreds))})
+    up = festival.scale_rows(frame, np.ones(len(hundreds), dtype=bool), FACTOR)["amount"]
+    assert np.all(np.rint(up.to_numpy() * 100).astype(np.int64) % 10000 == 0)
+    assert up.to_numpy().mean() / hundreds.mean() == pytest.approx(FACTOR, rel=0.01)
+
+    # A realistic grid: every class share is kept exactly, rounding hits included.
+    rng = np.random.default_rng(3)
+    paise = rng.integers(100, 500_000, size=20_000)
+    paise[:5000] = (paise[:5000] // 1000) * 1000  # multiples of 10 (and some of 100)
+    paise[5000:5600] = (paise[5000:5600] // 10000 + 1) * 10000  # multiples of 100
+    paise[5600:6000] = (paise[5600:6000] // 100) * 100  # whole rupees
+    grid = paise.astype(np.float64) / 100.0
+    frame = pl.DataFrame({"amount": grid, "balance_before": np.ones(len(grid))})
+    scaled = festival.scale_rows(frame, np.ones(len(grid), dtype=bool), FACTOR)
+    got = scaled["amount"].to_numpy()
+    assert _roundness_counts(got) == _roundness_counts(grid)
+    assert got.mean() / grid.mean() == pytest.approx(FACTOR, rel=0.005)
 
 
 def test_scale_rows_keeps_roundness_shares_and_the_mean_ratio():

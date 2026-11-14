@@ -69,16 +69,39 @@ def _coarsest_unit(amount: np.ndarray) -> np.ndarray:
     return unit
 
 
-def _round_amounts(amount: np.ndarray, factor: float) -> np.ndarray:
-    """Scale amounts and snap each one back onto its own roundness unit.
+def _next_ratio(unit: np.ndarray) -> np.ndarray:
+    """Steps of ``unit`` in the next coarser unit (0.01 -> 100, 1 -> 10, 10 -> 10, 100 -> 0)."""
+    ratio = np.zeros(unit.shape, dtype=np.float64)
+    for fine, coarse in zip(_UNITS[:-1], _UNITS[1:], strict=True):
+        ratio = np.where(np.isclose(unit, fine), np.rint(coarse / fine), ratio)
+    return ratio
 
-    The nearest multiple of that unit can be 0 for a tiny payment. One unit is the floor, so a
-    round amount does not collapse to a zero that would leave its class. A zero amount is a
-    multiple of 100, so the floor lifts it to 100.
+
+def _round_amounts(amount: np.ndarray, factor: float, seed: int = 0) -> np.ndarray:
+    """Scale amounts and snap each one back onto its own roundness class.
+
+    Each scaled amount lies between two multiples of its coarsest unit. It takes the upper one
+    with probability equal to its position between them (seeded stochastic rounding), so the
+    mean of every class scales by ``factor``; nearest rounding would leave a small multiple of
+    100 such as 100, 200 or 300 where it was. Of two neighbouring multiples, at most one is also
+    a multiple of the next coarser unit. Landing there would move the row into a rounder class
+    (about one multiple of 10 in ten would become a multiple of 100, one paise amount in a
+    hundred a whole rupee), so the row takes the other neighbour. The share of each class
+    therefore stays exactly as it was.
+
+    One unit is the floor, so a tiny round amount does not collapse to a zero that would leave
+    its class. A zero amount is a multiple of 100, so the floor lifts it to 100.
     """
     amount = np.asarray(amount, dtype=np.float64)
     unit = _coarsest_unit(amount)
-    steps = np.maximum(np.rint((amount * factor) / unit), 1.0)
+    target = (amount * factor) / unit
+    low = np.floor(target)
+    up = np.random.default_rng(seed).random(len(target)) < (target - low)
+    steps = np.maximum(low + up, 1.0)
+    ratio = _next_ratio(unit)
+    coarser = (ratio > 0) & (np.fmod(steps, np.where(ratio > 0, ratio, 1.0)) == 0)
+    other = np.where(steps > low, low, low + 1.0)
+    steps = np.where(coarser, np.maximum(other, 1.0), steps)
     unit_paise = np.rint(unit * 100.0).astype(np.int64)
     paise = np.rint(steps).astype(np.int64) * unit_paise
     return paise.astype(np.float64) / 100.0
@@ -94,11 +117,13 @@ def scale_rows(
     mask: np.ndarray,
     amount_factor: float,
     balance_factor: float = 1.0,
+    seed: int = 0,
 ) -> pl.DataFrame:
     """Copy ``led`` with money columns rescaled where ``mask`` is true.
 
     ``amount`` keeps the coarsest unit the original value already lands on (100, 10, 1 or 0.01)
-    and is rounded to the nearest multiple of that unit, never below one unit. ``balance_before``
+    and is rounded, stochastically with ``seed``, to a neighbouring multiple of that unit that
+    is not a multiple of a coarser one, never below one unit. ``balance_before``
     is rounded to the paisa. Every other row stays bit-identical, every other column is copied
     through, and ``led`` itself is not modified. Callers that must skip the scored month pass a
     mask from ``festival_mask``.
@@ -111,7 +136,7 @@ def scale_rows(
     amount = np.asarray(led["amount"].to_numpy(), dtype=np.float64).copy()
     balance = np.asarray(led["balance_before"].to_numpy(), dtype=np.float64).copy()
     if bool(mask.any()):
-        amount[mask] = _round_amounts(amount[mask], amount_factor)
+        amount[mask] = _round_amounts(amount[mask], amount_factor, seed)
         balance[mask] = _round_balance(balance[mask], balance_factor)
     return led.with_columns(
         pl.Series("amount", amount, dtype=led.schema["amount"]),
