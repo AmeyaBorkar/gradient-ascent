@@ -33,7 +33,7 @@
   },
   {
    "name": "tabm",
-   "run": "final-tabm",
+   "run": "density-tabm-half0",
    "variant": "fold",
    "cells": "tabm-half0",
    "role": "fraud"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every gate of the density study, from saved cells and month-fold runs (no refits).
-#   bash scripts/density_gate.sh [step1|rule|nopos|half|tabm|lomo|all]
+#   bash scripts/density_gate.sh [step1|rule|nopos|half|tabm|tabm-lomo|lomo|all]
 # Inputs: cells from `python -m ringtrace.density cells ...` under $RINGTRACE_OUT/density/,
 # month-fold runs `density-<member>[-nopos|-half<d>]` from `python -m ringtrace.density lomo`.
 # The LightGBM, CatBoost and TabM members keep the arrays of the best file in the month-fold
@@ -79,6 +79,15 @@ if [[ "$what" == tabm || "$what" == all ]]; then
   both "$R/m-tabm-4060.json" "$R/m-tabm-half0.json" half0-tabm
   both "$R/final-half-cpu3-t4060.json" "$R/final-half-chalf3t.json" half3t-blend
   both "$R/final-half-chalf3-t4060.json" "$R/final-half-chalf3t.json" half3t-vs-half3
+fi
+
+if [[ "$what" == tabm-lomo || "$what" == all ]]; then
+  # month folds of the blend with TabM at October's density, against TabM refitted on this GPU
+  # (runs density-tabm and density-tabm-half0)
+  lomo "$R/final-half-cpu3-t4060.json" "$R/final-half-chalf3t.json" \
+    --report "$G/half3t-blend-lomo.json"
+  half "$R/final-half-cpu3-t4060.json" "$R/final-half-chalf3t.json" \
+    --report "$G/half3t-blend-lomo-half0.json"
 fi
 
 if [[ "$what" == lomo || "$what" == all ]]; then

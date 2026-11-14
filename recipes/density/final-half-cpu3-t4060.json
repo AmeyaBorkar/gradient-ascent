@@ -33,7 +33,7 @@
   },
   {
    "name": "tabm",
-   "run": "final-tabm",
+   "run": "density-tabm",
    "variant": "fold",
    "cells": "tabm-4060",
    "role": "fraud"
