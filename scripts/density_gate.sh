@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every gate of the density study, from saved cells and month-fold runs (no refits).
-#   bash scripts/density_gate.sh [step1|rule|nopos3|half|half2|all]
+#   bash scripts/density_gate.sh [step1|rule|nopos3|half|half3|half2|all]
 # Inputs: cells from `python -m ringtrace.density cells ...` under $RINGTRACE_OUT/density/,
 # month-fold runs `density-<member>[-nopos|-half<d>]` from `python -m ringtrace.density lomo`.
 # The LightGBM, CatBoost and TabM members keep the arrays of the best file in the month-fold
@@ -96,6 +96,21 @@ if [[ "$what" == half || "$what" == all ]]; then
     --report "$G/half0-champion-lomo-half0.json"
   half "$R/final-half-cpu3.json" "$R/final-half-chalf0.json" \
     --report "$G/half0-blend-lomo-half0.json"
+fi
+
+if [[ "$what" == half3 || "$what" == all ]]; then
+  # (b) all three XGBoost members trained on the counter at October's density (draw 0)
+  for c in honest held; do
+    d="$N"
+    [[ "$c" == held ]] && d="$H"
+    cellgate "$R/final-half-cpu3.json:$d:$c" "$R/final-half-chalf3.json:$d:$c" \
+      --report "$G/half3-blend-cells-$c.json"
+  done
+  lomo "$R/final-half-cpu3.json" "$R/final-half-chalf3.json" --report "$G/half3-blend-lomo.json"
+  alone "$R/final-half-cpu3-alone.json" "$R/final-half-chalf3-alone.json" \
+    --report "$G/half3-blend-lomo-alone.json"
+  half "$R/final-half-cpu3.json" "$R/final-half-chalf3.json" \
+    --report "$G/half3-blend-lomo-half0.json"
 fi
 
 if [[ "$what" == half2 || "$what" == all ]]; then
