@@ -45,7 +45,7 @@ def test_round_bar():
     assert not round_bar(lomo, None)["months_ok"]
 
 
-def test_gate_groups_load_and_read_the_cpu_built_members():
+def test_gate_groups_load_and_read_the_gpu_built_member():
     from member_gate import GROUPS
 
     from ringtrace.final import load_recipe
@@ -59,5 +59,14 @@ def test_gate_groups_load_and_read_the_cpu_built_members():
                 m["cells"] == m["run"] or m["run"] in ("blend-champion-m1", "final-tabm")
                 for m in r["members"]
             )
-    assert {"member-cut04-cpu", "champion-cpu"} <= runs
-    assert not runs & {"member-x5", "member-cut04", "member-x5-cpu"}
+    assert "member-cut04" in runs
+    assert not runs & {"member-x5", "member-cut04-cpu", "champion-cpu", "member-x5-cpu"}
+
+
+def test_load_renames_the_tabm_run():
+    from member_gate import BASE, load
+
+    r = load(BASE, "tabm")
+    assert "final-tabm" not in {m["run"] for m in r["members"]}
+    assert sum(m["run"] == "tabm" for m in r["members"]) == 1
+    assert {m["run"] for m in load(BASE)["members"]} >= {"final-tabm"}

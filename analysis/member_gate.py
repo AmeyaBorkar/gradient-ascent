@@ -1,15 +1,18 @@
 """The 0.04-cut cascade member against the best file, on the full bar.
 
     python analysis/member_gate.py gate [<recipe> ...] [--cells DIR] [--out DIR] [--report NAME]
+        [--tabm-run NAME]
     python analysis/member_gate.py build <recipe> ... [--cells DIR] [--out DIR] [--best FILE]
+        [--tabm-run NAME] [--candidates]
 
 ``gate`` scores each group of ``GROUPS`` against its base with ``ringtrace.final.table``: the
-blend candidates against ``recipes/final-half.json``, the swaps against the blend whose champion
-is the CPU-built one (like with like: the members are CPU-built), the 0.04 cut alone against the
-CPU-built champion alone, and the CPU-built champion against the GPU-built one (the size of the
-device effect). Each table has the per-month change
-on the given, cleaned and gen-only targets, the paired event bootstrap of 2,000 draws, the nine
-October-like cells with 2,000 draws), then adds for each challenger:
+blend candidates (the member as a sixth tree in the type split, in the fraud mass, in both, and
+in place of the champion) against ``recipes/final-half.json``, and the 0.04 cut alone against the
+champion alone. The member's fits are GPU fits made the way the champion's were (the champion's
+seeds refitted on the same device give its saved cells byte for byte), so the saved champion is
+the like-for-like base. Each table has the per-month change on the given, cleaned and gen-only
+targets, the paired event bootstrap of 2,000 draws and the nine October-like cells with 2,000
+draws, then adds for each challenger:
 
 * the bar of this round: leave-one-month-out change >= 0 on given and cleaned in every month and
   > 0 in at least one, and an October-like mean change > 0 with its pooled 95 % lower bound > 0
@@ -19,7 +22,9 @@ October-like cells with 2,000 draws), then adds for each challenger:
 * October: rows changed and class moves (counts only).
 
 ``build`` writes the October file of each recipe, validated against the sample submission, with
-its sha256 and the class moves against the best file.
+its sha256 and the class moves against the best file; ``--candidates`` also copies each valid
+file to ``$RINGTRACE_OUT/candidates/<recipe name>.csv``. ``--tabm-run`` names the saved TabM run
+the recipes call ``final-tabm`` (default: that name).
 """
 
 from __future__ import annotations
@@ -36,7 +41,6 @@ from ringtrace.classes import N_CLASSES
 
 BASE = "recipes/final-half.json"
 C = "recipes/cand/"
-SWAPS = (C + "member-swap.json",)
 GROUPS = (
     (
         "blend",
@@ -45,17 +49,10 @@ GROUPS = (
             C + "member-type6.json",
             C + "member-mass6.json",
             C + "member-full6.json",
-            *SWAPS,
-            C + "member-champcpu.json",
+            C + "member-swap.json",
         ),
     ),
-    ("swap-cpu", C + "member-champcpu.json", SWAPS),
-    (
-        "solo",
-        C + "member-solo-champion-cpu.json",
-        (C + "member-solo-cut04.json",),
-    ),
-    ("device", C + "member-solo-champion.json", (C + "member-solo-champion-cpu.json",)),
+    ("solo", C + "member-solo-champion.json", (C + "member-solo-cut04.json",)),
 )
 MONTHS = (7, 8, 9)
 HIDDEN_TOTAL = 3482  # train fraud rows the cleaned labels leave legit (earlier measurement)
@@ -139,15 +136,28 @@ def _bench(cells: Path):
     return Bench.from_store(paths.out_dir() / "runs", cells)
 
 
-def cmd_gate(cells: Path, out: Path, only: list[str] | None = None, report_name="gate") -> dict:
-    from ringtrace.final import _json_default, load_recipe, table
+def load(path: str, tabm_run: str = "final-tabm") -> dict:
+    """A recipe whose ``final-tabm`` member reads the saved TabM run ``tabm_run``."""
+    from ringtrace.final import load_recipe
+
+    r = load_recipe(path)
+    for m in r["members"]:
+        if m["run"] == "final-tabm":
+            m["run"] = tabm_run
+    return r
+
+
+def cmd_gate(
+    cells: Path, out: Path, only: list[str] | None = None, report_name="gate", tabm_run="final-tabm"
+) -> dict:
+    from ringtrace.final import _json_default, table
 
     b = _bench(cells)
     out.mkdir(parents=True, exist_ok=True)
     report = {}
     for label, base_path, chal_paths in GROUPS:
-        base = load_recipe(base_path)
-        chals = [load_recipe(p) for p in chal_paths if not only or p in only]
+        base = load(base_path, tabm_run)
+        chals = [load(p, tabm_run) for p in chal_paths if not only or p in only]
         if not chals:
             continue
         rep = table(b, base, chals, draws=2000, oct_draws=2000)
@@ -185,14 +195,28 @@ def cmd_gate(cells: Path, out: Path, only: list[str] | None = None, report_name=
     return report
 
 
-def cmd_build(recipes: list[str], cells: Path, out: Path, best: Path) -> dict:
-    from ringtrace.final import build, load_recipe
+def cmd_build(
+    recipes: list[str],
+    cells: Path,
+    out: Path,
+    best: Path,
+    tabm_run="final-tabm",
+    candidates: bool = False,
+) -> dict:
+    import shutil
+
+    from ringtrace.final import build
 
     b = _bench(cells)
     reps = {}
     for p in recipes:
-        r = load_recipe(p)
-        reps[r["name"]] = build(b, r, out, paths.data_dir() / "sample_submission.csv", best)
+        r = load(p, tabm_run)
+        reps[r["name"]] = rep = build(b, r, out, paths.data_dir() / "sample_submission.csv", best)
+        if candidates and not rep["problems"]:
+            dest = paths.out_dir() / "candidates" / f"{r['name']}.csv"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(out / f"{r['name']}.csv", dest)
+            print(f"[member] {dest}: sha256 {rep['sha256']}", flush=True)
     return reps
 
 
@@ -207,11 +231,20 @@ def main(argv=None) -> None:
     ap.add_argument("--out", default=str(paths.out_dir() / "member"))
     ap.add_argument("--best", default=str(paths.out_dir() / "member" / "blend-tabmF-bq.csv"))
     ap.add_argument("--report", default="gate", help="report name for gate")
+    ap.add_argument("--tabm-run", default="final-tabm", help="saved run of the final-tabm member")
+    ap.add_argument("--candidates", action="store_true", help="build: copy to candidates/")
     a = ap.parse_args(argv)
     if a.cmd == "gate":
-        cmd_gate(Path(a.cells), Path(a.out), a.recipes or None, a.report)
+        cmd_gate(Path(a.cells), Path(a.out), a.recipes or None, a.report, a.tabm_run)
     else:
-        cmd_build(a.recipes, Path(a.cells), Path(a.out) / "build", Path(a.best))
+        cmd_build(
+            a.recipes,
+            Path(a.cells),
+            Path(a.out) / "build",
+            Path(a.best),
+            a.tabm_run,
+            a.candidates,
+        )
 
 
 if __name__ == "__main__":

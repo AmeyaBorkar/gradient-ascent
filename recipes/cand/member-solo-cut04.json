@@ -3,9 +3,9 @@
  "members": [
   {
    "name": "champion",
-   "run": "member-cut04-cpu",
+   "run": "member-cut04",
    "variant": "fold",
-   "cells": "member-cut04-cpu"
+   "cells": "member-cut04"
   }
  ],
  "weights": {
