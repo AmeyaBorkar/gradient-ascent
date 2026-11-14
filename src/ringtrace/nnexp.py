@@ -71,6 +71,15 @@ def variant_spec(name: str, recipe: dict):
     return spec
 
 
+# Job prefix of the fit in progress; side outputs (weights, label stats) carry it like the fits.
+_JOB = {"prefix": ""}
+
+
+def _side(name: str) -> Path:
+    """Path of a fit's side output, ``[<job>-]<name>`` in the screen's folder."""
+    return _dir() / (f"{_JOB['prefix']}-{name}" if _JOB["prefix"] else name)
+
+
 def _dir() -> Path:
     d = paths.out_dir() / "nntech"
     d.mkdir(parents=True, exist_ok=True)
@@ -288,7 +297,7 @@ def _shift_columns(c: str, cell, X: np.ndarray, log) -> np.ndarray:
     """Columns the domain classifier may read: fixed on ``sep``, then reused by every cell."""
     from ringtrace import nn_shift
 
-    path = _dir() / "shift-columns.json"
+    path = _side("shift-columns.json")
     if c == "sep":
         gap = nn_shift.column_auc_gap(X[cell.fit], X[cell.hold])
         keep = np.flatnonzero(gap <= SHIFT["calendar_gap"])
@@ -325,7 +334,7 @@ def _fit_shift(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
         threads=threads.budget(),
         log=log,
     )
-    (_dir() / f"shift-info_{c}.json").write_text(json.dumps(info, indent=1))
+    _side(f"shift-info_{c}.json").write_text(json.dumps(info, indent=1))
     (prob,) = nn_shift.fit_predict_weighted(
         X[cell.fit], cell.targets["given"][cell.fit], w, [X[cell.hold]], spec, log=log
     )
@@ -362,7 +371,7 @@ def _fit_gentarget(c: str, cell, X: np.ndarray, spec, log) -> np.ndarray:
     from ringtrace.octlike import _cleaned_target
 
     target, stats = _cleaned_target(cell, log, which="structured")
-    (_dir() / f"gentarget-stats_{c}.json").write_text(json.dumps(stats, indent=1))
+    _side(f"gentarget-stats_{c}.json").write_text(json.dumps(stats, indent=1))
     t = target[cell.fit]
     if (t < 0).any():
         raise ValueError(f"cell {c}: {int((t < 0).sum())} fit rows have no generator-only label")
@@ -408,6 +417,7 @@ def fit(variant: str, cells: list[str], seeds: tuple[int, ...], log=print, job: 
     else:
         spec = replace(variant_spec(variant, recipe), seeds=seeds)
     tag = tag_of(variant, seeds, job)
+    _JOB["prefix"] = job
     for c in cells:
         path = _dir() / f"{tag}_{c}.npz"
         if path.exists():

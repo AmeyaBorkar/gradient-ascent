@@ -209,3 +209,11 @@ def test_mean_of_averages_variants_cell_by_cell(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError):
         nnexp.mean_of("ac", ["a", "c"], ["s13"], log=lambda *_: None)
+
+
+def test_side_outputs_carry_the_job_prefix(tmp_path, monkeypatch):
+    monkeypatch.setattr(nnexp, "_dir", lambda: tmp_path)
+    monkeypatch.setitem(nnexp._JOB, "prefix", "wildrun")
+    assert nnexp._side("shift-columns.json") == tmp_path / "wildrun-shift-columns.json"
+    monkeypatch.setitem(nnexp._JOB, "prefix", "")
+    assert nnexp._side("shift-columns.json") == tmp_path / "shift-columns.json"
