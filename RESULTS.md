@@ -712,4 +712,10 @@ October census (`python analysis/cleandec.py census`):
 - ordinary rows equal legit rows on cross-month entity history, new_payee history, account and
   device age, and own-phone use.
 
+A-clean ceiling (`decode`, key `ceiling`), Jul / Aug / Sep:
+- best file 0.5462 / 0.5451 / 0.5525;
+- every generator row typed right 0.5743 / 0.5734 / 0.5813;
+- the best file plus 10 / 15 / 20 % of the ordinary rows called right, mean over months, 0.602 /
+  0.626 / 0.650.
+
 - 2026-11-14 14:30 IST: clean-label decoding judged; nothing to upload from it.

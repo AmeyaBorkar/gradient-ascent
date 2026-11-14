@@ -245,6 +245,29 @@ def cmd_noise(ctx: Ctx) -> dict:
 # --------------------------------------------------------------------------------------- decode
 
 
+def ceiling(ctx: Ctx, shares=(0.05, 0.1, 0.15, 0.2), seed: int = 0) -> dict:
+    """On the A-clean scale, per month: the best file; perfect typing of every generator row
+    (the gen-only labels as calls); and each of those with a random share of the ordinary rows
+    (cleaned fraud, gen-only legit) also called right, which is what a score above the
+    ceiling would need."""
+    rng = np.random.default_rng(seed)
+    calls = ctx.calls[ctx.b.tr]
+    out = {}
+    for m in MONTHS:
+        s = ctx.pt == m
+        y, g, h = ctx.cleaned[s], ctx.gen[s], ctx.hid[m]
+        ordinary = np.flatnonzero((y > 0) & (g == 0))
+        row = {"best_file": macro(y, calls[s], h), "generator_perfect": macro(y, g, h)}
+        for name, start in (("generator_perfect", g), ("best_file", calls[s])):
+            for f in shares:
+                p = start.copy()
+                pick = rng.choice(ordinary, int(f * len(ordinary)), replace=False)
+                p[pick] = y[pick]
+                row[f"{name}+ordinary_{f}"] = macro(y, p, h)
+        out[str(m)] = row
+    return out
+
+
 def cmd_decode(ctx: Ctx) -> dict:
     b = ctx.b
     base = ctx.scores(ctx.calls[b.tr])
@@ -267,6 +290,8 @@ def cmd_decode(ctx: Ctx) -> dict:
         }
         for m in MONTHS
     }
+    rep["ceiling"] = ceiling(ctx)
+    print("A-clean ceiling", json.dumps(rep["ceiling"]), flush=True)
     for name, dec in VARIANTS.items():
         t0 = time.time()
         pred = ctx.variant_calls(dec)

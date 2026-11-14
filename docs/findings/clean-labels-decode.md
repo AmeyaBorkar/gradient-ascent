@@ -154,6 +154,26 @@ Measured with `census`:
   - device age against the pair's first sighting;
   - own-phone use (92.4 % against 92.1 %).
 
+## 6. What a score above the ceiling needs
+
+Measured by `decode` (key `ceiling`), on the A-clean scale, which matches the public level
+(section 4):
+
+| | Jul | Aug | Sep |
+|---|---|---|---|
+| best file | 0.5462 | 0.5451 | 0.5525 |
+| every generator row typed right (the ceiling) | 0.5743 | 0.5734 | 0.5813 |
+| best file + 10 % of ordinary rows called right | 0.6010 | 0.5998 | 0.6056 |
+| best file + 15 % | 0.6242 | 0.6244 | 0.6298 |
+| best file + 20 % | 0.6495 | 0.6488 | 0.6530 |
+| ceiling + 10 % | 0.6291 | 0.6287 | 0.6344 |
+
+- A public score near 0.63 is 0.05 above the ceiling. It needs about 15 % of the ordinary rows
+  called with their right type and no false alarms, on top of the best file. In October that is
+  about 1,100 of roughly 7,500 rows.
+- With false alarms it needs more. The counter reaches about 3 % of them.
+- No noise correction or decoder supplies that.
+
 **Verdict.** Clean test labels do not change the decoding: the noise is uniform, its inversion
 is a monotone rescaling, and the file moves by one row. The public col7 pair confirms the label
 model used offline (A-clean, partner types kept) and rejects template-pure labels. Nothing here
