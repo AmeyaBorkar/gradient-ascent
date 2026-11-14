@@ -194,7 +194,20 @@ def _fit(X, y, spec: Spec, seed: int, rounds: int, n_class: int = 0):
         else {"objective": "binary:logistic"}
     )
     d = xgb.QuantileDMatrix(X, label=y, max_bin=spec.max_bin)
-    return xgb.train(spec.params(seed, **extra), d, rounds)
+    params = spec.params(seed, **extra)
+    if params["device"] == "cpu":
+        return train_cpu(params, d, rounds)
+    return xgb.train(params, d, rounds)
+
+
+def train_cpu(params: dict, d, rounds: int):
+    """``xgb.train`` without its per-round evaluation: the same trees. A CUDA build of XGBoost runs
+    the multiclass evaluation through the CUDA runtime even on the CPU, which fails when no GPU is
+    visible (``CUDA_VISIBLE_DEVICES`` empty)."""
+    bst = xgb.Booster(params, [d])
+    for i in range(rounds):
+        bst.update(d, i)
+    return bst
 
 
 def _fit_binary(X, y, spec: Spec, seed: int, rounds: int):

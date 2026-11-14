@@ -141,3 +141,24 @@ def test_device_switch_fits_a_cuda_spec_on_cpu(monkeypatch):
     )
     (p,) = fit_predict(X, y, period, [X[:100]], spec, log=lambda *_: None)
     np.testing.assert_allclose(p.sum(1), 1.0, atol=1e-5)
+
+
+@pytest.mark.parametrize("n_class", [0, 4])
+def test_cpu_training_loop_matches_xgb_train(n_class):
+    import xgboost as xgb
+
+    from ringtrace.cascade import train_cpu
+
+    rng = np.random.default_rng(3)
+    X = rng.normal(size=(2000, 5)).astype(np.float32)
+    y = rng.integers(0, max(n_class, 2), 2000).astype(np.float32)
+    extra = (
+        {"objective": "multi:softprob", "num_class": n_class}
+        if n_class
+        else {"objective": "binary:logistic"}
+    )
+    params = BoosterSpec(rounds=15, depth=3, device="cpu").params(0, **extra)
+    a = xgb.train(params, xgb.QuantileDMatrix(X, label=y, max_bin=256), 15)
+    b = train_cpu(params, xgb.QuantileDMatrix(X, label=y, max_bin=256), 15)
+    np.testing.assert_array_equal(a.inplace_predict(X), b.inplace_predict(X))
+    assert a.save_raw("json") == b.save_raw("json")
