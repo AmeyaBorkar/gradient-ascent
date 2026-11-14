@@ -6,7 +6,8 @@
 # Inputs under $RINGTRACE_OUT: the member runs (runs/<run>/, with runs/<run>-at-half0/ for the
 # month folds predicted at October's density) and the October-like cells
 # (density/cells-honest, density/cells-held) of `python -m ringtrace.density cells`.
-# Reports: $RINGTRACE_OUT/final2/gates/*.json; files: $RINGTRACE_OUT/final2/build*/.
+# Reports: $RINGTRACE_OUT/final2/gates/*.json; files: $RINGTRACE_OUT/final2/build*/, counted
+# against the best file ($RINGTRACE_BEST, default $RINGTRACE_OUT/best/blend-tabmF-bq.csv).
 set -euo pipefail
 what="${1:-all}"
 out="${RINGTRACE_OUT:-$HOME/outputs}"
@@ -59,7 +60,7 @@ fi
 if [[ "$what" == build || "$what" == all ]]; then
   # the best file and the bait file must rebuild to their recorded sha256 under this code; the
   # final file is built twice, each in a fresh process and directory, and must match itself
-  best="$out/final2/best/blend-tabmF-bq.csv"
+  best="${RINGTRACE_BEST:-$out/best/blend-tabmF-bq.csv}"
   for d in build-a build-b; do
     python -m ringtrace.final build recipes/final-half.json recipes/bait-combo.json \
       "$D/final-half-chalf3b.json" recipes/final2.json --out "$out/final2/$d" --against "$best"
