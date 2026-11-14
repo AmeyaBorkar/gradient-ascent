@@ -135,6 +135,17 @@ def test_device_switch_forces_cpu(monkeypatch):
         BoosterSpec().params(0)
 
 
+def test_device_switch_forces_cuda(monkeypatch):
+    from ringtrace.cascade import CatBoostSpec, LgbmSpec, forced_device
+
+    monkeypatch.setenv("RINGTRACE_DEVICE", "cuda")
+    assert forced_device() == "cuda"
+    assert BoosterSpec(device="cpu").params(0)["device"] == "cuda"
+    cat = CatBoostSpec(task_type="CPU", gpu_ram_part=0.2).params(0, "Logloss")
+    assert cat["task_type"] == "GPU" and cat["devices"] == "0" and cat["gpu_ram_part"] == 0.2
+    assert LgbmSpec().params(0)["device_type"] == "cpu"  # LightGBM has no GPU build here
+
+
 def test_device_switch_fits_a_cuda_spec_on_cpu(monkeypatch):
     monkeypatch.setenv("RINGTRACE_DEVICE", "cpu")
     X, y, period = _problem(3000, 0)

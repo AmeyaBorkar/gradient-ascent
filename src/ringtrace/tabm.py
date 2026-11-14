@@ -173,7 +173,7 @@ def _seed_all(seed: int) -> None:
 def train_one(Z: np.ndarray, y: np.ndarray, spec: TabMSpec, seed: int, log=print):
     torch = _torch()
     _seed_all(seed)
-    use_gpu = forced_device() is None and torch.cuda.is_available()
+    use_gpu = forced_device() != "cpu" and torch.cuda.is_available()
     dev = torch.device(spec.device if use_gpu else "cpu")
     model = build_model(Z.shape[1], spec).to(dev)
     Zt = torch.from_numpy(Z).to(dev)

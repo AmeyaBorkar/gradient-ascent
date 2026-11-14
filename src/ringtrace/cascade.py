@@ -16,7 +16,8 @@ stages can also use CatBoost (``stages="catboost"``, ``CatBoostSpec``); the scre
 still comes from ``booster``, so every option trains on the same rows.
 
 ``RINGTRACE_DEVICE=cpu`` puts every booster on the CPU whatever its spec says (XGBoost ``device``
-cpu, CatBoost ``task_type`` CPU); unset, each spec keeps its own device.
+cpu, CatBoost ``task_type`` CPU); ``RINGTRACE_DEVICE=cuda`` puts every XGBoost and CatBoost booster
+on the GPU (LightGBM stays on the CPU); unset, each spec keeps its own device.
 """
 
 from __future__ import annotations
@@ -39,8 +40,8 @@ def forced_device() -> str | None:
     v = os.environ.get(DEVICE_ENV, "").strip().lower()
     if not v:
         return None
-    if v != "cpu":
-        raise ValueError(f"{DEVICE_ENV} must be 'cpu' or unset, got {v!r}")
+    if v not in ("cpu", "cuda"):
+        raise ValueError(f"{DEVICE_ENV} must be 'cpu', 'cuda' or unset, got {v!r}")
     return v
 
 
@@ -125,7 +126,7 @@ class CatBoostSpec:
     gpu_ram_part: float | None = None  # share of GPU memory CatBoost may take (None: its default)
 
     def params(self, seed: int, loss: str) -> dict:
-        task_type = "CPU" if forced_device() == "cpu" else self.task_type
+        task_type = {"cpu": "CPU", "cuda": "GPU"}.get(forced_device() or "", self.task_type)
         p = {
             "iterations": self.iterations,
             "depth": self.depth,
