@@ -642,3 +642,30 @@ augmentation never loses there, but it has no full run, so it has no arrays to g
 - 2026-11-14 03:20 IST: every arrived component judged; `recipes/final.json` unchanged since
   02:15 (`final.csv` sha256 `39cb4952...4db3`).
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+## Velocity: velocity_bot and layering_chain in October (`python analysis/velocity.py`, 30 s, 4 threads)
+
+Calls of the best file (`blend-tabmF-bq`): out-of-fold on the train months, October as counts.
+Finding: `docs/findings/velocity-october.md`.
+
+- Bot-pool bursts: 33 / 26 / 25 / 7 (6.26 / 4.93 / 4.90 / 2.68 per 100k rows); October
+  expected 14.0 at the train rate (Poisson P(<= 7) = 0.032). Sizes 29 / 37 / 58 in October against
+  20 / 40 / 60 in train and 2 / 20 / 39 when train bursts are thinned to 50 % (Mann-Whitney p
+  0.85 whole, 1.8e-5 thinned). Every pool row is called bot in every month.
+- Off-pool sessions (device or sender; gaps 5 / 15 / 60 min; small whole-rupee merchant pay,
+  merchant pay of any amount, festive categories, any row; full density and thinned at seeds 0 to
+  2): no bot-like group above 5.5 rows per 100k in any month; none called or labelled bot.
+- Zone-ordinary rows (single-use fraud-pass devices with no template) per 100k, October / train
+  mean: bot 10.7 (1.04 times), layering 7.7 (0.99), mule 21.5 (1.46), phishing 10.7 (1.31),
+  collusion 3.8 (1.36), loan 1.9 (0.61), sim 4.2 (0.80).
+- Layering rows per 100k, Jul / Aug / Sep / Oct: fast chains 123.5 / 133.6 / 125.3 / 114.7; slow
+  chains 35.3 / 40.6 / 38.2 / 49.9; fan-ins 76.8 / 64.2 / 56.1 / 47.6; all called as in train.
+- Expected October macro-F1 from the rescaled anatomy (cleaned): 0.555 (pooled train 0.566;
+  public 0.5499). Backtest on each held-out train month: error -0.013 / +0.006 / +0.011 cleaned,
+  -0.015 / +0.006 / +0.014 given.
+
+| probe | train rows | October rows | given Jul / Aug / Sep | cleaned Jul / Aug / Sep | gen-only Jul / Aug / Sep | verdict |
+|---|---:|---:|---|---|---|---|
+| bot on P(bot) >= 0.35 | 68 | 0 | -0.00108 / 0.00000 / -0.00064 | -0.00112 / 0.00000 / -0.00061 | -0.00195 / 0.00000 / -0.00115 | rejected |
+| bot on P(bot) >= 0.20 | 195 | 22 | -0.00279 / -0.00028 / -0.00102 | -0.00303 / -0.00027 / -0.00098 | -0.00528 / -0.00051 / -0.00188 | rejected |
+| bot on P(bot) >= 0.10 | 386 | 39 | -0.00449 / -0.00084 / -0.00346 | -0.00493 / -0.00096 / -0.00383 | -0.00859 / -0.00181 / -0.00706 | rejected |

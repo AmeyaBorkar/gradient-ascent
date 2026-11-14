@@ -40,3 +40,6 @@ counter-anchored template rule.
 - [ ] The blind-spot rule: a label-free rule that calls generator-made rows the champion calls
       legit, adopted only if it never loses on leave-one-month-out and the October-like cells.
 - [ ] Finish the leave-one-family-out ablations left over in run 14.
+- [x] velocity_bot and layering_chain in October (`analysis/velocity.py`,
+      `docs/findings/velocity-october.md`): fewer bot bursts (7 against 14 expected) and a
+      chain-mix change, every marked row already called; no candidate.
