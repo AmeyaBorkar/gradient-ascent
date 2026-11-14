@@ -100,8 +100,10 @@ def test_lgbm_recipe_keeps_the_champion_screen_and_features():
     assert p["deterministic"] and p["force_row_wise"]
 
 
-def test_catboost_recipe_parses():
+def test_catboost_recipe_parses(monkeypatch):
     from ringtrace.run import cascade_spec, load_recipe
+
+    monkeypatch.delenv("RINGTRACE_DEVICE", raising=False)
 
     spec = cascade_spec(load_recipe("recipes/catboost.json"))
     assert spec.stages == "catboost"
