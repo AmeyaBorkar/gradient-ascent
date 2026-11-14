@@ -6,7 +6,14 @@ from sklearn.metrics import f1_score
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "analysis"))
 
-from velocity_core import per_100k, rescaled_f1, sessions, size_test, thin_keep  # noqa: E402
+from velocity_core import (  # noqa: E402
+    mule_edge,
+    per_100k,
+    rescaled_f1,
+    sessions,
+    size_test,
+    thin_keep,
+)
 
 
 def test_sessions_split_on_gap_key_and_split():
@@ -98,3 +105,13 @@ def test_rescaled_f1_tracks_a_month_with_half_the_structured_rows():
     # a is read from all non-zone calls, false alarms included, so the estimate is approximate
     assert abs(r["f1_test"][2] - actual[2]) < 0.05
     assert r["f1_test"][2] < r["f1_train"][2]
+
+
+def test_mule_edge_moves_only_bot_calls_on_mule_zone_rows():
+    calls = np.array([2, 2, 2, 1, 0, 2])
+    zord = np.array([True, True, False, True, True, True])
+    seg = np.array([1, 2, 1, 1, 1, 0])
+    new, hit = mule_edge(calls, zord, seg)
+    assert hit.tolist() == [True, False, False, False, False, False]
+    assert new.tolist() == [1, 2, 2, 1, 0, 2]
+    assert calls.tolist() == [2, 2, 2, 1, 0, 2]

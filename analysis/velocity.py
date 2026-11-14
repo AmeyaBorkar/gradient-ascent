@@ -16,6 +16,11 @@ Sections (October rows are only ever counted):
 * ``estimate``: the expected October F1 per class (``velocity_core.rescaled_f1``), with a
   backtest that estimates each train month from the other two.
 * ``probe``: velocity_bot called on every row with P(bot) above a cut, on the train months.
+* ``edge``: the fraud-phase zones per split (counter HMM), the single-row zone devices whose call
+  disagrees with the HMM segment, and the density of anchored devices around the mule/bot edge.
+* ``build`` (run on request only): the probe ``velocity-muleedge`` (``velocity_core.mule_edge``)
+  on top of the best file, scored on the train months and written to
+  ``$RINGTRACE_OUT/candidates/velocity-muleedge.csv``.
 
 Inputs: the ledger, the cached arrays of the best file (``$RINGTRACE_OUT/closelook/prep.npz``:
 blended probabilities, out-of-fold and October calls, targets, counter segments, templates and
@@ -36,7 +41,14 @@ from sklearn.metrics import f1_score
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from velocity_core import per_100k, rescaled_f1, sessions, size_test, thin_keep  # noqa: E402
+from velocity_core import (  # noqa: E402
+    mule_edge,
+    per_100k,
+    rescaled_f1,
+    sessions,
+    size_test,
+    thin_keep,
+)
 
 from ringtrace import paths, store, tables  # noqa: E402
 from ringtrace.classes import CLASSES, N_CLASSES  # noqa: E402
@@ -62,10 +74,14 @@ COLS = [
 ]
 
 
-def load() -> dict:
+def _ledger_path() -> Path:
     names = ("train", "test", "accounts", "merchants")
     key = "-".join(tables.file_digest(paths.data_dir() / f"{n}.csv", 8) for n in names)
-    led = pl.read_parquet(paths.cache_dir() / "tables" / f"ledger-{key}.parquet", columns=COLS)
+    return paths.cache_dir() / "tables" / f"ledger-{key}.parquet"
+
+
+def load() -> dict:
+    led = pl.read_parquet(_ledger_path(), columns=COLS)
     z = np.load(paths.out_dir() / "closelook" / "prep.npz")
     is_test = z["is_test"]
     n = led.height
@@ -317,6 +333,80 @@ def sec_probe(d: dict) -> dict:
     return rep
 
 
+def sec_edge(d: dict) -> dict:
+    ph = store.family("phones", verbose=False).select("ctr_block", "ctr_pos", "ctr_conf")
+    pos = ph["ctr_pos"].to_numpy().astype(float)
+    conf = ph["ctr_conf"].to_numpy().astype(float)
+    phase = ph["ctr_block"].fill_null(0).to_numpy() == 2
+    seg, calls, anchor = d["ctr_seg"], d["calls"], d["anchor"]
+    rep = {"zones": {}, "disagree": {}, "band": {}}
+    splits = {"train": ~d["is_test"], "october": d["is_test"]}
+    for c in range(1, N_CLASSES):
+        r = {}
+        for name, split in splits.items():
+            s = phase & split & (seg == c)
+            r[name] = [float(pos[s].min()), float(pos[s].max())]
+        r["share_ratio"] = (r["october"][1] - r["october"][0]) / (r["train"][1] - r["train"][0])
+        rep["zones"][CLASSES[c]] = r
+    for name, split in splits.items():
+        dis = phase & split & d["zord"] & (calls != seg) & (calls > 0)
+        out = {}
+        for h, c in sorted(set(zip(seg[dis].tolist(), calls[dis].tolist(), strict=True))):
+            ii = np.flatnonzero(dis & (seg == h) & (calls == c))
+            r = {
+                "rows": len(ii),
+                "pos": [float(pos[ii].min()), float(pos[ii].max())],
+                "conf": [float(conf[ii].min()), float(conf[ii].max())],
+            }
+            if name == "train":
+                r["cleaned_is_hmm"] = float((d["cleaned"][ii] == h).mean())
+                r["cleaned_is_call"] = float((d["cleaned"][ii] == c).mean())
+            out[f"{CLASSES[h]}->{CLASSES[c]}"] = r
+        rep["disagree"][name] = out
+        bands = {}
+        for lo, hi in ((0.0, 0.156), (0.156, 0.196), (0.196, 0.27)):
+            b = phase & split & (pos >= lo) & (pos < hi)
+            anchored = len(np.unique(d["device"][b & (anchor == MULE)]))
+            single = int((b & d["zord"]).sum())
+            bands[f"{lo:.3f}-{hi:.3f}"] = {"mule_anchored_devices": anchored, "zone_rows": single}
+        rep["band"][name] = bands
+    return rep
+
+
+BEST_FILE = "blend-tabmF-bq.csv"
+
+
+def sec_build(d: dict) -> dict:
+    from ringtrace.blend import write_submission
+
+    ids = pl.read_parquet(_ledger_path(), columns=["txn_id"])["txn_id"].to_numpy()
+    te = np.flatnonzero(d["is_test"])
+    best = pl.read_csv(paths.out_dir() / "candidates" / BEST_FILE, infer_schema=False)
+    code = {c: i for i, c in enumerate(CLASSES)}
+    pos = {t: i for i, t in enumerate(best["id"].to_list())}
+    best_calls = np.array([code[x] for x in best["label"].to_list()])[[pos[t] for t in ids[te]]]
+    if not np.array_equal(best_calls, d["calls"][te]):
+        raise ValueError("prep.npz October calls differ from the best file")
+    new, hit = mule_edge(d["calls"], d["zord"], d["ctr_seg"], mule=MULE, bot=BOT)
+    rep = {"train_rows": int((hit & ~d["is_test"]).sum()), "october_rows": int(hit[te].sum())}
+    for target in ("given", "cleaned", "gen"):
+        rep[target] = [
+            _macro(d[target][d["m"] == m], new[d["m"] == m])
+            - _macro(d[target][d["m"] == m], d["calls"][d["m"] == m])
+            for m in MONTHS
+        ]
+    moves = {}
+    for a, b in zip(d["calls"][te][hit[te]], new[te][hit[te]], strict=True):
+        k = f"{CLASSES[a]} -> {CLASSES[b]}"
+        moves[k] = moves.get(k, 0) + 1
+    rep["moves"] = moves
+    path = paths.out_dir() / "candidates" / "velocity-muleedge.csv"
+    sub = write_submission(path, ids[te], new[te], paths.data_dir() / "sample_submission.csv")
+    rep.update({"file": str(path), "sha256": sub["sha256"], "problems": sub["problems"]})
+    print(json.dumps(rep, indent=1))
+    return rep
+
+
 SECTIONS = {
     "bursts": sec_bursts,
     "offpool": sec_offpool,
@@ -324,7 +414,9 @@ SECTIONS = {
     "layering": sec_layering,
     "estimate": sec_estimate,
     "probe": sec_probe,
+    "edge": sec_edge,
 }
+ON_REQUEST = {"build": sec_build}
 
 
 def main(argv=None) -> None:
@@ -336,12 +428,13 @@ def main(argv=None) -> None:
     d = load()
     rep = {}
     for name in names:
-        rep[name] = SECTIONS[name](d)
+        rep[name] = {**SECTIONS, **ON_REQUEST}[name](d)
         print(f"[velocity] {name} done ({time.time() - t0:.0f}s)", flush=True)
     out = paths.out_dir() / "velocity"
     out.mkdir(parents=True, exist_ok=True)
-    (out / "report.json").write_text(json.dumps(rep, indent=1, default=str))
-    print(f"[velocity] report: {out / 'report.json'}")
+    stem = "report" if set(names) <= set(SECTIONS) else "-".join(names)
+    (out / f"{stem}.json").write_text(json.dumps(rep, indent=1, default=str))
+    print(f"[velocity] report: {out / f'{stem}.json'}")
 
 
 if __name__ == "__main__":

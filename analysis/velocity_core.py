@@ -116,3 +116,15 @@ def thin_keep(n: int, protect: np.ndarray, keep: float, seed: int) -> np.ndarray
     """A random row sample of rate ``keep`` that always keeps the rows in ``protect``."""
     rng = np.random.default_rng(seed)
     return protect | (rng.random(n) < keep)
+
+
+def mule_edge(
+    calls: np.ndarray, zord: np.ndarray, seg: np.ndarray, mule: int = 1, bot: int = 2
+) -> tuple[np.ndarray, np.ndarray]:
+    """Zone rows (single-use fraud-phase devices with no template or anchor) that the counter
+    HMM puts in the mule segment but that are called velocity_bot take mule_account. Returns
+    the new calls and the rows changed."""
+    hit = zord & (seg == mule) & (calls == bot)
+    out = calls.copy()
+    out[hit] = mule
+    return out, hit
