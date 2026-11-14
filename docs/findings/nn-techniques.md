@@ -41,6 +41,13 @@ seed.
   At alpha 0.7 the member becomes a copy of its teacher and loses everywhere in the fraud-only
   role.
 
+## Later: seeds 1 and 2 of SWA
+
+Single-seed SWA fits at seeds 1 and 2 (laptop), each against the plain TabM of the same seed
+on the same GPU, change no call in any of the four cells as the fraud-mass source. Alone they
+are mixed (seed 1: September -0.00005 given; seed 2: s15 -0.00008). The SWA verdict stands. The
+numbers are in `RESULTS.md`, "Seeds 1 and 2 of shift (box) and SWA (laptop)".
+
 ## Decisions taken
 
 - **Seed 0 only, not seeds 0-2.** The screen used one seed per fit (base and technique share it)

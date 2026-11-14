@@ -44,10 +44,11 @@ Numbers are in `RESULTS.md` ("Neural techniques, second screen"), and each techn
 finding in `docs/findings/nn-*.md`. Nothing passed, so nothing was promoted and no October file
 was written.
 
-Now running: seeds 1 and 2 of `shift` (box) and of SWA (laptop), each with a base of the same
-seed on the same GPU, and the scores of two plain averages as the fraud-mass source (seven seed-0
-variants, and base + SWA + shift). Each average is judged against the seed-0 base and against
-the 3-seed TabM the blend uses.
+Follow-ups, all rejected:
+- seeds 1 and 2 of `shift` and of SWA, each against the base of the same seed on the same GPU.
+  The shift signs flip with the seed; SWA changes no fraud-mass call.
+- two plain averages of seed-0 variants. Against the seed-0 base they never lose, but on 0-2
+  calls per cell; against the blend's 3-seed TabM each loses a cell.
 
 Current best idea: none from this screen. No neural training technique moves more than a few
 dozen October-like calls in the fraud-mass role without losing on given labels.
