@@ -77,7 +77,17 @@ segment 73 % to 20 % on train's out-of-fold calls.
 | cleaned | +0.00136 / +0.00276 / +0.00008 | +0.00140 | [+0.00045, +0.00258] |
 | gen-only | +0.00191 / +0.00402 / +0.00001 | +0.00198 | [+0.00044, +0.00405] |
 
-Rows changed per frame: 8, 18 and 1.
+Rows changed per frame: 8, 18 and 1. By move, pooled over the three frames:
+
+| move | rows | new call right (cleaned / given) | old call right (cleaned / given) |
+|---|---|---|---|
+| sim_swap → account_takeover | 18 | 18 / 15 | 0 / 0 |
+| velocity_bot → mule_account | 8 | 7 / 7 | 0 / 0 |
+| qr_swap → refund_abuse | 1 | 1 / 1 | 0 / 0 |
+
+`fC1` also flipped these 3 October rows, among 13 changes. Its flips came from members retrained
+on a density-matched counter, a different mechanism, and it was negative in one month. That upload
+lost 0.0009 on public, which cannot tell which of its phones were wrong.
 
 ## October
 
