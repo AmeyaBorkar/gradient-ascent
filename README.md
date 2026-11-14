@@ -46,6 +46,26 @@ sha256, the October calls per class and the rows changed against each member's o
 A single member: `python -m ringtrace.build recipes/champion.json` (features, cleaned labels,
 run, validated submission).
 
+## Reproduce the uploaded files
+
+The best public upload and its successor with the phishing bait rules are final recipes over saved
+member runs. Each command re-blends the members' arrays (`$RINGTRACE_OUT/runs/<run>/oof.npy` and
+`test.npy`), decodes, applies the recipe's rules, validates the file against
+`sample_submission.csv` and prints its sha256:
+
+```bash
+python -m ringtrace.final build recipes/final-half.json --out <dir>   # sha256 8a461426...fb926eb
+python -m ringtrace.final build recipes/bait-combo.json --out <dir>   # sha256 3b25869e...e1974
+```
+
+`final-half` is the five tree cascades for the type split, with the fraud mass taken half from
+TabM and a tenth from each tree, decoded at fraud scale 0.875 with the anchored template rule and
+`blank_merchant_qr`. `bait-combo` adds the two operator-role bait rules
+(`docs/findings/bait-operator-roles.md`). The member runs come from
+`python -m ringtrace.run recipes/<member>.json --name <run>` for each member listed in the
+recipe; re-blending is byte-reproducible, and a full member rebuild is too except CatBoost on the
+GPU (decision 14).
+
 ## Results
 
 Leave-one-month-out macro-F1 (train on two months, score the third), after the fixed point and
