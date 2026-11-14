@@ -687,4 +687,6 @@ Candidates on top of `blend-tabmF-bq.csv` (all legit -> phishing_collect): `bait
 sha256 `3b25869e1cd7ac3e390dd33568033d25d3b765b23f0e1f35dbbf3f2dff5e1974` (passes);
 `bait-roles.csv` 4 rows, `a6b55dd09914a2f18f098bd7644942959ddeaf574609de844ee790d54a7a8954`;
 `bait-pay-roles.csv` 3 rows, `6171470da676dec2f009913120f4aa038c66dd9c6f438aa4f35ea3fe1d13f2ee`.
+A-clean change (Jul / Aug / Sep): `roles` +0.00009 / +0.00001 / +0.00008, `pay` +0.00020 / +0.00004 /
+-0.00001, `pay-roles` +0.00020 / +0.00016 / +0.00007, `combo` +0.00029 / +0.00017 / +0.00016.
 Expected October change of `bait-combo`: about +0.0003.

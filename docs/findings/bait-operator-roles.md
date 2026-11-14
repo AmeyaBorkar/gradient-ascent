@@ -80,6 +80,10 @@ draws, 95 %.
   bot 6 / 1, round 5 / 4. PAY rule (receiver): qr 5 / 5, collect 4 / 4, bait 2 / 1, answer 1 / 1,
   bot 3 / 3, round 7 / 7. Not tuned: every rule uses all six roles.
 - The PAY rule at Rs 500 moves the same rows as at Rs 1,000; at Rs 100 it adds 4 wrong rows.
+- The A-clean proxy (cleaned labels with the expected unreported rows spread over the cleaned
+  legit rows) agrees with cleaned: `roles` +0.00009 / +0.00001 / +0.00008, `pay` +0.00020 /
+  +0.00004 / -0.00001, `pay-roles` +0.00020 / +0.00016 / +0.00007, `combo` +0.00029 / +0.00017 /
+  +0.00016.
 - The bait rule's August cleaned change is +0.0000034 (2 of 7 right against 0.275): it passes the
   months by one row. Its gen-only target loses in August and September: some of the cleaned
   phishing lone Rs 10s are judged ordinary-looking there.
@@ -128,6 +132,10 @@ with labels from the 12 classes.
 
 `bait-combo` is the union of the other two (4 + 3 rows, disjoint). The four-month variants give
 the same files byte for byte. The plain PAY rule fails and has no file.
+
+The rules compose with other components: on `pairs-tmplA-flip.csv` the same 7 rows move; on
+`final.csv` and `blend-tabm-bq.csv` 8 (one more legit call qualifies there). Rebuild on any base
+with `python analysis/bait.py build combo --best <file> --out <file>`.
 
 **Expected effect.** In the cells, `combo` moves 4.1 rows per cell for +0.00018 (cleaned); October
 moves 7, so about +0.0003 on October, and the same on the private 70 % in expectation. About two
