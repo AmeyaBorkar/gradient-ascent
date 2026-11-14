@@ -40,3 +40,14 @@ counter-anchored template rule.
 - [ ] The blind-spot rule: a label-free rule that calls generator-made rows the champion calls
       legit, adopted only if it never loses on leave-one-month-out and the October-like cells.
 - [ ] Finish the leave-one-family-out ablations left over in run 14.
+
+## Clean-label decoding (14 Nov)
+- [x] Noise process by class, template and observables: unreported 12 % and wrong type 3 %,
+      uniform; no group the model could learn to suppress.
+- [x] Counter proxy target (A-clean with the label-free counter imposed, 200 rows).
+- [x] Clean-posterior decoder (`ringtrace.decode.clean_posterior`, `fixed_point(clean=...)`):
+      every variant moves 0-2 October rows; best passing variant is a one-row tie
+      (`cleandec-clean-uk-flip.csv`, not worth an upload).
+- [x] Public check: the template-4 switch's public cost (-0.0078) rejects template-pure clean
+      labels and fits the train partner share.
+- Current best idea from this line: none; the gap to higher public scores is not in decoding.

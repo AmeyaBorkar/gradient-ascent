@@ -642,3 +642,74 @@ augmentation never loses there, but it has no full run, so it has no arrays to g
 - 2026-11-14 03:20 IST: every arrived component judged; `recipes/final.json` unchanged since
   02:15 (`final.csv` sha256 `39cb4952...4db3`).
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+## Clean-label decoding (commit eb9d31b, laptop 4 threads, about 10 s per command)
+
+Base: `recipes/final-half.json` (the `blend-tabmF-bq` file; rebuilt, 0 October rows differ).
+Five targets per month: given / cleaned / gen-only / A-clean / counter proxy (A-clean with the
+counter imposed: 200 train rows changed). The base scores 0.5137 / 0.5094 / 0.5150 given,
+0.5654 / 0.5644 / 0.5718 cleaned, 0.9031 / 0.9000 / 0.9019 gen-only, 0.5462 / 0.5451 / 0.5525
+A-clean and 0.5498 / 0.5482 / 0.5560 on the proxy. Finding: `docs/findings/clean-labels-decode.md`.
+
+Noise process (`python analysis/cleandec.py noise`):
+- unreported 12.09 % on 24,345 generator rows, 11.64 % on 3,195 label-free fraud-block rows and
+  11.68 % on 11,385 template rows;
+- flat by class, month, template, KYC, OS, app, payment type, home city, amount, new payee and
+  hour: of 36 homogeneity tests (12 groupings x 3 populations) the smallest p-values are 0.005
+  (bank on template rows, which share a sender per event), 0.012 (template on generator rows;
+  amount on fraud-block rows), 0.036 (hour) and 0.07 (bank on generator rows; 0.64 on
+  fraud-block rows), about what 36 tests and event clustering give by chance;
+- wrong type 2.8 / 3.4 / 2.9 %, spread over all other types;
+- the fraud-call rate on generator rows is 98-100 % in every bank.
+
+Re-decoding (`python analysis/cleandec.py decode`). Change in 1e-5 on given / cleaned, Jul /
+Aug / Sep; rows are train rows changed per month, then the October moves:
+
+| decoder | given | cleaned | rows | October | verdict |
+|---|---|---|---|---|---|
+| fraud scale 0.80 | -7.2 / -1.1 / +0.1 | -3.8 / -1.8 / -0.5 | 8 / 5 / 3 | 2 legit -> phishing | rejected |
+| fraud scale 0.85 | 0 / -1.2 / +4.1 | 0 / -1.3 / +3.7 | 0 / 1 / 1 | 1 legit -> phishing | rejected |
+| fraud scale 0.879 | 0 / +2.7 / 0 | 0 / +2.9 / 0 | 0 / 1 / 0 | 0 | tie (no October row) |
+| fraud scale 0.95 | 0 / -1.1 / +2.5 | 0 / -0.6 / +2.7 | 0 / 2 / 2 | 1 phishing -> legit | rejected |
+| fraud scale 1.0 | 0 / +0.1 / +0.1 | 0 / +0.7 / -4.0 | 0 / 3 / 4 | 2 phishing -> legit | rejected |
+| clean posterior, u 0.121 | 0 / +2.7 / 0 | 0 / +2.9 / 0 | 0 / 1 / 0 | 1 legit -> phishing | tie, passes |
+| clean posterior, u by class | 0 / +2.7 / 0 | 0 / +2.9 / 0 | 0 / 1 / 0 | 1 legit -> phishing | tie, passes |
+| clean posterior, u 0.121, type flip 3 % | -1.9 / 0 / +4.1 | -2.1 / 0 / +3.7 | 1 / 0 / 1 | 1 legit -> phishing | rejected |
+| **clean posterior, u by class, type flip 3 %** | 0 / 0 / +4.1 | 0 / 0 / +3.7 | 0 / 0 / 1 | 1 legit -> phishing | tie, passes |
+| type flip only | 0 / -1.2 / +4.1 | 0 / -1.3 / +3.7 | 0 / 1 / 1 | 1 legit -> phishing | rejected |
+| hidden factor 1.1 | -6.0 / -2.5 / +4.1 | -2.4 / -2.7 / +3.7 | 7 / 2 / 1 | 2 legit -> phishing | rejected |
+| hidden factor 0.9 | 0 / -1.1 / +0.3 | 0 / -0.6 / +1.0 | 0 / 2 / 3 | 1 phishing -> legit | rejected |
+
+- Candidate `cleandec-clean-uk-flip.csv` (`python analysis/cleandec.py build clean-uk-flip`):
+  - sha256 `715138bd2d1d6bc48338f34873363c310a2493556f1769ec0cc9a94d2f05fc3a`;
+  - 1 row changed against `blend-tabmF-bq.csv` (legit -> phishing_collect);
+  - a one-row tie, not worth an upload.
+- The model's fraud mass is 74 % of the A-clean fraud count in every month and in October
+  (7,280 rows).
+
+Public evidence (`python analysis/cleandec.py public`): the template-4 switch to
+phishing_collect.
+- It moves 155 / 153 / 198 train rows (cashback share of their fraud labels 46 / 40 / 44 %) and
+  94 October rows. On the public slice it cost -0.0078.
+- Train effect in 1e-4:
+  - given -32 / -13 / -19;
+  - cleaned -35 / -22 / -36;
+  - A-clean -35 / -22 / -36;
+  - proxy -34 / -23 / -35;
+  - gen-only -24 / +9 / -18;
+  - template-pure -169 / -180 / -217.
+- Public likelihood of -0.0078:
+  - P(change <= observed) is 0.10 at the train share (0.43), 0.66 at 0.6 and 1.00 at 0.9 or
+    above;
+  - the density peaks at shares of 0.5-0.6;
+  - template-pure labels are rejected.
+
+October census (`python analysis/cleandec.py census`):
+- fraud-block rows without evidence: 73.8 / 77.1 / 70.6 per 100k in train, 81.4 in October;
+- bot pool: 248 / 184 / 209 per 100k in train, 103 in October;
+- every fraud-block and bot-pool row is called fraud, and every legit-block row legit, in all
+  four months;
+- ordinary rows equal legit rows on cross-month entity history, new_payee history, account and
+  device age, and own-phone use.
+
+- 2026-11-14 14:30 IST: clean-label decoding judged; nothing to upload from it.
