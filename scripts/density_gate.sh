@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Every gate of the density study, from saved cells and month-fold runs (no refits).
-#   bash scripts/density_gate.sh [step1|rule|nopos3|half|half3|half2|all]
+#   bash scripts/density_gate.sh [step1|rule|nopos|half|lomo|all]
 # Inputs: cells from `python -m ringtrace.density cells ...` under $RINGTRACE_OUT/density/,
 # month-fold runs `density-<member>[-nopos|-half<d>]` from `python -m ringtrace.density lomo`.
 # The LightGBM, CatBoost and TabM members keep the arrays of the best file in the month-fold
@@ -36,92 +36,47 @@ cellgate() { python -m ringtrace.density cellgate "$@"; }
 lomo() { python -m ringtrace.final table "$@" --cells "$E"; }
 alone() { python -m ringtrace.density table "$@"; }
 half() { python -m ringtrace.density table --counter half0 --suffix -at-half0 "$@"; }
+both() {
+  # cellgate <a> <b> <report stem> under the rebuilt counter and under the held one
+  cellgate "$1:$N:honest" "$2:$N:honest" --report "$G/$3-cells-honest.json"
+  cellgate "$1:$H:held" "$2:$H:held" --report "$G/$3-cells-held.json"
+}
 
 if [[ "$what" == step1 || "$what" == all ]]; then
-  # how much the held counter overstates the best recipe: same models, September's counter only
-  cellgate "$R/final-half-cpu.json:$H:held" "$R/final-half-cpu.json:$N:honest" \
-    --report "$G/step1-cells.json"
+  # how much the held counter overstates: same models, only September's counter differs
   cellgate "$R/m-champion.json:$H:held" "$R/m-champion.json:$N:honest" \
     --report "$G/step1-champion-cells.json"
-  # the three refitted XGBoost members against those of the best file (month folds)
-  lomo recipes/final-half.json "$R/final-half-cpu3.json" --report "$G/step1-cpu3-vs-best.json"
-  # the champion's month folds under each counter (base scores of each table)
-  lomo "$R/m-champion.json" "$R/m-champion-nopos.json" --report "$G/champion-lomo.json"
-  alone "$R/m-champion-alone.json" "$R/m-champion-nopos-alone.json" \
-    --report "$G/champion-lomo-alone.json"
-  half "$R/m-champion.json" "$R/m-champion-nopos.json" --report "$G/champion-lomo-half0.json"
+  cellgate "$R/final-half-cpu.json:$H:held" "$R/final-half-cpu.json:$N:honest" \
+    --report "$G/step1-cells.json"
 fi
 
 if [[ "$what" == rule || "$what" == all ]]; then
   # the anchored template rule's gain and the TabM share (1/3 against 1/2) under each counter
-  for c in held honest; do
-    d="$H"
-    [[ "$c" == honest ]] && d="$N"
-    cellgate "$R/final-half-cpu-norule.json:$d:$c" "$R/final-half-cpu.json:$d:$c" \
-      --report "$G/rule-cells-$c.json"
-    cellgate "$R/final-third-cpu.json:$d:$c" "$R/final-half-cpu.json:$d:$c" \
-      --report "$G/tabm-share-cells-$c.json"
-  done
+  both "$R/final-half-cpu-norule.json" "$R/final-half-cpu.json" rule
+  both "$R/final-third-cpu.json" "$R/final-half-cpu.json" tabm-share
 fi
 
-if [[ "$what" == nopos3 || "$what" == all ]]; then
-  # (a) no position column in the three XGBoost members
-  for c in honest held; do
-    d="$N"
-    [[ "$c" == held ]] && d="$H"
-    cellgate "$R/final-half-cpu3.json:$d:$c" "$R/final-half-nopos3.json:$d:$c" \
-      --report "$G/nopos3-cells-$c.json"
-  done
-  cellgate "$R/m-champion.json:$N:honest" "$R/m-champion-nopos.json:$N:honest" \
-    --report "$G/nopos-champion-cells-honest.json"
-  lomo "$R/final-half-cpu3.json" "$R/final-half-nopos3.json" --report "$G/nopos3-lomo.json"
-  alone "$R/final-half-cpu3-alone.json" "$R/final-half-nopos3-alone.json" \
-    --report "$G/nopos3-lomo-alone.json"
-  half "$R/final-half-cpu3.json" "$R/final-half-nopos3.json" --report "$G/nopos3-lomo-half0.json"
+if [[ "$what" == nopos || "$what" == all ]]; then
+  # (a) the champion without the absolute position column
+  both "$R/m-champion.json" "$R/m-champion-nopos.json" nopos-champion
 fi
 
 if [[ "$what" == half || "$what" == all ]]; then
-  # (b) the champion trained on a counter at October's density (draw 0)
-  cellgate "$R/m-champion.json:$N:honest" "$R/m-champion-half0.json:$N:honest" \
-    --report "$G/half0-champion-cells-honest.json"
-  cellgate "$R/final-half-cpu3.json:$N:honest" "$R/final-half-chalf0.json:$N:honest" \
-    --report "$G/half0-blend-cells-honest.json"
-  lomo "$R/m-champion.json" "$R/m-champion-half0.json" --report "$G/half0-champion-lomo.json"
-  lomo "$R/final-half-cpu3.json" "$R/final-half-chalf0.json" --report "$G/half0-blend-lomo.json"
+  # (b) members trained on the counter at October's density (draw 0): the champion alone, then
+  # in the best recipe the champion only (chalf0) and all three XGBoost members (chalf3)
+  both "$R/m-champion.json" "$R/m-champion-half0.json" half0-champion
+  both "$R/final-half-cpu3.json" "$R/final-half-chalf0.json" half0-blend
+  both "$R/final-half-cpu3.json" "$R/final-half-chalf3.json" half3-blend
+fi
+
+if [[ "$what" == lomo || "$what" == all ]]; then
+  # month folds: the champion under each counter, then the candidates over the best file's
+  # arrays (final-half-r1 is the best recipe with the refitted champion)
+  lomo "$R/m-champion.json" "$R/m-champion-half0.json" --report "$G/champion-lomo.json"
   alone "$R/m-champion-alone.json" "$R/m-champion-half0-alone.json" \
-    --report "$G/half0-champion-lomo-alone.json"
-  alone "$R/final-half-cpu3-alone.json" "$R/final-half-chalf0-alone.json" \
-    --report "$G/half0-blend-lomo-alone.json"
-  half "$R/m-champion.json" "$R/m-champion-half0.json" \
-    --report "$G/half0-champion-lomo-half0.json"
-  half "$R/final-half-cpu3.json" "$R/final-half-chalf0.json" \
-    --report "$G/half0-blend-lomo-half0.json"
-fi
-
-if [[ "$what" == half3 || "$what" == all ]]; then
-  # (b) all three XGBoost members trained on the counter at October's density (draw 0)
-  for c in honest held; do
-    d="$N"
-    [[ "$c" == held ]] && d="$H"
-    cellgate "$R/final-half-cpu3.json:$d:$c" "$R/final-half-chalf3.json:$d:$c" \
-      --report "$G/half3-blend-cells-$c.json"
-  done
-  lomo "$R/final-half-cpu3.json" "$R/final-half-chalf3.json" --report "$G/half3-blend-lomo.json"
-  # the same changes over the best file's member arrays (the October candidates)
-  lomo recipes/final-half.json "$R/final-half-chalf0b.json" "$R/final-half-chalf3b.json"     --report "$G/half-best-lomo.json"
-  alone "$R/final-half-cpu3-alone.json" "$R/final-half-chalf3-alone.json" \
-    --report "$G/half3-blend-lomo-alone.json"
-  half "$R/final-half-cpu3.json" "$R/final-half-chalf3.json" \
-    --report "$G/half3-blend-lomo-half0.json"
-fi
-
-if [[ "$what" == half2 || "$what" == all ]]; then
-  # (b) with both draws of the training counter
-  cellgate "$R/m-champion.json:$N:honest" "$R/m-champion-half.json:$N:honest" \
-    --report "$G/half-champion-cells-honest.json"
-  cellgate "$R/final-half-cpu3.json:$N:honest" "$R/final-half-chalf.json:$N:honest" \
-    --report "$G/half-blend-cells-honest.json"
-  lomo "$R/final-half-cpu3.json" "$R/final-half-chalf.json" --report "$G/half-blend-lomo.json"
-  half "$R/final-half-cpu3.json" "$R/final-half-chalf.json" \
-    --report "$G/half-blend-lomo-half0.json"
+    --report "$G/champion-lomo-alone.json"
+  half "$R/m-champion.json" "$R/m-champion-half0.json" --report "$G/champion-lomo-half0.json"
+  lomo recipes/final-half.json "$R/final-half-r1.json" "$R/final-half-chalf0b.json" \
+    "$R/final-half-chalf3b.json" --report "$G/half-best-lomo.json"
+  half "$R/final-half-r1.json" "$R/final-half-chalf0b.json" --report "$G/half-best-lomo-half0.json"
 fi
