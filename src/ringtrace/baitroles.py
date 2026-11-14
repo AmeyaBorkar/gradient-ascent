@@ -28,10 +28,16 @@ bait: any train month). By default the bait is the lone unanswered Rs 10 (shape 
 a multiple of ten, called legit, becomes phishing_collect; with ``operator_receiver`` only when
 the receiver holds an operator role in another month (the victim pays the operator).
 
+``just_under_pay`` (a rule): a P2P PAY to a new payee of a just-under-limit amount that is a
+multiple of ten (1,950 / 1,990 / 4,950 / 4,990 / 9,950 / 9,990 / 24,950 / 24,990), called legit,
+becomes phishing_collect when its receiver holds an operator role in another month of all four
+(October's label-free acts count, so a train row may be found through its October receiver). The
+other four just-under amounts (1,999 / 4,999 / 9,999 / 24,999) are ``first_pay``'s.
+
 ``own_month`` lets an act in the row's own month count as well (with ``months`` = July to October
 every month then sees the same four months).
 
-Both rules read only label-free columns and the row's own call.
+The rules read only label-free columns and the row's own call.
 """
 
 from __future__ import annotations
@@ -43,6 +49,8 @@ from ringtrace.classes import CODE
 from ringtrace.evidence import requests as rq
 
 TRAIN_MONTHS = (7, 8, 9)
+ALL_MONTHS = (7, 8, 9, 10)
+JUST_UNDER = (1950, 1990, 4950, 4990, 9950, 9990, 24950, 24990)
 ROLES = (
     "qr_receiver",
     "collect_receiver",
@@ -252,4 +260,39 @@ def first_pay(
     out[hit] = CODE[target]
     te = led["is_test"].to_numpy()
     log(f"  first_pay: changed train {int((hit & ~te).sum())} / test {int((hit & te).sum())}")
+    return out
+
+
+def just_under_pay(
+    pred,
+    proba,
+    led,
+    log=print,
+    amounts=JUST_UNDER,
+    roles=ROLES,
+    months=ALL_MONTHS,
+    own_month: bool = False,
+    target: str = "phishing_collect",
+) -> np.ndarray:
+    """A P2P PAY to a new payee of one of ``amounts`` (rupees), called legit, becomes ``target``
+    when its receiver holds one of ``roles`` in another month of ``months``."""
+    cols = columns(led)
+    cents = np.round(cols["amount"].to_numpy() * 100).astype(np.int64)
+    want = np.round(np.asarray(amounts, dtype=np.float64) * 100).astype(np.int64)
+    hit = (
+        cols["to_person"].fill_null(False).to_numpy()
+        & (cols["txn_type"].fill_null("") == "PAY").to_numpy()
+        & (cols["new_payee"].fill_null(0).to_numpy() == 1)
+        & np.isin(cents, want)
+        & (np.asarray(pred) == 0)
+    )
+    if hit.any():
+        idx = np.flatnonzero(hit)
+        rcv = cols["receiver"].to_numpy()[idx]
+        per = cols["period"].to_numpy()[idx]
+        hit[idx] = other_month(rcv, per, operator_roles(cols), months, roles, own_month)
+    out = np.asarray(pred).copy()
+    out[hit] = CODE[target]
+    te = led["is_test"].to_numpy()
+    log(f"  just_under_pay: changed train {int((hit & ~te).sum())} / test {int((hit & te).sum())}")
     return out

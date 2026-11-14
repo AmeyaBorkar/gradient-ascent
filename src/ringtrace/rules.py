@@ -22,8 +22,17 @@
   is an operator in another month (``ringtrace.baitroles``).
 * ``first_pay``: a first-time P2P PAY of Rs 1,000 or more in whole rupees, not a multiple of ten,
   called legit, is phishing_collect (``ringtrace.baitroles``).
+* ``just_under_pay``: a first-time P2P PAY of a just-under-limit multiple of ten (1,950 / 1,990 /
+  4,950 / ...), called legit, to a receiver with an operator role in another month (October's
+  label-free acts included), is phishing_collect (``ringtrace.baitroles``).
+* ``far_segment``: a fraud-phase row whose confident counter segment is far from its fraud call
+  (neither the segment, a neighbour in label-list order, nor a class the segment's zone is written
+  with) takes the segment's class.
+* ``legit_topup``: a row called legit by the rules and by the plain decode whose most likely fraud
+  class is one of ``classes`` with a scaled probability at or above its threshold takes that class.
 
-Rules only read label-free columns; NaN never triggers one. Each logs the rows it changed.
+Rules only read label-free columns, the row's call and the blend probabilities; NaN never
+triggers one. Each logs the rows it changed.
 """
 
 from __future__ import annotations
@@ -32,7 +41,8 @@ import numpy as np
 import polars as pl
 
 from ringtrace import baitroles
-from ringtrace.evidence import anchors
+from ringtrace.classes import CODE, N_CLASSES
+from ringtrace.evidence import anchors, phones
 from ringtrace.evidence.anchors import TEMPLATE_CLASS, TEMPLATE_NAMES, TEMPLATE_PAIR
 
 TRUSTED_SEGMENTS = 7  # mule .. qr; the last four segments are unreliable in test
@@ -226,10 +236,106 @@ def recovery_rule(pred, proba, led, log=print, **params) -> np.ndarray:
     return recovery(pred, proba, led, log=log, **params)
 
 
+def segment_fits(min_weight: float = 0.04) -> np.ndarray:
+    """``fits[s, c]``: a call of class ``c`` fits counter segment class ``s`` (1..11) when it is the
+    segment's class, a neighbour of it in label-list order, or a class the segment's zone is
+    cross-written with (``phones.MARKED`` weight at least ``min_weight``). Row 0 (no segment)
+    fits every call."""
+    fits = np.zeros((N_CLASSES, N_CLASSES), dtype=bool)
+    fits[0] = True
+    for k, marked in phones.MARKED.items():
+        s = k + 1
+        fits[s, [c for c in (s - 1, s, s + 1) if c < N_CLASSES]] = True
+        fits[s, [c for c, w in marked.items() if w >= min_weight]] = True
+    return fits
+
+
+def far_segment(
+    pred, proba, led, log=print, min_conf: float = 0.9, min_weight: float = 0.04
+) -> np.ndarray:
+    """A fraud-phase row whose counter segment is confident (``ctr_conf >= min_conf``) and whose
+    fraud call does not fit the segment (``segment_fits``) takes the segment's class.
+
+    Every segment counts, not only the seven trusted ones. No train row meets the rule, so
+    out-of-fold scoring cannot test it; it enters on its October base rate."""
+    c = _counter(led)
+    pred = np.asarray(pred, dtype=np.int64)
+    seg = c["seg_class"]
+    hit = (
+        (c["block"] == 2)
+        & (seg >= 1)
+        & (c["conf"] >= min_conf)
+        & (pred > 0)
+        & ~segment_fits(min_weight)[seg, pred]
+    )
+    out = pred.copy()
+    out[hit] = seg[hit]
+    log(f"  far segment: {_split_counts(hit, led['is_test'].to_numpy())}")
+    return out
+
+
+def scaled_proba(proba, fraud_scale: float = 0.875) -> np.ndarray:
+    """The probabilities as the decoder reads them: fraud columns divided by ``fraud_scale``,
+    rows renormalised."""
+    q = np.asarray(proba, dtype=np.float64).copy()
+    q[:, 1:] /= fraud_scale
+    q /= q.sum(axis=1, keepdims=True)
+    return q
+
+
+def plain_calls(proba, led: pl.DataFrame, fraud_scale: float = 0.875) -> np.ndarray:
+    """The fixed point alone, without rules: each train month on its own and the October rows
+    together, as the final bench decodes."""
+    from ringtrace.decode import fixed_point
+
+    is_test = led["is_test"].to_numpy()
+    period = led["period"].to_numpy()
+    p = np.asarray(proba, dtype=np.float64)
+    tr = np.flatnonzero(~is_test)
+    groups = [tr[period[tr] == m] for m in np.unique(period[tr])] + [np.flatnonzero(is_test)]
+    out = np.zeros(len(p), dtype=np.int64)
+    for rows in groups:
+        if len(rows):
+            out[rows] = fixed_point(p[rows], fraud_scale=fraud_scale)
+    return out
+
+
+def legit_topup(
+    pred, proba, led, log=print, classes: dict | None = None, fraud_scale: float = 0.875
+) -> np.ndarray:
+    """A row called legit, both after the rules and by the plain decode (``plain_calls``), whose
+    most likely fraud class under the decoder's scaling (``scaled_proba``) is one of ``classes``
+    with a scaled probability at or above that class's threshold takes that class.
+
+    ``classes`` maps class names to thresholds, e.g. ``{"qr_swap": 0.125}``. The decoder calls
+    fewer rows of these classes than their October volume implies; the top-up adds back the
+    likeliest of the legit-called rows."""
+    if not classes:
+        raise ValueError("legit_topup needs classes, e.g. {'qr_swap': 0.125}")
+    codes = {name: CODE[name] for name in classes}
+    if any(k == 0 for k in codes.values()):
+        raise ValueError("legit_topup moves rows to fraud classes only")
+    pred = np.asarray(pred, dtype=np.int64)
+    q = scaled_proba(proba, fraud_scale)
+    top = q[:, 1:].argmax(axis=1) + 1
+    top_q = q[:, 1:].max(axis=1)
+    free = (pred == 0) & (plain_calls(proba, led, fraud_scale) == 0)
+    is_test = led["is_test"].to_numpy()
+    out = pred.copy()
+    for name, k in codes.items():
+        hit = free & (top == k) & (top_q >= float(classes[name]))
+        out[hit] = k
+        log(f"  legit top-up {name} (q >= {classes[name]}): {_split_counts(hit, is_test)}")
+    return out
+
+
 RULES = {
     "blank_merchant_qr": blank_merchant_qr,
     "recovery": recovery_rule,
     "mule_edge": mule_edge,
+    "far_segment": far_segment,
+    "legit_topup": legit_topup,
+    "just_under_pay": baitroles.just_under_pay,
     "counter": counter_rule,
     "legit_block": legit_block_rule,
     "plain_templates": plain_templates,
