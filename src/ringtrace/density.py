@@ -468,7 +468,8 @@ def fit_cells(
     t0 = time.time()
     out_held, out_honest = _out_dir("cells-held"), _out_dir("cells-honest")
     first = cells[0][0] if cells else "none"
-    summary_path = _out_dir("cells") / f"summary-{first}{tag}.json"
+    seed_tag = "-".join(str(s) for s in seeds)
+    summary_path = _out_dir("cells") / f"summary-{first}{tag}-s{seed_tag}.json"
     summary = json.loads(summary_path.read_text()) if summary_path.exists() else {}
     line = _production_line()
     train_ph = training_counter(train_counter, line, log)
