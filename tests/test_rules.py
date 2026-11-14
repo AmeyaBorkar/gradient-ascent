@@ -175,3 +175,30 @@ def test_anchored_templates_class_override():
         rules.apply(
             [{"name": "anchored_templates", "classes": {"1": PHISH}}], pred, proba, led, log=print
         )
+
+
+def test_posterior_edge_moves_only_adjacent_confident_phones(monkeypatch):
+    import numpy as np
+    import polars as pl
+
+    from ringtrace import rules
+    from ringtrace.evidence import anchors
+
+    n = 6
+    post = np.zeros((n, 11))
+    post[0, 4] = 0.85  # class 5 (account_takeover) at 0.85; row called 4 (sim_swap): moves
+    post[0, 3] = 0.15
+    post[1, 4] = 0.85  # same posterior, row called 7: not adjacent, stays
+    post[2, 4] = 0.60  # below tau, stays
+    post[2, 3] = 0.40
+    post[3, 4] = 0.90  # outside the fraud phase, stays
+    post[4, 4] = 0.95  # called legit, stays
+    post[5, 2] = 0.95  # class 3 (layering) at 0.95, called 4: moves
+    cols = {f"ctr_p{k:02d}": post[:, k] for k in range(11)}
+    cols["ctr_block"] = np.array([2, 2, 2, 3, 2, 2])
+    fake = pl.DataFrame(cols)
+    monkeypatch.setattr(anchors, "family_columns", lambda led, names: fake.select(names))
+    led = pl.DataFrame({"is_test": [False] * n})
+    pred = np.array([4, 7, 4, 4, 0, 4])
+    out = rules.posterior_edge(pred, None, led, log=lambda *_: None, tau=0.8)
+    assert out.tolist() == [5, 7, 4, 4, 0, 3]
