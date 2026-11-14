@@ -40,3 +40,17 @@ counter-anchored template rule.
 - [ ] The blind-spot rule: a label-free rule that calls generator-made rows the champion calls
       legit, adopted only if it never loses on leave-one-month-out and the October-like cells.
 - [ ] Finish the leave-one-family-out ablations left over in run 14.
+
+## The 0.04-cut cascade member (14 Nov, from 13:00 IST)
+- What the champion cascade trains on now (`ringtrace.cascade.training_rows`): stage one keeps
+  every fraud-labelled row and the legit-labelled rows whose cross-fitted screening score is
+  below 0.70 (legit rows at 0.70 or more are left out as suspected unreported fraud); its target
+  is 1 only on fraud-labelled rows scoring at least 0.10. Stage two trains on those fraud rows
+  scoring at least 0.10. So the legit-side drop at 0.70 is already in the champion, and a 0.04
+  type cut adds rows to stage two (about 270 to 430 per fit) rather than removing any.
+- Built: `ringtrace.member` (seed-by-seed fits; one set of fits serves several seed subsets,
+  byte-equal to `fit_predict`), the `type` blend role in `ringtrace.final.mix`, recipes
+  `member-x5` (0.04 cut, seeds 0-4) and `member-cut04` (0.04 cut, seeds 0-2), five blend
+  candidates in `recipes/cand/member-*.json` and the gate `analysis/member_gate.py`.
+- Running on the box GPU: leave-one-month-out seeds 0-4 and October-like frames s13-15 with seeds
+  0-14; a champion control on frame s14 checks that the cells reproduce.
