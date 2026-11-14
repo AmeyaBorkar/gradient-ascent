@@ -821,3 +821,20 @@ Eight of the ten train rows are phishing_collect on the cleaned labels, but two 
 their operator only through October's acts, and without them September loses. The case for the
 rule is the operator pool shared by all four months (`docs/findings/bait-operator-roles.md`); the
 October row's receiver holds a role in a train month under either view.
+
+### The October rules on the full bar: rejected at October's density
+
+`python -m ringtrace.final table recipes/bait-edge.json recipes/proven-qr-jup.json
+recipes/proven-qrphish-jup.json recipes/research-combo-1.json --cells <outputs>/lens-cells`
+(2,000 event-bootstrap draws, nine October-like cells). Changes against `bait-edge`:
+
+| recipe | given Jul / Aug / Sep [95 %] | cleaned [95 %] | October-like given per seed (lb) | October-like cleaned per seed (lb) | October rows |
+|---|---|---|---|---|---|
+| proven-qr-jup (`legit_topup` qr_swap + `just_under_pay`) | +0.00024 / +0.00010 / +0.00013 [+0.00005, +0.00027] | +0.00021 / +0.00026 / +0.00015 [+0.00010, +0.00032] | -0.000004 / -0.00007 / +0.000003 (-0.00010) | +0.00013 / -0.00001 / +0.000003 (-0.00005) | 3 |
+| proven-qrphish-jup (top-up qr_swap + phishing_collect + `just_under_pay`) | +0.00033 / +0.00010 / +0.00013 [+0.00005, +0.00034] | +0.00032 / +0.00029 / +0.00015 [+0.00011, +0.00040] | -0.00010 / -0.00017 / -0.00006 (-0.00021) | +0.00006 / -0.00012 / -0.00008 (-0.00017) | 7 |
+| research-combo-1 (adds `far_segment`) | same as above | same as above | same as above | same as above | 8 |
+
+The month-fold gains do not survive at October's density: both combinations are negative on at least
+one thinning seed and their October-like lower bounds are below zero. The top-up cut (scaled
+probability >= 0.125) is calibrated on full-density months. None of these recipes is uploaded;
+`bait-edge` stays the final file. `far_segment` changes no train or cell rows, so it cannot be judged.
