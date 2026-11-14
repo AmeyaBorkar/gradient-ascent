@@ -343,6 +343,16 @@ def cmd_ceiling(args, led, grp) -> dict:
                     f"[ceiling] {args.target} is out of reach even with every hidden row found "
                     f"(max {need['max_macro']:.4f})"
                 )
+        if args.front_shares:
+            n_public = round(args.public_share * n)
+            rows = [ceil.split_scores(pred, tp, true, n, n_public, f) for f in args.front_shares]
+            sub_rep["position_split"] = {"public_rows": n_public, "rows": rows}
+            for r in rows:
+                print(
+                    f"[ceiling] if public = first {n_public} rows of the file and "
+                    f"{r['front_share']:.0%} of its fraud calls sit there: "
+                    f"public {r['public']:.4f}, private {r['private']:.4f}"
+                )
         rep["submission"] = sub_rep
     return rep
 
@@ -450,6 +460,13 @@ def parser() -> argparse.ArgumentParser:
         help="share of the submission's fraud calls taken to be right",
     )
     p.add_argument("--target", type=float, default=None)
+    p.add_argument(
+        "--front-shares",
+        type=lambda s: [float(v) for v in s.split(",") if v != ""],
+        default=None,
+        help="model a position-based public part: shares of the fraud calls in its rows",
+    )
+    p.add_argument("--public-share", type=float, default=0.3)
     p = sub.add_parser("lookalike")
     common(p)
     p.add_argument("--templates", type=_ints, default=(1, 2, 3, 4, 5, 6))

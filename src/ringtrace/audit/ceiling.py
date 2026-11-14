@@ -107,3 +107,29 @@ def extra_rows_for(
         "extra_rows": float(x.sum()),
         "per_class": x.tolist(),
     }
+
+
+def split_scores(
+    pred: np.ndarray,
+    tp: np.ndarray,
+    true: np.ndarray,
+    n_rows: int,
+    n_public: int,
+    front_share: float,
+) -> dict:
+    """Expected public and private macro of one file when the public part is the first
+    ``n_public`` rows *of the file* and a share ``front_share`` of its fraud calls sits there.
+
+    Rows called legit fill the rest of the public part at random, so a random row order is
+    ``front_share = n_public / n_rows`` and gives the file's full-month score on both parts. Under
+    an id-based public part the row order does not matter at all; this models the other case."""
+    pred, tp, true = (np.asarray(a, dtype=np.float64) for a in (pred, tp, true))
+    f = float(front_share)
+    legit_called = n_rows - pred.sum()
+    frac = (n_public - f * pred.sum()) / legit_called  # share of legit-called rows in public
+    missed = true - tp
+    public = expected_scores(f * pred, f * tp, f * tp + frac * missed, n_public)["macro"]
+    private = expected_scores(
+        (1 - f) * pred, (1 - f) * tp, (1 - f) * tp + (1 - frac) * missed, n_rows - n_public
+    )["macro"]
+    return {"front_share": f, "public": public, "private": private}

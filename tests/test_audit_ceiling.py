@@ -44,3 +44,16 @@ def test_extra_rows_for_target():
     got = ceil.expected_scores(pred + x, tp + x, true, 2000)["macro"]
     assert got == pytest.approx(now + 0.05, abs=1e-5)
     assert not ceil.extra_rows_for(0.999, pred, tp, true, hidden, 2000)["feasible"]
+
+
+def test_split_scores_random_order_is_neutral_and_front_loading_shifts_score():
+    pred = np.array([400.0, 300.0])
+    tp = 0.95 * pred
+    true = tp + np.array([700.0, 500.0])
+    n, n_pub = 100_000, 30_000
+    full = ceil.expected_scores(pred, tp, true, n)["macro"]
+    rnd = ceil.split_scores(pred, tp, true, n, n_pub, n_pub / n)
+    assert rnd["public"] == pytest.approx(full, abs=2e-3)
+    assert rnd["private"] == pytest.approx(full, abs=2e-3)
+    front = ceil.split_scores(pred, tp, true, n, n_pub, 0.45)
+    assert front["public"] > full + 0.02 and front["private"] < full - 0.02
