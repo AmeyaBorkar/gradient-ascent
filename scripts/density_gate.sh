@@ -34,6 +34,25 @@ if [[ "$what" == step1 || "$what" == all ]]; then
     --cells "$E" --report "$G/step1-cpu-vs-best.json"
 fi
 
+if [[ "$what" == rule || "$what" == all ]]; then
+  # the tree blend alone under either counter, and the anchored template rule's gain under each
+  cellgate "$R/blend-cpu.json:$H:held" "$R/blend-cpu.json:$N:honest" \
+    --report "$G/blend-cells.json"
+  for c in held honest; do
+    d="$H"; [[ "$c" == honest ]] && d="$N"
+    cellgate "$R/final-half-cpu-norule.json:$d:$c" "$R/final-half-cpu.json:$d:$c" \
+      --report "$G/rule-cells-$c.json"
+  done
+fi
+
+if [[ "$what" == nopos3 || "$what" == all ]]; then
+  # no position column in the three XGBoost members only
+  cellgate "$R/final-half-cpu.json:$N:honest" "$R/final-half-nopos3.json:$N:honest" \
+    --report "$G/nopos3-cells-honest.json"
+  python -m ringtrace.final table "$R/final-half-cpu.json" "$R/final-half-nopos3.json" \
+    --cells "$E" --report "$G/nopos3-lomo.json"
+fi
+
 if [[ "$what" == nopos || "$what" == all ]]; then
   cellgate "$R/final-half-cpu.json:$N:honest" "$R/final-half-nopos.json:$N:honest" \
     --report "$G/nopos-cells-honest.json"

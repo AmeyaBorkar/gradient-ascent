@@ -49,7 +49,13 @@ counter-anchored template rule.
   agreement with the held counter 0.92 to 0.96 on the thinned frames, mean segment confidence
   0.971 to 0.975 (held 0.993 to 0.997; October's own 0.975).
 - First cells (seed 13): the held counter overstates a tree member by about 0.004 macro-F1.
-- Under way on the box: the five trees refitted on CPU (held and rebuilt September from one fit),
-  the same without the absolute position column (`ctr_pos`), month folds of both, the champion
-  trained on a half-density counter (two draws), October-mix frames (seeds 23 to 25). TabM on
-  Colab.
+- Every box job runs CPU-only: `scripts/density_queue.sh` hides every GPU
+  (`CUDA_VISIBLE_DEVICES` empty) and sets `RINGTRACE_DEVICE=cpu`, which forces XGBoost `device`
+  cpu and CatBoost `task_type` CPU whatever the recipe says. With no GPU visible, the CUDA build
+  of XGBoost 3.4.1 fails in `xgb.train`'s per-round evaluation of a multiclass model; CPU fits now
+  run the same boosting loop without that evaluation (identical model bytes, tested).
+- The box container has a CPU quota of 46 cores shared by every job, so the queue was ordered by
+  value: September cells of the five trees (seeds 13 to 15), month folds and cells of the three
+  XGBoost members with and without `ctr_pos`, then the champion on a half-density counter (draw
+  0, then draw 1), then October-mix frames and the LightGBM / CatBoost `ctr_pos` variants.
+  TabM cells and month folds with the standalone counter run on Colab.
