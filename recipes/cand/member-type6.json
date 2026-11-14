@@ -40,9 +40,9 @@
   },
   {
    "name": "member",
-   "run": "member-x5",
+   "run": "member-x5-cpu",
    "variant": "fold",
-   "cells": "member-x5",
+   "cells": "member-x5-cpu",
    "role": "type"
   }
  ],

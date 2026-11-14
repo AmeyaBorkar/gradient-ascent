@@ -43,3 +43,21 @@ def test_round_bar():
     assert not round_bar(lomo, octl)["months_ok"]
     lomo = {"given": {"change": [0.0] * 3}, "cleaned": {"change": [0.0] * 3}}
     assert not round_bar(lomo, None)["months_ok"]
+
+
+def test_gate_groups_load_and_read_the_cpu_built_members():
+    from member_gate import GROUPS
+
+    from ringtrace.final import load_recipe
+
+    runs = set()
+    for _, base, chals in GROUPS:
+        for p in (base, *chals):
+            r = load_recipe(p)
+            runs |= {m["run"] for m in r["members"]}
+            assert all(
+                m["cells"] == m["run"] or m["run"] in ("blend-champion-m1", "final-tabm")
+                for m in r["members"]
+            )
+    assert {"member-x5-cpu", "member-cut04-cpu", "champion-cpu"} <= runs
+    assert not runs & {"member-x5", "member-cut04"}

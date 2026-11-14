@@ -3,9 +3,9 @@
  "members": [
   {
    "name": "champion",
-   "run": "member-cut04",
+   "run": "member-cut04-cpu",
    "variant": "fold",
-   "cells": "member-cut04"
+   "cells": "member-cut04-cpu"
   },
   {
    "name": "lgbm",

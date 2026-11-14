@@ -3,8 +3,11 @@
     python analysis/member_gate.py gate [<recipe> ...] [--cells DIR] [--out DIR] [--report NAME]
     python analysis/member_gate.py build <recipe> ... [--cells DIR] [--out DIR] [--best FILE]
 
-``gate`` scores every blend recipe in ``BLEND`` against ``recipes/final-half.json`` and every solo
-recipe in ``SOLO`` against the champion alone, with ``ringtrace.final.table`` (per-month change
+``gate`` scores each group of ``GROUPS`` against its base with ``ringtrace.final.table``: the
+blend candidates against ``recipes/final-half.json``, the swaps against the blend whose champion
+is the CPU-built one (like with like: the members are CPU-built), the 0.04 cut alone against the
+CPU-built champion alone, and the CPU-built champion against the GPU-built one (the size of the
+device effect). Each table has the per-month change
 on the given, cleaned and gen-only targets, the paired event bootstrap of 2,000 draws, the nine
 October-like cells with 2,000 draws), then adds for each challenger:
 
@@ -32,15 +35,28 @@ from ringtrace import paths
 from ringtrace.classes import N_CLASSES
 
 BASE = "recipes/final-half.json"
-BLEND = (
-    "recipes/cand/member-type6.json",
-    "recipes/cand/member-mass6.json",
-    "recipes/cand/member-full6.json",
-    "recipes/cand/member-swap.json",
-    "recipes/cand/member-cut04-swap.json",
+C = "recipes/cand/"
+SWAPS = (C + "member-swap.json", C + "member-cut04-swap.json")
+GROUPS = (
+    (
+        "blend",
+        BASE,
+        (
+            C + "member-type6.json",
+            C + "member-mass6.json",
+            C + "member-full6.json",
+            *SWAPS,
+            C + "member-champcpu.json",
+        ),
+    ),
+    ("swap-cpu", C + "member-champcpu.json", SWAPS),
+    (
+        "solo",
+        C + "member-solo-champion-cpu.json",
+        (C + "member-solo-cut04.json", C + "member-solo-x5.json"),
+    ),
+    ("device", C + "member-solo-champion.json", (C + "member-solo-champion-cpu.json",)),
 )
-SOLO_BASE = "recipes/cand/member-solo-champion.json"
-SOLO = ("recipes/cand/member-solo-cut04.json", "recipes/cand/member-solo-x5.json")
 MONTHS = (7, 8, 9)
 HIDDEN_TOTAL = 3482  # train fraud rows the cleaned labels leave legit (earlier measurement)
 
@@ -129,7 +145,7 @@ def cmd_gate(cells: Path, out: Path, only: list[str] | None = None, report_name=
     b = _bench(cells)
     out.mkdir(parents=True, exist_ok=True)
     report = {}
-    for label, base_path, chal_paths in (("blend", BASE, BLEND), ("solo", SOLO_BASE, SOLO)):
+    for label, base_path, chal_paths in GROUPS:
         base = load_recipe(base_path)
         chals = [load_recipe(p) for p in chal_paths if not only or p in only]
         if not chals:
