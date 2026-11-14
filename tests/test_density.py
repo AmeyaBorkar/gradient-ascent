@@ -158,3 +158,27 @@ def test_half_split_keeps_units_whole_and_differs_by_draw():
     assert 0.35 < a.mean() < 0.65
     assert (a != b).any()
     assert np.array_equal(a, density.half_split(units, 0, 7))
+
+
+def test_unit_class_is_the_majority_fraud_label():
+    units = np.array([0, 0, 0, 1, 1, 2])
+    y = np.array([0, 3, 3, 0, 0, 5])
+    assert density.unit_class(units, y).tolist() == [3, 0, 5]
+
+
+def test_mix_keep_moves_class_shares_and_keeps_units_whole():
+    n = 6000
+    units = np.arange(n)
+    y = np.zeros(n, dtype=np.int64)
+    y[:2000] = 1  # mule units, factor 1.22
+    y[2000:4000] = 2  # bot units: half in bursts (factor 0.53), half not (factor 1)
+    burst = np.zeros(n, dtype=bool)
+    burst[2000:3000] = True
+    kept = density.mix_keep(units, y, burst, 7, 0.5)
+    assert abs(kept[:2000].mean() - 0.61) < 0.04
+    assert abs(kept[2000:3000].mean() - 0.265) < 0.04
+    assert abs(kept[3000:4000].mean() - 0.5) < 0.05
+    assert abs(kept[4000:].mean() - 0.5) < 0.04
+    two = np.repeat(np.arange(100), 2)
+    k2 = density.mix_keep(two, np.zeros(200, dtype=np.int64), np.zeros(200, bool), 1, 0.5)
+    assert (k2[::2] == k2[1::2]).all()

@@ -335,6 +335,105 @@ def seg_label_agreement(cols: pl.DataFrame, y: np.ndarray, rows: np.ndarray) -> 
 
 
 # ---------------------------------------------------------------------------------------------
+# October-mix frames: September thinned with October's class mix
+
+
+# October against train, per class (calls; the bot factor applies to bot-burst units only)
+MIX = {1: 1.22, 2: 0.53, 8: 1.11, 11: 0.63}
+BOT_CLASS = 2
+
+
+def unit_class(units: np.ndarray, y: np.ndarray) -> np.ndarray:
+    """Majority fraud label of each unit's fraud-labelled rows (ties: the lower class), 0 for a
+    unit with none."""
+    n = int(units.max()) + 1 if len(units) else 0
+    counts = np.zeros((n, int(y.max(initial=0)) + 1), dtype=np.int64)
+    fr = y > 0
+    np.add.at(counts, (units[fr], y[fr]), 1)
+    counts[:, 0] = 0
+    cls = counts.argmax(axis=1)
+    cls[counts.sum(axis=1) == 0] = 0
+    return cls
+
+
+def mix_keep(
+    units: np.ndarray,
+    y: np.ndarray,
+    burst: np.ndarray,
+    seed: int,
+    keep: float,
+    mix: dict[int, float] = MIX,
+) -> np.ndarray:
+    """Row mask: each unit kept whole with probability ``keep`` times its class's factor (the
+    bot factor only for units holding a bot burst row)."""
+    cls = unit_class(units, y)
+    n = len(cls)
+    has_burst = np.zeros(n, dtype=bool)
+    has_burst[units[burst]] = True
+    factor = np.ones(n)
+    for c, f in mix.items():
+        sel = cls == c
+        if c == BOT_CLASS:
+            sel &= has_burst
+        factor[sel] = f
+    rng = np.random.default_rng([seed, 0])
+    kept_unit = rng.random(n) < np.minimum(keep * factor, 1.0)
+    return kept_unit[units]
+
+
+def build_mix_frame(seed: int, log=print) -> dict:
+    """An October-like frame whose September keeps October's class mix; saved like the
+    October-like frames (``octlike.Frame(seed)`` reads it)."""
+    from ringtrace import octlike, store
+
+    store.use_frame(None)
+    led = store.ledger()
+    period = led["period"].to_numpy()
+    is_test = led["is_test"].to_numpy()
+    sept = np.flatnonzero(~is_test & (period == octlike.HOLD_PERIOD))
+    events = [
+        store.family(f)[c].fill_null(-1).to_numpy().astype(np.int64)
+        for f, c in zip(octlike.EVENT_FAMILIES, octlike.EVENT_COLUMNS, strict=True)
+    ]
+    units = octlike.september_units(led, events, sept)
+    y = led["y"].to_numpy().astype(np.int64)[sept]
+    burst = events[0][sept] >= 0
+    kept = mix_keep(units, y, burst, seed, octlike.KEEP)
+    keep_rows = np.sort(
+        np.concatenate([np.flatnonzero(~np.isin(np.arange(led.height), sept)), sept[kept]])
+    )
+    qr = (led["txn_type"] == "QR").to_numpy() & led["to_person"].to_numpy()
+    cand = sept[kept & qr[sept]]
+    blanked = octlike.qr_blank(cand, seed)
+    unit_of = np.full(led.height, -1, dtype=np.int64)
+    unit_of[sept] = units
+    res = {
+        "seed": seed,
+        "rows": keep_rows.astype(np.int64),
+        "blank": blanked.astype(np.int64),
+        "unit": unit_of[keep_rows],
+    }
+    d = paths.cache_dir() / "octlike"
+    d.mkdir(parents=True, exist_ok=True)
+    np.savez(d / f"s{seed}.npz", **res)
+    labels = {int(c): int((y[kept] == c).sum()) for c in range(12)}
+    full = {int(c): int((y == c).sum()) for c in range(12)}
+    stats = {
+        "mix": {str(k): v for k, v in MIX.items()},
+        "september_rows": int(len(sept)),
+        "kept_september_rows": int(kept.sum()),
+        "kept_share_by_label": {
+            str(c): labels[c] / full[c] if full[c] else None for c in range(12)
+        },
+        "qr_blanked": int(len(blanked)),
+        "frame_rows": int(len(keep_rows)),
+    }
+    (d / f"s{seed}.json").write_text(json.dumps(stats, indent=1))
+    log(f"[density] mix frame s{seed}: {json.dumps(stats)}")
+    return stats
+
+
+# ---------------------------------------------------------------------------------------------
 # fits
 
 
@@ -719,6 +818,8 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     c = sub.add_parser("check")
     c.add_argument("--seeds", default="13,14,15")
+    mx = sub.add_parser("mixframes", help="October-mix frames (new thinning seeds)")
+    mx.add_argument("--seeds", default="23,24,25")
     f = sub.add_parser("cells")
     f.add_argument("cells", nargs="+", help="recipe:seedset,seedset ...")
     f.add_argument("--seeds", default="13,14,15")
@@ -743,6 +844,10 @@ def main(argv=None):
     args = ap.parse_args(argv)
     if args.cmd == "check":
         return check(_ints(args.seeds))
+    if args.cmd == "mixframes":
+        if set(_ints(args.seeds)) & {13, 14, 15}:
+            raise ValueError("seeds 13-15 are the October-like frames; pick others")
+        return [build_mix_frame(sd) for sd in _ints(args.seeds)]
     if args.cmd == "cells":
         cells = []
         for spec in args.cells:
