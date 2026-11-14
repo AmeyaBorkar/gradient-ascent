@@ -40,3 +40,12 @@ counter-anchored template rule.
 - [ ] The blind-spot rule: a label-free rule that calls generator-made rows the champion calls
       legit, adopted only if it never loses on leave-one-month-out and the October-like cells.
 - [ ] Finish the leave-one-family-out ablations left over in run 14.
+
+## Look-alike pairs (14 Nov)
+- [x] Who writes the partner label: the routine (device-counter zones agree with the label on
+      every template event with a fraud-block phone). Clean October labels keep the partner
+      types; retyping by template is rejected.
+- [x] Current best idea: `pairs-tmplA-flip`, a takeover flip inside the own-phone drain.
+      Leave-one-month-out given +0.0007 / +0.0002 / +0.0007, cleaned +0.0007 / +0.0002 / +0.0006;
+      6 October rows. Small; fold into a combined upload.
+- [x] phishing_collect / fake_cashback (col7, col1) and loan_app_extortion in col1: at chance.

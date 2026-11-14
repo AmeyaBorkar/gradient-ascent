@@ -642,3 +642,24 @@ augmentation never loses there, but it has no full run, so it has no arrays to g
 - 2026-11-14 03:20 IST: every arrived component judged; `recipes/final.json` unchanged since
   02:15 (`final.csv` sha256 `39cb4952...4db3`).
   (cap 40 October rows). No measurable component has passed the bar yet.
+
+## Look-alike pairs (`analysis/pairs.py`; finding `docs/findings/pairs-partner-labels.md`)
+
+Against the best file's out-of-fold calls (`blend-tabmF-bq`, from `prep.npz`), per held-out month
+Jul / Aug / Sep; rows changed train / October. Wall time under 10 s per command on the laptop.
+
+| change | given | cleaned | gen-only | rows | verdict |
+|---|---|---|---|---|---|
+| own-phone drain: takeover score >= 0.57 (C = 1.0, sim_swap-zone events kept) -> account_takeover (`pairs-tmplA-flip`) | +0.0007 / +0.0002 / +0.0007; event bootstrap +0.00055 [+0.00015, +0.00106] | +0.0007 / +0.0002 / +0.0006; [+0.00009, +0.00102] | +0.0012 / +0.0004 / +0.0010 | 40 / 6 | passes the train-month bar; small |
+| the same, threshold nested over the other two months (no zone guard) | +0.0005 / +0.0002 / +0.0004 | +0.0006 / +0.0002 / +0.0003 | | | confirms |
+| the same at threshold 0.50 | +0.0005 / -0.0006 / -0.0006 | +0.0006 / -0.0005 / -0.0010 | | 112 / - | loses |
+| col7: bait other than Rs 5 -> phishing_collect | -0.0004 / +0.0001 / +0.0001 | -0.0002 / -0.0005 / -0.0006 | +0.0022 / +0.0023 / +0.0020 | 344 / 66 | rejected |
+| col7 -> phishing_collect (all) | -0.0032 / -0.0013 / -0.0019 | -0.0035 / -0.0022 / -0.0036 | -0.0024 / +0.0009 / -0.0018 | 506 / 94 | rejected |
+| col7: event model (AUC 0.48 to 0.57), top-scored -> phishing_collect | -0.0015 to +0.0005 | -0.0014 to +0.0002 | | | rejected |
+| generic event aggregates, all six templates, nested threshold | template 2 Aug -0.0018; others +0.0003 to -0.0013 | | | | rejected |
+
+The partner labels inside the templates are the writing routine, not noise: every own-phone drain
+event with a fraud-block phone sits in the zone of its label (10 takeover, 36 sim_swap), as do the
+new-phone drains (356 / 156) and the collect rows (col7 14 / 9, col1 44 / 1). So the clean October
+labels keep them, and retyping by template (the rejected `tmpl-simato`) should lose in October as
+it does in train.
