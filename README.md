@@ -54,6 +54,7 @@ validates the file against `sample_submission.csv` and prints its sha256:
 
 ```bash
 python -m ringtrace.final build recipes/bait-edge.json --out <dir>    # sha256 b571af3e...2f9dfc (best public, 0.5506)
+python -m ringtrace.final build recipes/research-combo-2.json --out <dir>  # sha256 214926a6...986344 (public 0.5506, tied)
 python -m ringtrace.final build recipes/bait-combo.json --out <dir>   # sha256 3b25869e...e1974
 python -m ringtrace.final build recipes/final-half.json --out <dir>   # sha256 8a461426...fb926eb
 ```
@@ -62,7 +63,8 @@ python -m ringtrace.final build recipes/final-half.json --out <dir>   # sha256 8
 TabM and a tenth from each tree, decoded at fraud scale 0.875 with the anchored template rule and
 `blank_merchant_qr`. `bait-combo` adds the two operator-role bait rules
 (`docs/findings/bait-operator-roles.md`), and `bait-edge` the counter's mule/bot edge
-(`mule_edge`).
+(`mule_edge`). `research-combo-2` adds three October base-rate rules to `bait-edge` (`far_segment`,
+`legit_topup` for qr_swap, `just_under_pay`; 4 October rows) and builds from the same six member runs.
 
 From a clean checkout and an empty cache, one command builds the features and cleaned labels, runs
 the six member recipes behind the recipe's runs (`python -m ringtrace.run recipes/<member>.json
