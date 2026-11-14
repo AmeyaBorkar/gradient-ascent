@@ -55,6 +55,29 @@ segment), using the train share of ordinary fraud rows that drew a new phone: **
   **0.5475**; its public score was 0.5474. The ceiling with the same reachable rows is 0.5541.
 - A public score of **0.6338 needs 1,006 extra correct rows**, 13.9 % of October's hidden
   ordinary rows. The audits above find no handle on any of them.
+- The same check on the TabM fraud-only file (3,973 fraud calls) gives an expected 0.5491
+  against its public 0.5499, and 991 extra rows for 0.6338.
+
+## If the public part were picked by row position
+
+Scores of 0.61 to 0.63 need no extra signal if the public part is the first 30 % of rows *of each
+uploaded file* rather than a fixed set of ids. A file that happens to hold more than 30 % of its
+fraud calls in its first rows then scores higher on public and lower on private, with the same
+calls (`ceiling --front-shares`, TabM fraud-only file):
+
+| fraud calls in the first 78,175 rows | public | private |
+|---|---|---|
+| 30 % (random order, every file of ours) | 0.5491 | 0.5491 |
+| 40 % | 0.6110 | 0.5156 |
+| 45 % | 0.6357 | 0.4967 |
+| 50 % | 0.6572 | 0.4761 |
+
+This is a hypothesis about the platform, not about the data. The order probe tests it with one
+upload: `shuffle` keeps every call and permutes the rows. An identical public score means the
+public part is fixed by id (the hypothesis is false); a different score means it moves with row
+order. The probe's calls are the source's, so its expected private score is the same in either
+case. A file must never be reordered to raise its public score: the final ranking scores the best
+public file on its private part, which such an order lowers.
 
 ## Look-alike templates
 
@@ -89,7 +112,7 @@ overfits below 0.5). An event-level typing model would gain little over the temp
 python -m ringtrace.audit ordinary
 python -m ringtrace.audit links
 python -m ringtrace.audit shift
-python -m ringtrace.audit ceiling --submission <blend submission.csv> --target 0.6338
+python -m ringtrace.audit ceiling --submission <file.csv> --target 0.6338 --front-shares 0.3,0.4,0.45,0.5
 python -m ringtrace.audit lookalike
 python -m ringtrace.audit shuffle <submission.csv>      # order probe, optional upload
 ```
