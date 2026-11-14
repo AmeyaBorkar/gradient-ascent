@@ -48,23 +48,37 @@ run, validated submission).
 
 ## Reproduce the uploaded files
 
-The best public upload and its successor with the phishing bait rules are final recipes over saved
-member runs. Each command re-blends the members' arrays (`$RINGTRACE_OUT/runs/<run>/oof.npy` and
-`test.npy`), decodes, applies the recipe's rules, validates the file against
-`sample_submission.csv` and prints its sha256:
+The uploads are final recipes over saved member runs. Each command re-blends the members' arrays
+(`$RINGTRACE_OUT/runs/<run>/oof.npy` and `test.npy`), decodes, applies the recipe's rules,
+validates the file against `sample_submission.csv` and prints its sha256:
 
 ```bash
-python -m ringtrace.final build recipes/final-half.json --out <dir>   # sha256 8a461426...fb926eb
+python -m ringtrace.final build recipes/bait-edge.json --out <dir>    # sha256 b571af3e...2f9dfc (best public, 0.5506)
 python -m ringtrace.final build recipes/bait-combo.json --out <dir>   # sha256 3b25869e...e1974
+python -m ringtrace.final build recipes/final-half.json --out <dir>   # sha256 8a461426...fb926eb
 ```
 
 `final-half` is the five tree cascades for the type split, with the fraud mass taken half from
 TabM and a tenth from each tree, decoded at fraud scale 0.875 with the anchored template rule and
 `blank_merchant_qr`. `bait-combo` adds the two operator-role bait rules
-(`docs/findings/bait-operator-roles.md`). The member runs come from
-`python -m ringtrace.run recipes/<member>.json --name <run>` for each member listed in the
-recipe; re-blending is byte-reproducible, and a full member rebuild is too except CatBoost on the
-GPU (decision 14).
+(`docs/findings/bait-operator-roles.md`), and `bait-edge` the counter's mule/bot edge
+(`mule_edge`).
+
+From a clean checkout and an empty cache, one command builds the features and cleaned labels, runs
+the six member recipes behind the recipe's runs (`python -m ringtrace.run recipes/<member>.json
+--name <run>`, retried if the GPU runs out of memory) and builds the file:
+
+```bash
+RINGTRACE_THREADS=8 bash scripts/build_final.sh recipes/bait-edge.json <dir> [--against <uploaded csv>]
+```
+
+Measured on the box (one RTX 5060 Ti, torch 2.14.1+cu130, code at `c7eba12`): 93 minutes, and the
+file is byte-identical to the uploaded `bait-edge.csv` (sha256 `b571af3e...2f9dfc`, 0 rows
+different). TabM is the one member whose arrays depend on the software and hardware it ran on:
+two fits on the box's two GPUs are bit-identical, while the uploaded run's arrays (fitted earlier
+in another environment) differ slightly from the rebuild's (oof sha256 `5bef8fbc...` against
+`a78a87a1...`); no October call of the final file moves. CatBoost on the GPU is not
+bit-reproducible either (decision 14); it also moved no call here.
 
 ## Results
 
