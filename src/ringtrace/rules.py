@@ -13,6 +13,9 @@
 * ``anchored_templates``: as ``plain_templates``, except that a template row on a fraud-block phone
   whose counter segment is one of the pair (``ctr_conf >= min_conf``) keeps its segment class and
   hands it to the rest of its family event.
+* ``pair_templates``: as ``anchored_templates``, then each template event with a fraud-phase
+  phone takes the class its phones' posterior gives it inside the template's pair
+  (``ringtrace.pairpost``).
 * ``event_types``: every fraud-called row of a label-free event (the first evidence family that
   places the row in an event) takes the event's type: the argmax of the fraud-type probabilities
   summed over the event's fraud-called rows. Legit calls are never touched.
@@ -43,7 +46,7 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
-from ringtrace import baitroles, counternews
+from ringtrace import baitroles, counternews, pairpost
 from ringtrace.classes import CODE, N_CLASSES
 from ringtrace.evidence import anchors, phones
 from ringtrace.evidence.anchors import TEMPLATE_CLASS, TEMPLATE_NAMES, TEMPLATE_PAIR
@@ -366,6 +369,7 @@ RULES = {
     "legit_block": legit_block_rule,
     "plain_templates": plain_templates,
     "anchored_templates": anchored_templates,
+    "pair_templates": pairpost.pair_templates,
     "event_types": event_types,
     "anchor_rescue": anchor_rescue,
     "bait_roles": baitroles.bait_roles,
