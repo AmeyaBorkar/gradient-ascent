@@ -69,7 +69,8 @@ counter-anchored template rule.
 - [x] Border posteriors on the number line (`evidence.borders`), validated on train blocks thinned
       to October's size: calibrated when pooled, biased at two borders
       (`docs/findings/october-borders.md`).
-- [x] `fresh_bursts` and `border_shift` on top of `counter-news`: `stack-burst12-b8`, public 0.5532,
-      the best upload (`docs/findings/october-events.md`).
+- [x] `fresh_bursts` on top of `counter-news`: `stack-burst12-sim45`, public 0.5556, the best upload
+      (`docs/findings/october-events.md`). The `border_shift` row of `stack-burst12-b8` (0.5532) was
+      removed.
 - [x] `pair_templates`: no call changes, rejected (`docs/findings/pair-templates.md`).
 - [ ] `capped_rings` (five 8-row merchant rings as merchant_collusion): built, not uploaded.

@@ -859,7 +859,8 @@ runs. Public scores are read off the leaderboard. Findings: `docs/findings/octob
 |---|---|---|---|---|
 | `counter-news` | - | - | 0.5516 | `b8c3183ab76d9c0730cd8d60dba60c36f8647633937b2a639a560accb0967799` |
 | `stack-burst-b8` | `fresh_bursts` (20 rows, 50 h), `border_shift` (border 8, rank 0) | 29: mule_account -> velocity_bot 28, loan_app_extortion -> fake_cashback 1 | 0.5531 | `31251e77f9607c417cfa4c14375e7501908d5c6a091423e5d18a061076eb63d3` |
-| `stack-burst12-b8` | `fresh_bursts` (12 rows, 50 h), `border_shift` | 56: mule_account -> velocity_bot 55, loan_app_extortion -> fake_cashback 1 | **0.5532** (best) | `a9a3e35d0baca7fc2f92e1ddcd206b51883b3c105dffe3d706756b79226ed20b` |
+| `stack-burst12-b8` | `fresh_bursts` (12 rows, 50 h), `border_shift` | 56: mule_account -> velocity_bot 55, loan_app_extortion -> fake_cashback 1 | 0.5532 | `a9a3e35d0baca7fc2f92e1ddcd206b51883b3c105dffe3d706756b79226ed20b` |
+| `stack-burst12-sim45` | `fresh_bursts` (12 rows, SIM 45 to 50 h) | 40: mule_account -> velocity_bot 40 | **0.5556** (best) | `c278490094706e156dc4f4d573989fafda24de896f3a7ec147fb5fc886eb2efc` |
 | `stack-burst13-b8` | `fresh_bursts` (13 rows, 50 h), `border_shift` | 44: mule_account -> velocity_bot 43, 1 border row | 0.5520 | `f51fe71b96c574931d088556ab8b28ce24a66ea4d906c2ae8a69837790ec3659` |
 | `stack-burst20-12-b8` | `fresh_bursts` twice (20 rows; 12 to 14 rows), `border_shift` | 41: mule_account -> velocity_bot 40, 1 border row | not uploaded | `0ff63433a1339be6225b5a0b220efa8c3e010643700746f1da143fda78027e1f` |
 | `stack-burst12-b8-rings8` | as the best, plus `capped_rings` (size 8) | 96: the best's 56, refund_abuse -> merchant_collusion 40 | not uploaded | `37d327ed4848d20eb53c88a19b5faaa7659bca95e97df8481a7e2e330767475b` |
@@ -868,8 +869,12 @@ runs. Public scores are read off the leaderboard. Findings: `docs/findings/octob
 
 - The compute box rebuilt `counter-news` and `stack-burst12-b8` from the saved member runs with the
   sha256 above (the second at commit `a0b6ed1`).
-- Read of the three public scores: the 28-row burst and the 12-row burst are velocity_bot, the
-  15-row burst is mule_account. The border row has not been read on its own.
+- Read of the public scores: the 28-row burst and the 12-row burst are velocity_bot, the 15-row
+  burst is mule_account. `stack-burst12-sim45` removes the 15-row burst and the border row from
+  `stack-burst12-b8` (16 rows) and gains 0.0024, in line with the border row being public and
+  wrong (about 0.0013) and the 15-row burst being mule_account (about 0.0010). The two removals
+  were not uploaded apart.
+- The compute box built `stack-burst12-sim45` from the saved member runs with the sha256 above.
 - `fresh_bursts` changes 199 train rows at 20 rows and 50 hours, on bursts of which 4 of 9 are
   velocity_bot: it would lose on month folds and is a base-rate rule, not a gated one.
 - Border files alone (`recipes/borders/`, 21 files that change a row): none uploaded.
