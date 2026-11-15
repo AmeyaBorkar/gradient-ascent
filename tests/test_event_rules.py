@@ -85,3 +85,12 @@ def test_fresh_bursts_upper_size_cut():
     out = burstsim.fresh_bursts(pred, None, led, log=lambda *_: None, min_rows=12, max_rows=14)
     ev = led["mf_event"].to_numpy()
     assert (out[ev == 0] == BOT).all() and (out[ev == 1] == MULE).all()
+
+
+def test_fresh_bursts_lower_sim_cut():
+    led, pred = burst_frame([{"rows": 12, "sim": 48.0}, {"rows": 15, "sim": 44.0}])
+    out = burstsim.fresh_bursts(
+        pred, None, led, log=lambda *_: None, min_rows=12, min_sim_hours=45.0
+    )
+    ev = led["mf_event"].to_numpy()
+    assert (out[ev == 0] == BOT).all() and (out[ev == 1] == MULE).all()
