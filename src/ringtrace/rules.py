@@ -46,7 +46,7 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
-from ringtrace import baitroles, bordershift, burstsim, counternews, pairpost
+from ringtrace import baitroles, bordershift, burstsim, counternews, pairpost, ringsize
 from ringtrace.classes import CODE, N_CLASSES
 from ringtrace.evidence import anchors, phones
 from ringtrace.evidence.anchors import TEMPLATE_CLASS, TEMPLATE_NAMES, TEMPLATE_PAIR
@@ -360,6 +360,7 @@ RULES = {
     "posterior_edge": posterior_edge,
     "border_shift": bordershift.border_shift,
     "fresh_bursts": burstsim.fresh_bursts,
+    "capped_rings": ringsize.capped_rings,
     "blank_merchant_qr": blank_merchant_qr,
     "recovery": recovery_rule,
     "mule_edge": mule_edge,
