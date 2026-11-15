@@ -3,7 +3,8 @@
 Mule fan-ins and bot bursts are written in one shape (template mf2+mf3). When a burst has a phone
 in the fraud phase the counter's zone names its class; when it has none the template rule calls
 it mule_account, the pair's majority. ``fresh_bursts`` calls such a burst velocity_bot when it has
-at least ``min_rows`` rows and its youngest sender SIM is under ``max_sim_hours`` hours old.
+at least ``min_rows`` rows (and at most ``max_rows``, when given) and its youngest sender SIM is
+under ``max_sim_hours`` hours old.
 
 Train measures this weakly: of the 9 bursts without a phase phone that meet both cuts, 4 are
 velocity_bot on the cleaned labels (2 of the other 33 with 20 rows or more). One event has one
@@ -22,7 +23,13 @@ BURST_TEMPLATE = 3
 
 
 def fresh_bursts(
-    pred, proba, led, log=print, min_rows: int = 20, max_sim_hours: float = 50.0
+    pred,
+    proba,
+    led,
+    log=print,
+    min_rows: int = 20,
+    max_sim_hours: float = 50.0,
+    max_rows: int | None = None,
 ) -> np.ndarray:
     pred = np.asarray(pred, dtype=np.int64)
     tmpl, event = anchors.templates(led)
@@ -41,7 +48,10 @@ def fresh_bursts(
             .group_by("ev")
             .agg(pl.len().alias("rows"), pl.col("phase").any(), pl.col("sim").min())
             .filter(
-                ~pl.col("phase") & (pl.col("rows") >= min_rows) & (pl.col("sim") < max_sim_hours)
+                ~pl.col("phase")
+                & (pl.col("rows") >= min_rows)
+                & (pl.col("rows") <= (max_rows if max_rows is not None else 10**9))
+                & (pl.col("sim") < max_sim_hours)
             )
         )
         hit = inside & np.isin(event, ev["ev"].to_numpy()) & np.isin(pred, (MULE, BOT))
