@@ -77,7 +77,17 @@ segment 73 % to 20 % on train's out-of-fold calls.
 | cleaned | +0.00136 / +0.00276 / +0.00008 | +0.00140 | [+0.00045, +0.00258] |
 | gen-only | +0.00191 / +0.00402 / +0.00001 | +0.00198 | [+0.00044, +0.00405] |
 
-Rows changed per frame: 8, 18 and 1. By move, pooled over the three frames:
+A fourth frame (s20, built after the upload) agrees: given +0.00251 [+0.00026, +0.00540], cleaned
++0.00280 [+0.00045, +0.00591], gen-only +0.00479; its 14 sim_swap → account_takeover moves are
+right on all 14 (cleaned). Pooled over the four frames:
+
+| target | mean | 95 % event bootstrap |
+|---|---|---|
+| given | +0.00157 | [+0.00071, +0.00264] |
+| cleaned | +0.00175 | [+0.00082, +0.00289] |
+| gen-only | +0.00268 | [+0.00113, +0.00469] |
+
+Rows changed per frame: 8, 18 and 1 (s13–s15). By move, pooled over the first three frames:
 
 | move | rows | new call right (cleaned / given) | old call right (cleaned / given) |
 |---|---|---|---|
