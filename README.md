@@ -53,9 +53,9 @@ The uploads are final recipes over saved member runs. Each command re-blends the
 validates the file against `sample_submission.csv` and prints its sha256:
 
 ```bash
-python -m ringtrace.final build recipes/bait-edge.json --out <dir>    # sha256 b571af3e...2f9dfc (best public, 0.5506)
+python -m ringtrace.final build recipes/bait-edge.json --out <dir>    # sha256 b571af3e...2f9dfc (public 0.5506)
 python -m ringtrace.final build recipes/research-combo-2.json --out <dir>  # sha256 214926a6...986344 (public 0.5506, tied)
-python -m ringtrace.final build recipes/counter-news.json --out <dir>  # sha256 b8c3183a...967799 (rules on the refined counter)
+python -m ringtrace.final build recipes/counter-news.json --out <dir>  # sha256 b8c3183a...967799 (best public, 0.5516)
 python -m ringtrace.final build recipes/bait-combo.json --out <dir>   # sha256 3b25869e...e1974
 python -m ringtrace.final build recipes/final-half.json --out <dir>   # sha256 8a461426...fb926eb
 ```
@@ -74,7 +74,8 @@ phone's allocation geometry, meaning the run of unused numbers below it and its 
 base-rate rule (`counter_news`) then moves a row whose call still follows the champion segment
 when the refined counter puts it one class away with posterior at least 0.7. Against
 `research-combo-2` this changes 4 October rows: sim_swap → account_takeover 3, velocity_bot →
-mule_account 1. The evidence is in `docs/findings/counter-news.md`.
+mule_account 1. Public score 0.5516, against 0.5506 for `research-combo-2`. The evidence is in
+`docs/findings/counter-news.md`.
 
 From a clean checkout and an empty cache, one command builds the features and cleaned labels, runs
 the six member recipes behind the recipe's runs (`python -m ringtrace.run recipes/<member>.json
