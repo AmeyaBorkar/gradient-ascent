@@ -5,7 +5,8 @@ one of 10 or more is merchant_collusion, with nothing at 9. October departs from
 sides at once: five rings at exactly 8 rows where the train rate gives about 1.7, and none at 10
 to 19 rows where it gives about 4.3. ``capped_rings`` reads the excess at the cap as the missing
 mid-size collusion rings and calls every row of a test ring of exactly ``size`` rows
-merchant_collusion when it is called refund_abuse.
+merchant_collusion when it is called refund_abuse. A ring with a fraud-phase phone in the refund
+zone is left out: the counter already names it.
 
 Train cannot measure it (every 8-row train ring is refund_abuse), so it is a base-rate rule with a
 row cap; one ring has one class, so its rows share one answer.
@@ -22,6 +23,8 @@ REFUND_RING = 2  # rng_shape of a refund-sized round-amount ring
 
 
 def capped_rings(pred, proba, led, log=print, size: int = 8, only_test: bool = True) -> np.ndarray:
+    from ringtrace import rules
+
     pred = np.asarray(pred, dtype=np.int64)
     cols = anchors.family_columns(led, ["rng_shape", "rng_event"])
     shape = cols["rng_shape"].fill_null(0).to_numpy().astype(np.int64)
@@ -29,6 +32,10 @@ def capped_rings(pred, proba, led, log=print, size: int = 8, only_test: bool = T
     is_test = led["is_test"].to_numpy()
     ids, inv, n = np.unique(event, return_inverse=True, return_counts=True)
     at_cap = (event >= 0) & (n[inv] == int(size)) & (shape == REFUND_RING)
+    # a ring with a fraud-phase phone in the refund zone is named by the counter: leave it out
+    c = rules._counter(led)
+    named = np.unique(event[(event >= 0) & (c["block"] == 2) & (c["seg_class"] == REFUND)])
+    at_cap &= ~np.isin(event, named)
     hit = at_cap & (pred == REFUND) & (is_test | (not only_test))
     out = pred.copy()
     out[hit] = COLLU
