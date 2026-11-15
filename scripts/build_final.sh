@@ -42,6 +42,8 @@ if unknown:
 for r in runs:
     print(RECIPE_OF[r], r)
 PY
+  recipe=${recipe%$'\r'}; name=${name%$'\r'}   # Python on Windows ends lines with \r\n
+
   if [[ -f "${RINGTRACE_OUT:-$HOME/outputs}/runs/$name/test.npy" ]]; then
     echo "== member $name: saved arrays found, kept"
     continue

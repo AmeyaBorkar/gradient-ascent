@@ -9,6 +9,8 @@ Every number in these documents was measured; October rows were used only throug
 | Document | What it holds |
 |---|---|
 | [`../README.md`](../README.md) | the approach, the uploads and how to rebuild each one |
+| [`report/GradientAscent_Documentation.pdf`](report/GradientAscent_Documentation.pdf) | the full report: approach, architecture, validation, results (source: `report/*.md`) |
+| [`../video/README.md`](../video/README.md) | the video context pack: story, architecture, validation, uploads, script |
 | [`onboarding.md`](onboarding.md) | code map, how to reproduce results, how the pieces fit |
 | [`decisions.md`](decisions.md) | design decisions and why |
 | [`research.md`](research.md) | sources and prior art |

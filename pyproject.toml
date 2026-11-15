@@ -28,6 +28,7 @@ where = ["src"]
 
 [tool.ruff]
 line-length = 100
+extend-exclude = ["docs/report"]  # the report's PDF and figure builders, not pipeline code
 target-version = "py312"
 
 [tool.ruff.lint]
