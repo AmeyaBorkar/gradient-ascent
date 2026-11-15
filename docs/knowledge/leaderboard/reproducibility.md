@@ -33,6 +33,11 @@ whichever file scores best publicly is the one that must reproduce. Rules and ev
 4. No test row is typed by hand and nothing is fixed for a particular test row; every test label
    comes from code that also runs on the train months, where it is scored. Hard-coded device-counter
    boundaries are forbidden; segments are fitted per split.
+   Stated exceptions in the final recipe: the base-rate rules. `mule_edge`, `counter_news` and
+   `blank_merchant_qr` rest on a test-phase argument that train cannot score, and the cuts of
+   `fresh_bursts` (12 rows, SIM 45 to 50 hours) were set with public reads. Each is a rule in
+   code with a cap on the test rows it may change (`docs/findings/october-events.md`,
+   `docs/decisions.md` item 19).
 5. Validator PASS with no warnings (warnings are a blocker for the final upload); the file's sha256
    recorded with the commit it rebuilds from; a tag per upload.
 6. Features that could be ruled out (the device counter) are one switch-off family, with the

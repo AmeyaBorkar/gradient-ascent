@@ -863,8 +863,10 @@ runs. Public scores are read off the leaderboard. Findings: `docs/findings/octob
 | `stack-burst12-sim45` | `fresh_bursts` (12 rows, SIM 45 to 50 h) | 40: mule_account -> velocity_bot 40 | **0.5556** (best) | `c278490094706e156dc4f4d573989fafda24de896f3a7ec147fb5fc886eb2efc` |
 | `stack-burst13-b8` | `fresh_bursts` (13 rows, 50 h), `border_shift` | 44: mule_account -> velocity_bot 43, 1 border row | 0.5520 | `f51fe71b96c574931d088556ab8b28ce24a66ea4d906c2ae8a69837790ec3659` |
 | `stack-burst20-12-b8` | `fresh_bursts` twice (20 rows; 12 to 14 rows), `border_shift` | 41: mule_account -> velocity_bot 40, 1 border row | not uploaded | `0ff63433a1339be6225b5a0b220efa8c3e010643700746f1da143fda78027e1f` |
-| `stack-burst12-b8-rings8` | as the best, plus `capped_rings` (size 8) | 96: the best's 56, refund_abuse -> merchant_collusion 40 | not uploaded | `37d327ed4848d20eb53c88a19b5faaa7659bca95e97df8481a7e2e330767475b` |
-| `stack-burst13-b8-rings8` | as `stack-burst13-b8`, plus `capped_rings` | 84 | not uploaded | `27a85b3d7d6bcd478963d64483e6bd261a01f11f29cabf47a7045e4515649ff0` |
+| `stack-burst12-b8-rings8` | as the best, plus `capped_rings` (size 8) | 96: the best's 56, refund_abuse -> merchant_collusion 40 | not uploaded; built before `capped_rings` left out rings the counter names refund, so it no longer rebuilds | `37d327ed4848d20eb53c88a19b5faaa7659bca95e97df8481a7e2e330767475b` |
+| `stack-burst13-b8-rings8` | as `stack-burst13-b8`, plus `capped_rings` | 84 | not uploaded; no longer rebuilds, as above | `27a85b3d7d6bcd478963d64483e6bd261a01f11f29cabf47a7045e4515649ff0` |
+| `stack-sim45-b9r2` | as the best, plus `border_shift` (border 9, rank 2) | 42: the best's 40, merchant_collusion -> loan_app_extortion 2 | 0.5556 (tie) | `438e0eb79c7b6a527e90eca7fb36289a853e8d4cec6120cfb9020b1cf91fd474` |
+| `stack-sim45-rings8` | as the best, plus `capped_rings` (size 8) | 64: the best's 40, refund_abuse -> merchant_collusion 24 | 0.5505 | `e7872f85cf6445b6e162748e393b5085c3c17083cc2697580da7eceb73bec4c3` |
 | `stack-burst` | `fresh_bursts` (20 rows, 50 h) | 28 | not uploaded | `303570004c83439811ac0dbbf0317cdd20e9d2e6bea64297ecb1a0676dc2ce57` |
 
 - The compute box rebuilt `counter-news` and `stack-burst12-b8` from the saved member runs with the
@@ -875,6 +877,12 @@ runs. Public scores are read off the leaderboard. Findings: `docs/findings/octob
   wrong (about 0.0013) and the 15-row burst being mule_account (about 0.0010). The two removals
   were not uploaded apart.
 - The compute box built `stack-burst12-sim45` from the saved member runs with the sha256 above.
+- From scratch: a clean tree at `afadf4b` and an empty cache rebuilt the six member runs and
+  `counter-news` in 5,086 s (`scripts/build_final.sh`), byte-identical to the upload. Built on those
+  runs, `stack-burst12-sim45` and `stack-sim45-b9r2` have the sha256 above.
+- `stack-sim45-rings8` lost 0.0051: the three 8-row rings without a fraud-phase phone are
+  refund_abuse, and `capped_rings` is rejected. `stack-sim45-b9r2` tied: neither of its two rows is
+  in the public part, so the move is unread and not adopted.
 - `fresh_bursts` changes 199 train rows at 20 rows and 50 hours, on bursts of which 4 of 9 are
   velocity_bot: it would lose on month folds and is a base-rate rule, not a gated one.
 - Border files alone (`recipes/borders/`, 21 files that change a row): none uploaded.

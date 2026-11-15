@@ -101,7 +101,7 @@ scikit-learn 1.9.1, scipy 1.18.1).
 **What it changes.**
 - **Ordinary rows are out of reach on this data.** Runs aimed at them are not worth spending. A
   new feature family that claims ordinary rows must first lift the `ordinary` AUC clearly above
-  0.5 in both train and October, and leave `shift` at chance (`docs/decisions.md` item 16).
+  0.5 in both train and October, and leave `shift` at chance (`docs/decisions.md` item 18).
 - **Public scores of 0.61 to 0.63 sit above what the data supports.** They need about a thousand
   hidden rows found; whatever produces them is not in the row or relational signal audited here.
 - **The remaining gain is template-side and small:** about 0.007 between the blend's expected

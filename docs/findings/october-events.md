@@ -14,7 +14,7 @@ read off the leaderboard; this repository makes no uploads.
 | `stack-burst13-b8` | the 12-row burst back to mule_account | 0.5520 |
 | `stack-burst12-sim45` | the 15-row burst back to mule_account and the border row removed: `fresh_bursts` at 12 rows and a SIM of 45 to 50 hours, 40 rows | **0.5556** (best) |
 | `stack-burst20-12-b8` | the 15-row burst back to mule_account instead | built, not uploaded |
-| `stack-burst12-b8-rings8` | five merchant rings of 8 rows to merchant_collusion | built, not uploaded |
+| `stack-sim45-rings8` | the best, plus three merchant rings of 8 rows to merchant_collusion (24 rows) | 0.5505 |
 
 ## Fresh bursts (`ringtrace.burstsim`, rule `fresh_bursts`)
 
@@ -70,8 +70,14 @@ Round-amount merchant rings are typed by size. Events by size (measured in this 
 
 At half of train's monthly volume October should hold about 1.7 rings of 8 rows and about 4.3 of
 10 to 19. It holds 5 and 0. The rule reads the excess at the cap as the missing mid-size collusion
-rings and calls the 40 rows of the five 8-row rings merchant_collusion. Train cannot measure it
-(every 8-row train ring is refund_abuse), so it is test-only and capped. Not uploaded yet.
+rings. Train cannot measure it (every 8-row train ring is refund_abuse), so it is test-only and
+capped.
+
+The counter speaks for two of the five rings: they carry a fraud-phase phone in the refund zone
+(in train 4 of 10 such rings do), and October's one ring with a collusion-zone phone has 20 rows or
+more. The rule leaves those two out and moves the other three (24 rows). Uploaded on the best file
+as `stack-sim45-rings8`: public 0.5505 against 0.5556. The three rings are refund_abuse, and the
+rule is rejected.
 
 **Command.**
 

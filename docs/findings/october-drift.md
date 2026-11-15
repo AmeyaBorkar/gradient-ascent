@@ -57,3 +57,6 @@ device counter's density (`docs/findings/density-counter.md` on `feat/noise-dens
 
 **Command.** `python analysis/drift.py --calls <calls.npy>` (about 4 minutes on a laptop CPU with
 the families cached); report in `$RINGTRACE_OUT/drift/drift.json`.
+
+**Correction (15 Nov).** "None missed" holds for bursts on bot-range phones. Two velocity_bot events
+were later found in the mule-burst shape, with no fraud-phase phone (`docs/findings/october-events.md`).
