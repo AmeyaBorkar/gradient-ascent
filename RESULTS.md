@@ -838,3 +838,12 @@ The month-fold gains do not survive at October's density: both combinations are 
 one thinning seed and their October-like lower bounds are below zero. The top-up cut (scaled
 probability >= 0.125) is calibrated on full-density months. None of these recipes is uploaded;
 `bait-edge` stays the final file. `far_segment` changes no train or cell rows, so it cannot be judged.
+
+## Pair templates (`research/boundary-events`, commit `94618d6`): no call changes
+
+`pair_templates` reads each template event's fraud-phase phones through the refined counter's
+posterior restricted to the template's two classes (`docs/findings/pair-templates.md`). Against
+`counter-news`, 24 recipes (`recipes/research/pt-*.json`: pair share 0.6 to 0.9, pair mass 0.5 or
+0.2, all templates or one) change 0 train rows and 0 October rows, so every month-fold and
+October-like number equals the base. Of 354 train and 62 October phones inside template events,
+350 and 61 already carry a confident segment of the pair. Rejected; `counter-news` stays the file.
