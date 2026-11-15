@@ -34,9 +34,9 @@ shifted by a log-normal factor per class. Phones in the wrong zone per block, 24
 
 | class-mix log-sd | refined counter | border model, no length prior | length sd 0.3 | 0.5 | 0.8 |
 |---|---|---|---|---|---|
-| 0 | 11.73 | 11.35 | 9.53 | 10.08 | 10.50 |
-| 0.25 | 11.50 | 11.14 | 10.55 | 10.30 | 10.48 |
-| 0.4 | 11.26 | 10.82 | 12.03 | 10.68 | 10.52 |
+| 0 | 11.66 | 11.04 | 9.14 | 9.84 | 10.25 |
+| 0.25 | 12.37 | 11.89 | 11.22 | 11.07 | 11.28 |
+| 0.4 | 12.00 | 11.54 | 12.16 | 11.27 | 11.18 |
 
 A tight length prior helps only while the mix stays close to train's; at log-sd 0.8 it never
 hurts, which is why 0.8 is fixed in the code. The gain over the refined counter is about one phone
