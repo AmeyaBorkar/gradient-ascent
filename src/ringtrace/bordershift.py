@@ -95,6 +95,7 @@ def border_shift(
     is_test = led["is_test"].to_numpy()
     ch = out != pred
     log(
-        f"  border shift {a}|{b}: train {int((ch & ~is_test).sum())} / test {int((ch & is_test).sum())}"
+        f"  border shift {a}|{b}: train {int((ch & ~is_test).sum())} / "
+        f"test {int((ch & is_test).sum())}"
     )
     return out

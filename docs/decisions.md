@@ -144,3 +144,14 @@ Short records of design choices.
     chance, so the signal is neither absent nor an October-only artefact. `ceiling --submission`
     is run on every candidate file: it gives the file's expected public score from its call
     counts and the October composition, and how far the reachable ceiling lies above it.
+19. **Border changes are judged at the test block's size, not on the train months.** A change that
+    only moves a class border inside a fraud phase (`evidence.borders`, `border_shift`,
+    `counter_news`, `mule_edge`) moves no call in train: the train phase is six times longer and
+    its borders are not in doubt. "No train row changes" is therefore the expected outcome, not a
+    reason to reject, and no month-fold gain is required. The test is calibration: the train phase
+    is thinned to the test phase's size (numbers dropped and closed up, class mix shifted), the
+    border posterior is recomputed, and its probabilities are compared with how often a phone truly
+    lies above each border, pooled and per border. Rows near one border share one answer, so a
+    public score can then settle a border. Model and feature changes keep the full bar (every
+    month, the October-like frames, the paired bootstrap): there each row has its own answer and
+    a public rise can be luck.
