@@ -7,6 +7,10 @@ velocity_bot, layering_chain, sim_swap, account_takeover, phishing_collect, qr_s
 fake_cashback, loan_app_extortion, merchant_collusion), scored by 12-class macro-F1. Train is
 July to September; test is October (260,582 rows). The code is the Python package `ringtrace`.
 
+> **Code frozen** on 15 November 2026 at tag `v1.0`. The best file and every upload below rebuild
+> from that tag. The full report is [`docs/report/GradientAscent_Documentation.pdf`](docs/report/GradientAscent_Documentation.pdf);
+> the video context pack is in [`video/`](video/README.md).
+
 **Best public score: 0.5556** (`stack-burst12-sim45`). It rebuilds byte for byte from this repository:
 
 ```bash

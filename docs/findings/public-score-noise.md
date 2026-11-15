@@ -1,6 +1,6 @@
 # Public-score noise
 
-**Question.** How much does the 30 % public slice (78,175 of 260,583 October rows) move a score,
+**Question.** How much does the 30 % public slice (78,175 of 260,582 October rows) move a score,
 and how big must a gap between two near-identical files be before it means anything?
 
 **Answer.** September stands in for October: cleaned labels, and 2,000 random public slices of

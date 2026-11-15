@@ -24,7 +24,8 @@ whichever file scores best publicly is the one that must reproduce. Rules and ev
 ## What a submission must satisfy (practical checklist)
 
 1. One command rebuilds the file from the committed code (this repo:
-   `python -m ringtrace.build recipes/champion.json`), with data supplied by the organisers.
+   `bash scripts/build_final.sh recipes/stack/stack-burst12-sim45.json <dir>`), with data supplied
+   by the organisers.
 2. Pinned environment: exact library versions (the rebuilds used Python 3.13 and
    xgboost 3.4.1; the blends also lightgbm 4.7.0 and catboost 1.2.10; polars 2.1.0, numpy 2.5.4).
 3. The best public file's whole recipe is in the code: if it is a blend, every member, seed count,
@@ -75,8 +76,8 @@ not bit-reproducible (atomics), another reason to keep such models out of the fi
 
 ## Open points to settle next
 
-- Which of the tied best-public files (uploads 4 and 5 in [uploads.md](uploads.md)) will be
-  re-run, and whether its full recipe is in the code that will be submitted.
+- Settled: the best public file is `stack-burst12-sim45` (0.5556); its recipe and every member
+  recipe are in the submitted code, and it rebuilds byte for byte.
 - Whether the device counter is acceptable to the organisers; if not, switch it off and accept the
   measured loss (about 0.03 macro-F1, measured in this repo as 0.028 in the ablation).
 - Whether the approach note and the repository link have been submitted before the deadline.

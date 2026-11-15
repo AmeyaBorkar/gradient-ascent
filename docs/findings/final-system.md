@@ -1,5 +1,8 @@
 # The final system: one recipe, the evidence for each component, and the stress tests
 
+> Historical: this finding chose `recipes/final.json` on 14 Nov. The best upload is now
+> `stack-burst12-sim45` (public 0.5556), built on `final-half`; see the README.
+
 **Question.** Which combination of members, training variant, weights, decoder and rules should
 make the October file, chosen only on offline evidence, and does it generalise?
 
