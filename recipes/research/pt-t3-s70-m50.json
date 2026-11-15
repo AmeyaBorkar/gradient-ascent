@@ -1,0 +1,102 @@
+{
+ "name": "pt-t3-s70-m50",
+ "members": [
+  {
+   "name": "champion",
+   "run": "blend-champion-m1",
+   "variant": "fold",
+   "cells": "champion"
+  },
+  {
+   "name": "lgbm",
+   "run": "lgbm",
+   "variant": "fold",
+   "cells": "lgbm"
+  },
+  {
+   "name": "catboost",
+   "run": "catboost",
+   "variant": "fold",
+   "cells": "catboost"
+  },
+  {
+   "name": "clean-event",
+   "run": "clean-event",
+   "variant": "fold",
+   "cells": "clean-event"
+  },
+  {
+   "name": "clean-l2",
+   "run": "clean-l2",
+   "variant": "fold",
+   "cells": "clean-l2"
+  },
+  {
+   "name": "tabm",
+   "run": "final-tabm",
+   "variant": "fold",
+   "cells": "tabm",
+   "role": "fraud"
+  }
+ ],
+ "weights": {
+  "mode": "fixed",
+  "values": {
+   "champion": 0.1,
+   "lgbm": 0.1,
+   "catboost": 0.1,
+   "clean-event": 0.1,
+   "clean-l2": 0.1,
+   "tabm": 0.5
+  }
+ },
+ "decoder": {
+  "fraud_scale": 0.875
+ },
+ "rule_counter": "refined",
+ "rules": [
+  {
+   "name": "pair_templates",
+   "min_share": 0.7,
+   "min_mass": 0.5,
+   "templates": [
+    3
+   ]
+  },
+  "bait_roles",
+  {
+   "name": "first_pay",
+   "operator_receiver": true
+  }
+ ],
+ "base_rate_rules": [
+  {
+   "name": "blank_merchant_qr",
+   "max_october_rows": 40
+  },
+  {
+   "name": "mule_edge",
+   "max_october_rows": 25
+  },
+  {
+   "name": "far_segment",
+   "max_october_rows": 5
+  },
+  {
+   "name": "legit_topup",
+   "classes": {
+    "qr_swap": 0.125
+   },
+   "max_october_rows": 2
+  },
+  {
+   "name": "just_under_pay",
+   "max_october_rows": 1
+  },
+  {
+   "name": "counter_news",
+   "min_post": 0.7,
+   "max_october_rows": 10
+  }
+ ]
+}
