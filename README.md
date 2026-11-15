@@ -11,6 +11,8 @@ July to September; test is October (260,582 rows). The code is the Python packag
 > from that tag. The full report is [`docs/report/GradientAscent_Documentation.pdf`](docs/report/GradientAscent_Documentation.pdf);
 > the video context pack is in [`video/`](video/README.md).
 
+**Notebook:** [`notebooks/GradientAscent_reproduce.ipynb`](notebooks/GradientAscent_reproduce.ipynb) rebuilds the best upload step by step ([open in Colab](https://colab.research.google.com/github/AmeyaBorkar/gradient-ascent/blob/main/notebooks/GradientAscent_reproduce.ipynb)).
+
 **Best public score: 0.5556** (`stack-burst12-sim45`). It rebuilds byte for byte from this repository:
 
 ```bash
