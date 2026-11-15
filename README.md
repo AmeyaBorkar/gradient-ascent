@@ -1,50 +1,72 @@
-# ringtrace
+# GradientAscent · UPI Fraud Rings
 
-A pipeline for the "UPI Fraud Rings" datathon: label every October transaction with
-one of 12 classes (legit + 11 fraud types), scored by macro-F1. Train is July-September, test is
-October.
+**Team:** GradientAscent  ·  **Member:** Ameya Borkar
 
-The submission is an **equal-weight blend of five cascade models**. Each member is a cascade
-(P(fraud) x P(type | fraud)) over the same 230 label-free features (relational windows plus seven
-evidence families and the device-number counter), averaged over three seeds (0, 1, 2) on
-leave-one-month-out folds: out-of-fold probabilities on train rows, the mean of the three fold
-models on October.
+Label every October 2026 UPI payment as `legit` or one of 11 fraud types (mule_account,
+velocity_bot, layering_chain, sim_swap, account_takeover, phishing_collect, qr_swap, refund_abuse,
+fake_cashback, loan_app_extortion, merchant_collusion), scored by 12-class macro-F1. Train is
+July to September; test is October (260,582 rows). The code is the Python package `ringtrace`.
 
-| # | member | model | training labels | recipe |
-|---|---|---|---|---|
-| 1 | `champion` | XGBoost cascade | given | `recipes/champion.json` |
-| 2 | `lgbm` | LightGBM cascade | given | `recipes/lgbm.json` |
-| 3 | `catboost` | CatBoost cascade | given | `recipes/catboost.json` |
-| 4 | `clean-event` | XGBoost cascade | event-cleaned | `recipes/clean-event.json` |
-| 5 | `clean-l2` | XGBoost cascade | event-cleaned + noise-floor flips | `recipes/clean-l2.json` |
+**Best public score: 0.5532** (`stack-burst12-b8`). It rebuilds byte for byte from this repository:
 
-The blend (`recipes/blend.json`, `ringtrace.blend`) is the arithmetic mean of the five members'
-probabilities with weights 1/5. It is decoded per month, October on its own: the label-free
-fixed point for expected macro-F1 at fraud scale 0.875, then the counter-anchored template rule,
-the same decoder and rule as the champion recipe.
+```bash
+python -m ringtrace.final build recipes/stack/stack-burst12-b8.json --out <dir>
+# sha256 a9a3e35d0baca7fc2f92e1ddcd206b51883b3c105dffe3d706756b79226ed20b
+```
 
-## One command
+## The approach on one page
 
-On a machine with the organisers' files in `~/data` (or `RINGTRACE_DATA`), a CUDA GPU and
-Python 3.13, from a clean checkout and an empty cache:
+| Layer | What it does |
+|---|---|
+| **Label-free evidence** | Rebuilds the generator's fraud routines from how rows connect (accounts, phones, receivers, time), inside each split and without labels: layering hops and mule fan-ins with onward transfers, bot sessions on shared devices, balance drains stepping by a fixed fraction, collect requests and cashback baits, repeat refund and lending chains, round-amount merchant rings |
+| **Device-number counter** | Fresh phones are numbered in creation order. Each split has a bot pool, a fraud phase written class by class and a dense legit block. An 11-state left-to-right HMM segments the fraud phase, so a phone's position certifies fraud rows that look ordinary and gives their type; the refined counter also reads each phone's allocation geometry (the unused numbers below it and its row count) |
+| **Features** | About 230 per row: relational windows, the evidence columns and the counter columns |
+| **Members** | Five two-stage boosted cascades, P(fraud) x P(type given fraud): XGBoost on the given labels, LightGBM, CatBoost and XGBoost on two event-cleaned label sets. Plus a TabM network. Three seeds each, fitted on whole months as folds |
+| **Mix** | The type split is the mean of the five trees; the legit-against-fraud split is half TabM and a tenth from each tree |
+| **Decoder** | An expected-macro-F1 fixed point, each month decoded on its own. Fraud probabilities are divided by 0.875, because train labels miss about 12 % of fraud and test labels are clean |
+| **Rules** | Look-alike templates take their counter segment or anchor's class; operator-role bait rules; then base-rate rules, each with a cap on the October rows it may change: the counter's class borders and edges, counter news, fresh-SIM bursts |
+
+## How every change was judged
+
+- **Month folds:** leave-one-month-out on the given labels, on cleaned labels from an independent
+  teacher and on generator-only labels, with a paired bootstrap over label-free events.
+- **October-like frames:** September thinned to October's density, with the device counter
+  rebuilt as its own pass, exactly as October's is built.
+- **Labelled counter passes:** the counter's boundaries are scored on train passes at October's
+  size.
+- A change is adopted only when it is non-negative in every held-out month and its lower bound
+  is above zero; a tie goes to the simpler file. Changes that train cannot measure (one October
+  event or one border) are judged by calibration at the test phase's size; the cuts of the
+  fresh-SIM burst rule in the best file were set with public reads, as
+  `docs/findings/october-events.md` states.
+
+## Uploads
+
+| File | What changed | Public |
+|---|---|---|
+| `final-half` + blank-QR rule | TabM sets half of the legit-against-fraud split | 0.5499 |
+| `bait-combo` | operator-role bait rules, 7 rows | 0.5502 |
+| `bait-edge` | the counter's mule / bot edge, 10 rows | 0.5506 |
+| `research-combo-2` | three small base-rate rules, 4 rows | 0.5506 |
+| `counter-news` | the refined counter in the rules, 4 rows | 0.5516 |
+| `stack-burst-b8` | one 28-row burst to velocity_bot, 1 border row | 0.5531 |
+| **`stack-burst12-b8`** | two more bursts (15 and 12 rows) | **0.5532** |
+
+The documents that hold the evidence are indexed in [`docs/README.md`](docs/README.md).
+
+## One command, from a clean checkout
+
+On a machine with the organisers' files in `~/data` (or `RINGTRACE_DATA`), a CUDA GPU and Python
+3.13, with an empty cache:
 
 ```bash
 uv venv --python 3.13 ~/venv && VIRTUAL_ENV=~/venv uv pip install -e ".[dev]"
-RINGTRACE_THREADS=4 bash scripts/build_submission.sh recipes/blend.json --final
+RINGTRACE_THREADS=8 bash scripts/build_final.sh recipes/stack/stack-burst12-b8.json <dir>
 ```
 
-This builds every feature family (cached by content hash under `~/cache/ringtrace`), freezes the
-cleaned labels used for scoring, runs the five member recipes
-(`python -m ringtrace.run <recipe> --name <run>`, each retried if the shared GPU runs out of
-memory), then `python -m ringtrace.blend recipes/blend.json --final`: it checks every member's
-shapes and row alignment, averages, decodes, scores the blend and each member on the given,
-cleaned and gen-only labels per held-out month, and writes the submission in the sample's id
-order, validated against `sample_submission.csv`, to `~/outputs/runs/blend/submission.csv` (and,
-with `--final`, `~/outputs/submission.csv`). `summary.json` next to it holds the scores, the
-sha256, the October calls per class and the rows changed against each member's own decode.
-
-A single member: `python -m ringtrace.build recipes/champion.json` (features, cleaned labels,
-run, validated submission).
+This builds every feature family (cached by content hash), freezes the cleaned labels used for
+scoring, runs the six member recipes behind the recipe's runs and builds the October file,
+validated against `sample_submission.csv`. About 90 minutes on one RTX 5060 Ti.
 
 ## Reproduce the uploaded files
 
@@ -101,10 +123,11 @@ in another environment) differ slightly from the rebuild's (oof sha256 `5bef8fbc
 `a78a87a1...`); no October call of the final file moves. CatBoost on the GPU is not
 bit-reproducible either (decision 14); it also moved no call here.
 
-## Results
+## Member results
 
-Leave-one-month-out macro-F1 (train on two months, score the third), after the fixed point and
-the template rule; mean of July / August / September. Details per month in `RESULTS.md`.
+Leave-one-month-out macro-F1 of each tree member and of their early equal-weight blend (train on
+two months, score the third), after the fixed point and the template rule; mean of July / August /
+September. Details per month in `RESULTS.md`.
 
 | model | given | cleaned | gen-only | wall |
 |---|---|---|---|---|
@@ -118,7 +141,7 @@ the template rule; mean of July / August / September. Details per month in `RESU
 The submission (`~/outputs/runs/blend/submission.csv`) has 260,582 rows in the sample's id order
 and sha256 `c3af1418ffab08f7843b1813359ad7353ee0ac6676f4293609d3cf530a696c05`.
 
-## Verifying the submission
+## Verifying the early five-member blend
 
 ```bash
 sha256sum ~/outputs/runs/blend/submission.csv          # or ~/outputs/submission.csv after --final
@@ -173,7 +196,7 @@ Recipes are JSON files in `recipes/`. Results of every run are in `RESULTS.md`, 
 Train rows may be inspected; test rows are used only through code and aggregates. No external
 data, no leaderboard uploads from here, no data or model files in git.
 
-## Working with the compute box
+## Working with a remote GPU machine
 
 `scripts/ship.sh` copies the committed tree to `~/work/$RINGTRACE_BOX_DIR`; `scripts/launch.sh
 <name> <command>` starts a job in tmux from its own copy of that tree, logging to
