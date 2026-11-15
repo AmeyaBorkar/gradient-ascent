@@ -30,9 +30,9 @@ Phones inside template events, under the refined counter the rules read (aggrega
 - The event already enters the counter as an anchor emission, so the posterior at an event's
   phone is decided: the second class's share inside the pair is below 0.05 or above 0.95 on all
   but five train phones and one October phone.
-- The four undecided mule-burst phones in train and the one drain phone in October do not flip an
-  event: two hold almost no pair mass, and the others sit on the template's own class or in an
-  event another phone already anchors.
+- In train, two more mule-burst phones hold under 0.2 of their posterior in the pair, and two
+  have a segment of the pair below confidence 0.8; in October one drain phone holds 0.2 to 0.5
+  of its posterior in the pair. None of these changes an event's call at any tested threshold.
 - The errors that remain in the shared templates are in events with **no** fraud-phase phone.
   A row draws a new phone with probability 0.03, so most events have none, and the counter cannot
   speak for them at any threshold.
