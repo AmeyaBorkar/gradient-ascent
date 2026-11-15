@@ -63,6 +63,10 @@ def ring_frame() -> tuple[pl.DataFrame, np.ndarray]:
             "is_test": np.isin(ev, (0, 1, 3)),
             "rng_shape": pl.Series(np.where(ev == 3, 3, 2), dtype=pl.Int8),
             "rng_event": pl.Series(ev, dtype=pl.Int64),
+            "ctr_block": pl.Series([0] * len(ev), dtype=pl.Int8),
+            "ctr_seg": [float("nan")] * len(ev),
+            "ctr_conf": [float("nan")] * len(ev),
+            "ctr_dev_rows": pl.Series([1] * len(ev), dtype=pl.Int32),
         }
     )
     pred = np.full(len(ev), REFUND, dtype=np.int64)
@@ -94,3 +98,13 @@ def test_fresh_bursts_lower_sim_cut():
     )
     ev = led["mf_event"].to_numpy()
     assert (out[ev == 0] == BOT).all() and (out[ev == 1] == MULE).all()
+
+
+def test_capped_rings_leave_out_a_ring_the_counter_names_refund():
+    led, pred = ring_frame()
+    block = led["ctr_block"].to_numpy().copy()
+    seg = led["ctr_seg"].to_numpy().copy()
+    block[1], seg[1] = 2, 7.0  # one row of event 0 on a fraud-phase phone in the refund zone
+    led = led.with_columns(pl.Series("ctr_block", block, dtype=pl.Int8), pl.Series("ctr_seg", seg))
+    out = ringsize.capped_rings(pred, None, led, log=lambda *_: None)
+    assert (out == pred).all()
