@@ -64,3 +64,12 @@ counter-anchored template rule.
 - [x] Current best idea: `bait-combo` (lone Rs 10 from an operator; first-time whole-rupee PAY
       of Rs 1,000 or more to an operator): cleaned +0.00029 / +0.00017 / +0.00016, nine cells
       +0.00018 (lb +0.00005), 7 October rows legit -> phishing_collect. The plain PAY rule fails.
+
+## October borders and events (15 Nov)
+- [x] Border posteriors on the number line (`evidence.borders`), validated on train blocks thinned
+      to October's size: calibrated when pooled, biased at two borders
+      (`docs/findings/october-borders.md`).
+- [x] `fresh_bursts` and `border_shift` on top of `counter-news`: `stack-burst12-b8`, public 0.5532,
+      the best upload (`docs/findings/october-events.md`).
+- [x] `pair_templates`: no call changes, rejected (`docs/findings/pair-templates.md`).
+- [ ] `capped_rings` (five 8-row merchant rings as merchant_collusion): built, not uploaded.

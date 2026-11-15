@@ -155,3 +155,7 @@ Short records of design choices.
     public score can then settle a border. Model and feature changes keep the full bar (every
     month, the October-like frames, the paired bootstrap): there each row has its own answer and
     a public rise can be luck.
+    The same holds for a rule that names one look-alike event without a fraud-phase phone
+    (`fresh_bursts`, `capped_rings`): one event has one class, so a public score reads the whole
+    event. Such a rule is a base-rate rule with a row cap; its train precision is reported beside
+    it (`docs/findings/october-events.md`), and a cut set with a public read is stated as such.

@@ -847,3 +847,30 @@ posterior restricted to the template's two classes (`docs/findings/pair-template
 0.2, all templates or one) change 0 train rows and 0 October rows, so every month-fold and
 October-like number equals the base. Of 354 train and 62 October phones inside template events,
 350 and 61 already carry a confident segment of the pair. Rejected; `counter-news` stays the file.
+
+## October border and event rules on top of `counter-news` (`feat/october-events`)
+
+Each file is `counter-news` plus the base-rate rules named, built with
+`python -m ringtrace.final build recipes/stack/<name>.json --out <dir>` from the same six member
+runs. Public scores are read off the leaderboard. Findings: `docs/findings/october-events.md`,
+`docs/findings/october-borders.md`.
+
+| file | rules added | October rows against `counter-news` | public | sha256 |
+|---|---|---|---|---|
+| `counter-news` | - | - | 0.5516 | `b8c3183ab76d9c0730cd8d60dba60c36f8647633937b2a639a560accb0967799` |
+| `stack-burst-b8` | `fresh_bursts` (20 rows, 50 h), `border_shift` (border 8, rank 0) | 29: mule_account -> velocity_bot 28, loan_app_extortion -> fake_cashback 1 | 0.5531 | `31251e77f9607c417cfa4c14375e7501908d5c6a091423e5d18a061076eb63d3` |
+| `stack-burst12-b8` | `fresh_bursts` (12 rows, 50 h), `border_shift` | 56: mule_account -> velocity_bot 55, loan_app_extortion -> fake_cashback 1 | **0.5532** (best) | `a9a3e35d0baca7fc2f92e1ddcd206b51883b3c105dffe3d706756b79226ed20b` |
+| `stack-burst13-b8` | `fresh_bursts` (13 rows, 50 h), `border_shift` | 44: mule_account -> velocity_bot 43, 1 border row | 0.5520 | `f51fe71b96c574931d088556ab8b28ce24a66ea4d906c2ae8a69837790ec3659` |
+| `stack-burst20-12-b8` | `fresh_bursts` twice (20 rows; 12 to 14 rows), `border_shift` | 41: mule_account -> velocity_bot 40, 1 border row | not uploaded | `0ff63433a1339be6225b5a0b220efa8c3e010643700746f1da143fda78027e1f` |
+| `stack-burst12-b8-rings8` | as the best, plus `capped_rings` (size 8) | 96: the best's 56, refund_abuse -> merchant_collusion 40 | not uploaded | `37d327ed4848d20eb53c88a19b5faaa7659bca95e97df8481a7e2e330767475b` |
+| `stack-burst13-b8-rings8` | as `stack-burst13-b8`, plus `capped_rings` | 84 | not uploaded | `27a85b3d7d6bcd478963d64483e6bd261a01f11f29cabf47a7045e4515649ff0` |
+| `stack-burst` | `fresh_bursts` (20 rows, 50 h) | 28 | not uploaded | `303570004c83439811ac0dbbf0317cdd20e9d2e6bea64297ecb1a0676dc2ce57` |
+
+- The compute box rebuilt `counter-news` and `stack-burst12-b8` from the saved member runs with the
+  sha256 above (the second at commit `a0b6ed1`).
+- Read of the three public scores: the 28-row burst and the 12-row burst are velocity_bot, the
+  15-row burst is mule_account. The border row has not been read on its own.
+- `fresh_bursts` changes 199 train rows at 20 rows and 50 hours, on bursts of which 4 of 9 are
+  velocity_bot: it would lose on month folds and is a base-rate rule, not a gated one.
+- Border files alone (`recipes/borders/`, 21 files that change a row): none uploaded.
+- `pair_templates` (24 recipes): 0 rows changed, rejected (section above).
