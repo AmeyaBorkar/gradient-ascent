@@ -92,6 +92,9 @@ probability 0.01 or more:
   fake_cashback, about 0.7 to 0.8 after calibration). It is part of the stacked files in
   `docs/findings/october-events.md`. The step that later removed it, together with one burst,
   gained 0.0024 on public, which fits this row being public and wrong; it is not in the best file.
+- Also uploaded: the 2-row loan_app_extortion \| merchant_collusion move (`border: 9, rank: 2`) on
+  the best file, as `stack-sim45-b9r2`. It tied at 0.5556: neither row is in the public part, so the
+  move is unread and not adopted.
 
 ## How border changes are judged
 

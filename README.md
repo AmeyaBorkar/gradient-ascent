@@ -53,6 +53,8 @@ python -m ringtrace.final build recipes/stack/stack-burst12-sim45.json --out <di
 | `stack-burst12-b8` | two more bursts (15 and 12 rows) | 0.5532 |
 | `stack-burst13-b8` | the 12-row burst back to mule_account | 0.5520 |
 | **`stack-burst12-sim45`** | the 15-row burst back to mule_account, the border row removed | **0.5556** |
+| `stack-sim45-b9r2` | 2 rows at the loan_app_extortion / merchant_collusion border | 0.5556 (tie: neither row is public) |
+| `stack-sim45-rings8` | three merchant rings of 8 rows as merchant_collusion | 0.5505 |
 
 The documents that hold the evidence are indexed in [`docs/README.md`](docs/README.md).
 
@@ -62,13 +64,18 @@ On a machine with the organisers' files in `~/data` (or `RINGTRACE_DATA`), a CUD
 3.13, with an empty cache:
 
 ```bash
-uv venv --python 3.13 ~/venv && VIRTUAL_ENV=~/venv uv pip install -e ".[dev]"
+uv venv --python 3.13 ~/venv && VIRTUAL_ENV=~/venv uv pip install -e ".[dev,nn]"
 RINGTRACE_THREADS=8 bash scripts/build_final.sh recipes/stack/stack-burst12-sim45.json <dir>
 ```
 
 This builds every feature family (cached by content hash), freezes the cleaned labels used for
 scoring, runs the six member recipes behind the recipe's runs and builds the October file,
-validated against `sample_submission.csv`. About 90 minutes on one RTX 5060 Ti.
+validated against `sample_submission.csv`. About 90 minutes on one RTX 5060 Ti. The `nn` extra
+installs torch for the TabM member.
+
+Measured on 15 Nov: a clean tree and an empty cache rebuilt the six member runs and `counter-news`
+in 5,086 s, byte-identical to the upload (sha256 `b8c3183a...967799`). `stack-burst12-sim45` and
+`stack-sim45-b9r2`, built on those runs, have their uploaded sha256.
 
 ## Reproduce the uploaded files
 
@@ -83,6 +90,7 @@ python -m ringtrace.final build recipes/counter-news.json --out <dir>  # sha256 
 python -m ringtrace.final build recipes/stack/stack-burst-b8.json --out <dir>    # sha256 31251e77...76eb63d3 (public 0.5531)
 python -m ringtrace.final build recipes/stack/stack-burst12-b8.json --out <dir>  # sha256 a9a3e35d...226ed20b (public 0.5532)
 python -m ringtrace.final build recipes/stack/stack-burst12-sim45.json --out <dir>  # sha256 c2784900...86eb2efc (best public, 0.5556)
+python -m ringtrace.final build recipes/stack/stack-sim45-b9r2.json --out <dir>     # sha256 438e0eb7...f91fd474 (public 0.5556, tied)
 python -m ringtrace.final build recipes/bait-combo.json --out <dir>   # sha256 3b25869e...e1974
 python -m ringtrace.final build recipes/final-half.json --out <dir>   # sha256 8a461426...fb926eb
 ```
@@ -171,7 +179,7 @@ October rows. Compare such a rebuild through the scores and October calls in `su
   BLAS/OpenMP and the boosters).
 - Wall times: as in the table above, with the GPU shared by other jobs; building every feature
   family into an empty cache adds about 40 s (all nine families; the cleaned labels are built once, a few minutes). The one command runs the members one after
-  another: about an hour in total.
+  another: about 85 to 95 minutes in total.
 
 ## Layout
 

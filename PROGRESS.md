@@ -32,7 +32,7 @@ counter-anchored template rule.
       paired-bootstrap gate (`docs/decisions.md` item 13).
 - [x] Knowledge base in `docs/knowledge/` (data, modeling, experiments, leaderboard) and
       `docs/onboarding.md`.
-- [x] Signal audits (`python -m ringtrace.audit`, `docs/decisions.md` item 16): ordinary-looking
+- [x] Signal audits (`python -m ringtrace.audit`, `docs/decisions.md` item 18): ordinary-looking
       fraud carries no signal in train (AUC 0.490) or October (0.490); October's reachable ceiling is
       about 0.556; the blend's expected public score from its call counts is 0.5475 (public 0.5474)
       (`docs/findings/ordinary-rows-audit.md`).
@@ -73,4 +73,7 @@ counter-anchored template rule.
       (`docs/findings/october-events.md`). The `border_shift` row of `stack-burst12-b8` (0.5532) was
       removed.
 - [x] `pair_templates`: no call changes, rejected (`docs/findings/pair-templates.md`).
-- [ ] `capped_rings` (five 8-row merchant rings as merchant_collusion): built, not uploaded.
+- [x] `capped_rings` (8-row merchant rings as merchant_collusion): three rings uploaded, public
+      0.5505 against 0.5556, rejected.
+- [x] From-scratch rebuild: a clean tree and an empty cache give the uploaded sha256 of
+      `counter-news`, `stack-burst12-sim45` and `stack-sim45-b9r2`.
