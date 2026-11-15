@@ -96,6 +96,7 @@ def _calibration(args):
 
 
 def replay(blocks: int) -> None:
+    phase_tables()  # built once here; the pool's workers inherit it
     for sd in MIX_SD:
         with Pool() as pool:
             got = pool.map(_replay, [(s, sd) for s in range(blocks)], chunksize=2)
@@ -104,6 +105,7 @@ def replay(blocks: int) -> None:
 
 
 def calibration(blocks: int) -> None:
+    phase_tables()
     for sd in MIX_SD[:2]:
         with Pool() as pool:
             got = pool.map(_calibration, [(s, sd) for s in range(blocks)], chunksize=2)
