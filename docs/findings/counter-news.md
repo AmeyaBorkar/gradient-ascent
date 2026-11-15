@@ -91,6 +91,9 @@ lost 0.0009 on public, which cannot tell which of its phones were wrong.
 
 ## October
 
+Uploaded as `counter-news.csv`: public **0.5516**, against 0.5506 for `research-combo-2` (+0.0010).
+Three of the four rows sit on one phone, so the public rows also speak for its private ones.
+
 The change against `research-combo-2` is 4 rows:
 
 | move | rows | why |
