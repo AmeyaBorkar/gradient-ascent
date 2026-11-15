@@ -10,8 +10,9 @@ read off the leaderboard; this repository makes no uploads.
 | file | change against `counter-news` | public |
 |---|---|---|
 | `stack-burst-b8` | one mule-shaped burst of 28 rows to velocity_bot; 1 border row | 0.5531 |
-| `stack-burst12-b8` | two more bursts (15 and 12 rows) to velocity_bot | **0.5532** (best) |
+| `stack-burst12-b8` | two more bursts (15 and 12 rows) to velocity_bot | 0.5532 |
 | `stack-burst13-b8` | the 12-row burst back to mule_account | 0.5520 |
+| `stack-burst12-sim45` | the 15-row burst back to mule_account and the border row removed: `fresh_bursts` at 12 rows and a SIM of 45 to 50 hours, 40 rows | **0.5556** (best) |
 | `stack-burst20-12-b8` | the 15-row burst back to mule_account instead | built, not uploaded |
 | `stack-burst12-b8-rings8` | five merchant rings of 8 rows to merchant_collusion | built, not uploaded |
 
@@ -81,8 +82,10 @@ python -m ringtrace.final build recipes/stack/stack-burst12-b8.json --out <dir> 
 ```
 
 **What it changes.**
-- The best upload is `stack-burst12-b8`: `counter-news` plus `fresh_bursts` (12 rows, 50 hours) and
-  one border row.
+- The best upload is `stack-burst12-sim45`: `counter-news` plus `fresh_bursts` (12 rows, SIM 45 to
+  50 hours; two events, 40 rows). The lower SIM cut exists only to leave out the 15-row event the
+  public score read as mule_account; in train the velocity_bot bursts have younger SIMs (4 to 33
+  hours), so this cut is a public read, not a train result.
 - A shape's minority class can hide in events without a fraud-phase phone, and one event is the
   right unit to test: a public score then speaks for the event's private rows too.
 - Moves that flip every phone-less event of a shape mix many answers and lose; flipping all

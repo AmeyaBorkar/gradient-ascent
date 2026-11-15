@@ -90,7 +90,8 @@ probability 0.01 or more:
   public, and was dropped.
 - In the uploads: `border_shift` with `border: 8, rank: 0` (1 row, loan_app_extortion to
   fake_cashback, about 0.7 to 0.8 after calibration). It is part of the stacked files in
-  `docs/findings/october-events.md`; its row has not been read on its own.
+  `docs/findings/october-events.md`. The step that later removed it, together with one burst,
+  gained 0.0024 on public, which fits this row being public and wrong; it is not in the best file.
 
 ## How border changes are judged
 

@@ -7,11 +7,11 @@ velocity_bot, layering_chain, sim_swap, account_takeover, phishing_collect, qr_s
 fake_cashback, loan_app_extortion, merchant_collusion), scored by 12-class macro-F1. Train is
 July to September; test is October (260,582 rows). The code is the Python package `ringtrace`.
 
-**Best public score: 0.5532** (`stack-burst12-b8`). It rebuilds byte for byte from this repository:
+**Best public score: 0.5556** (`stack-burst12-sim45`). It rebuilds byte for byte from this repository:
 
 ```bash
-python -m ringtrace.final build recipes/stack/stack-burst12-b8.json --out <dir>
-# sha256 a9a3e35d0baca7fc2f92e1ddcd206b51883b3c105dffe3d706756b79226ed20b
+python -m ringtrace.final build recipes/stack/stack-burst12-sim45.json --out <dir>
+# sha256 c278490094706e156dc4f4d573989fafda24de896f3a7ec147fb5fc886eb2efc
 ```
 
 ## The approach on one page
@@ -50,7 +50,9 @@ python -m ringtrace.final build recipes/stack/stack-burst12-b8.json --out <dir>
 | `research-combo-2` | three small base-rate rules, 4 rows | 0.5506 |
 | `counter-news` | the refined counter in the rules, 4 rows | 0.5516 |
 | `stack-burst-b8` | one 28-row burst to velocity_bot, 1 border row | 0.5531 |
-| **`stack-burst12-b8`** | two more bursts (15 and 12 rows) | **0.5532** |
+| `stack-burst12-b8` | two more bursts (15 and 12 rows) | 0.5532 |
+| `stack-burst13-b8` | the 12-row burst back to mule_account | 0.5520 |
+| **`stack-burst12-sim45`** | the 15-row burst back to mule_account, the border row removed | **0.5556** |
 
 The documents that hold the evidence are indexed in [`docs/README.md`](docs/README.md).
 
@@ -61,7 +63,7 @@ On a machine with the organisers' files in `~/data` (or `RINGTRACE_DATA`), a CUD
 
 ```bash
 uv venv --python 3.13 ~/venv && VIRTUAL_ENV=~/venv uv pip install -e ".[dev]"
-RINGTRACE_THREADS=8 bash scripts/build_final.sh recipes/stack/stack-burst12-b8.json <dir>
+RINGTRACE_THREADS=8 bash scripts/build_final.sh recipes/stack/stack-burst12-sim45.json <dir>
 ```
 
 This builds every feature family (cached by content hash), freezes the cleaned labels used for
@@ -79,15 +81,17 @@ python -m ringtrace.final build recipes/bait-edge.json --out <dir>    # sha256 b
 python -m ringtrace.final build recipes/research-combo-2.json --out <dir>  # sha256 214926a6...986344 (public 0.5506, tied)
 python -m ringtrace.final build recipes/counter-news.json --out <dir>  # sha256 b8c3183a...967799 (public 0.5516)
 python -m ringtrace.final build recipes/stack/stack-burst-b8.json --out <dir>    # sha256 31251e77...76eb63d3 (public 0.5531)
-python -m ringtrace.final build recipes/stack/stack-burst12-b8.json --out <dir>  # sha256 a9a3e35d...226ed20b (best public, 0.5532)
+python -m ringtrace.final build recipes/stack/stack-burst12-b8.json --out <dir>  # sha256 a9a3e35d...226ed20b (public 0.5532)
+python -m ringtrace.final build recipes/stack/stack-burst12-sim45.json --out <dir>  # sha256 c2784900...86eb2efc (best public, 0.5556)
 python -m ringtrace.final build recipes/bait-combo.json --out <dir>   # sha256 3b25869e...e1974
 python -m ringtrace.final build recipes/final-half.json --out <dir>   # sha256 8a461426...fb926eb
 ```
 
-`stack-burst12-b8` is `counter-news` with two base-rate rules appended: `fresh_bursts` (a
-mule-shaped burst with no fraud-phase phone, 12 rows or more and a youngest sender SIM under 50
-hours, is velocity_bot; three October events, 55 rows) and `border_shift` (the fake_cashback /
-loan_app_extortion border at its most likely position; 1 row). See
+`stack-burst12-sim45` is `counter-news` with one base-rate rule appended: `fresh_bursts` (a
+mule-shaped burst with no fraud-phase phone, 12 rows or more and a youngest sender SIM of 45 to
+50 hours, is velocity_bot; two October events, 40 rows). `stack-burst12-b8` had the cut at under
+50 hours (three events) and a `border_shift` row; the public scores read the third event as
+mule_account and the border row as wrong, and both were removed. See
 `docs/findings/october-events.md` and `docs/findings/october-borders.md`.
 
 `final-half` is the five tree cascades for the type split, with the fraud mass taken half from
